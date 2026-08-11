@@ -1,0 +1,310 @@
+// Prisma schema — PetCare shop management system
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  ADMIN // สิทธิ์เต็ม (จัดการบัญชีธนาคาร + ผู้ใช้งานได้)
+  USER // พนักงานทั่วไป
+}
+
+enum Species {
+  DOG
+  CAT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum ServiceCategory {
+  BATH // อาบน้ำ
+  GROOMING // ตัดขน
+  BOARDING // ฝากเลี้ยง
+  OTHER
+}
+
+enum RoomSize {
+  SMALL
+  MEDIUM
+  LARGE
+  XLARGE
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // รอชำระเงิน
+  PAID // ชำระแล้ว
+  IN_PROGRESS // กำลังดำเนินการ
+  COMPLETED // เสร็จสิ้น
+  CANCELLED // ยกเลิก
+}
+
+enum OrderItemType {
+  SERVICE
+  ROOM
+  PRODUCT
+}
+
+enum PaymentMethod {
+  PROMPTPAY
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING // ยังไม่ได้ชำระ / รอสร้าง QR
+  SUBMITTED // ลูกค้าอัปโหลดสลิปแล้ว รอตรวจ
+  VERIFIED // ยืนยันแล้ว
+  REJECTED // ปฏิเสธ
+  EXPIRED // QR หมดอายุ
+}
+
+enum ProductTarget {
+  PET // ของสัตว์
+  HUMAN // ของคน (คาเฟ่ - ไว้รองรับอนาคต)
+}
+
+enum StockMovementType {
+  IN // รับเข้า
+  OUT // ตัดออก (ขาย/ใช้)
+  ADJUST // ปรับปรุงยอด
+}
+
+enum AccountType {
+  PROMPTPAY
+  BANK
+}
+
+// ---------- Staff / Auth ----------
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String
+  email        String?  @unique
+  passwordHash String
+  role         Role     @default(USER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ordersCreated    Order[]         @relation("OrderCreatedBy")
+  ordersUpdated    Order[]         @relation("OrderUpdatedBy")
+  paymentsVerified Payment[]       @relation("PaymentVerifiedBy")
+  stockMovements   StockMovement[]
+  productsCreated  Product[]       @relation("ProductCreatedBy")
+  productsUpdated  Product[]       @relation("ProductUpdatedBy")
+}
+
+// ---------- Customers & Pets ----------
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  address   String?
+  lineId    String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pets   Pet[]
+  orders Order[]
+
+  @@index([phone])
+  @@index([name])
+}
+
+model Pet {
+  id         String    @id @default(cuid())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  name       String
+  species    Species
+  breed      String?
+  gender     Gender    @default(UNKNOWN)
+  birthDate  DateTime?
+  weightKg   Float?
+  color      String?
+  allergies  String? // อาการแพ้ / ยาที่แพ้
+  note       String?
+  photoUrl   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  orders Order[]
+
+  @@index([customerId])
+}
+
+// ---------- Master data ----------
+
+model Service {
+  id          String          @id @default(cuid())
+  name        String
+  category    ServiceCategory
+  description String?
+  price       Int // หน่วยเป็นบาท
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Room {
+  id            String   @id @default(cuid())
+  name          String   @unique // ชื่อ/เลขห้อง เช่น A1, VIP-2
+  size          RoomSize
+  hasAir        Boolean  @default(false)
+  hasFan        Boolean  @default(false)
+  pricePerNight Int // ราคาต่อคืนตามขนาดห้อง
+  equipment     String? // อุปกรณ์เสริมต่างๆ (คั่นด้วยจุลภาค)
+  description   String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Product {
+  id        String        @id @default(cuid())
+  name      String
+  sku       String?       @unique
+  target    ProductTarget @default(PET)
+  category  String? // เช่น ขนม, อาหารเปียก, อาหารเม็ด
+  price     Int
+  cost      Int?
+  stockQty  Int           @default(0)
+  unit      String        @default("ชิ้น")
+  active    Boolean       @default(true)
+  createdBy   User?       @relation("ProductCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+  updatedBy   User?       @relation("ProductUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  movements StockMovement[]
+
+  @@index([target])
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  product     Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  type        StockMovementType
+  quantity    Int
+  reason      String?
+  createdBy   User?             @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime          @default(now())
+
+  @@index([productId])
+}
+
+model BankAccount {
+  id            String      @id @default(cuid())
+  bankName      String // ชื่อธนาคาร
+  accountName   String // ชื่อบัญชี
+  accountNumber String // เลขบัญชี
+  promptpayId   String? // เบอร์/เลขบัตรสำหรับ PromptPay QR
+  type          AccountType @default(BANK)
+  isDefault     Boolean     @default(false)
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  payments Payment[]
+}
+
+// ---------- Orders / Payments ----------
+
+model Order {
+  id          String      @id @default(cuid())
+  code        String      @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  customerId  String
+  pet         Pet?        @relation(fields: [petId], references: [id])
+  petId       String?
+  room        Room?       @relation(fields: [roomId], references: [id])
+  roomId      String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
+  status      OrderStatus @default(PENDING_PAYMENT)
+  checkInAt   DateTime?
+  checkOutAt  DateTime?
+  nights      Int         @default(0)
+  subtotal    Int         @default(0)
+  discount    Int         @default(0)
+  total       Int         @default(0)
+  note        String?
+  createdBy   User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+  updatedBy   User?       @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items   OrderItem[]
+  payment Payment?
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String        @id @default(cuid())
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  itemType  OrderItemType
+  refId     String? // id ของ service/room/product ที่อ้างอิง
+  name      String // ชื่อ ณ ตอนสั่ง (snapshot)
+  unitPrice Int
+  quantity  Int           @default(1)
+  subtotal  Int
+
+  @@index([orderId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String        @unique
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  bankAccountId String?
+  method        PaymentMethod @default(PROMPTPAY)
+  amount        Int
+  status        PaymentStatus @default(PENDING)
+  qrPayload     String? // PromptPay payload สำหรับสร้าง QR
+  expiresAt     DateTime? // QR หมดอายุ (15 นาที)
+  slipUrl       String? // สลิปที่ลูกค้าอัปโหลด
+  submittedAt   DateTime?
+  verifiedBy    User?         @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+  verifiedById  String?
+  verifiedAt    DateTime?
+  rejectReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// ---------- App settings (ชื่อร้าน / ข้อมูลใบเสร็จ ฯลฯ) ----------
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
