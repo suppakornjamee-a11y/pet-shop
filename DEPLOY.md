@@ -49,22 +49,31 @@ Vercel → **Settings → Environment Variables** เพิ่ม:
 | `AUTH_SECRET` | `ERUkKl1Q+6maZ/XuM+i2CnS9dHesZwH07F4Pu8rFISQ=` |
 | `AUTH_TRUST_HOST` | `true` |
 
-## 5) Deploy + นำข้อมูลขึ้น cloud
+## 5) Deploy — build จะผ่าน (ไม่แตะ DB ตอน build)
 
-- กด **Deploy** — ตอน build จะรัน `prisma migrate deploy` สร้างตารางให้อัตโนมัติ
-- หลัง deploy สำเร็จ ให้ **นำข้อมูลปัจจุบันขึ้น cloud** (ลูกค้า/ออเดอร์/สินค้าที่เทสไว้ + admin/admin)
-  โดยรันจากเครื่อง **ครั้งเดียว** (ใช้ไฟล์ `prisma/seed-data.json` ที่ export ไว้แล้ว):
+- กด **Deploy** — build แค่ `prisma generate && next build` (ไม่ต้องมี DB ก็ผ่าน)
+
+## 6) สร้างตาราง + นำข้อมูลขึ้น cloud (จากเครื่อง ครั้งเดียว)
+
+หลังมี `DATABASE_URL` ของ Neon แล้ว รันจากเครื่อง:
 
 ```bash
-# แทน <CLOUD_URL> ด้วย DATABASE_URL ของ Neon (ก็อปจาก Vercel — ใช้แบบ pooled)
+# แทน <CLOUD_URL> ด้วย DATABASE_URL ของ Neon (ก็อปจาก Vercel — ใช้แบบ pooled + sslmode=require)
 cd C:\Users\SuppakornJame\petcare-app
+
+# 6.1 สร้างตารางบน cloud
+$env:DATABASE_URL="<CLOUD_URL>"; npm run db:deploy
+
+# 6.2 นำข้อมูลปัจจุบันขึ้น (ลูกค้า/ออเดอร์/สินค้า + admin/admin)
 $env:DATABASE_URL="<CLOUD_URL>"; npm run db:import
 ```
 
-> อยากได้ข้อมูลล่าสุดก่อน import? รัน `npm run db:export` ก่อน (ต้องเปิด `npm run db` อยู่)
 > อยากได้แค่ข้อมูลตัวอย่างเปล่าๆ แทนข้อมูลจริง? ใช้ `npm run db:seed` แทน `db:import`
+> อยากได้ข้อมูลล่าสุดก่อน import? เปิด `npm run db` แล้วรัน `npm run db:export` ก่อน
 
 เสร็จแล้วเข้าเว็บที่ Vercel ให้มา → login **admin / admin** ได้เลย 🎉
+
+> **สำคัญ:** ถ้าเปิดเว็บแล้ว error เรื่อง database — แปลว่ายังไม่ได้รันข้อ 6 (สร้างตาราง) หรือ `DATABASE_URL` ใน Vercel ยังไม่ถูกต้อง
 
 ---
 
