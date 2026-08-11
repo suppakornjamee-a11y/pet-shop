@@ -56,13 +56,15 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 <Pencil /> แก้ไขออเดอร์
               </Button>
             )}
-            <Button
-              render={<Link href={`/print/orders/${order.id}`} target="_blank" />}
-              nativeButton={false}
-              variant="secondary"
-            >
-              <Printer /> พิมพ์เอกสาร
-            </Button>
+            {["PAID", "IN_PROGRESS", "COMPLETED"].includes(order.status) && (
+              <Button
+                render={<Link href={`/print/orders/${order.id}`} target="_blank" />}
+                nativeButton={false}
+                variant="secondary"
+              >
+                <Printer /> พิมพ์เอกสาร
+              </Button>
+            )}
           </>
         }
       />
