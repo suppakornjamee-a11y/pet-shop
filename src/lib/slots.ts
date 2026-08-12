@@ -66,6 +66,11 @@ export function thaiMonthRange(monthStr: string): { start: Date; end: Date } {
 export function isValidDateStr(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
+/** รับเวลา HH:mm ทั่วไป (00:00–23:59) — ไม่จำกัดแค่ช่วงเวลาสำเร็จรูป */
 export function isValidTimeStr(s: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+/** เป็นช่วงเวลาสำเร็จรูปหรือไม่ */
+export function isPresetSlot(s: string): boolean {
   return (TIME_SLOTS as readonly string[]).includes(s);
 }

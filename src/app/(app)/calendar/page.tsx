@@ -8,6 +8,7 @@ import {
   todayThaiStr,
   thaiMonthRange,
   isValidDateStr,
+  isPresetSlot,
 } from "@/lib/slots";
 import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CustomSlotPicker } from "@/components/custom-slot-picker";
 
 const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
@@ -57,6 +59,10 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   for (const b of dayBookings) {
     if (b.appointmentAt) bySlot.set(toThaiTimeStr(b.appointmentAt), b);
   }
+  // คิวที่จองเวลานอกช่วงสำเร็จรูป (กำหนดเวลาเอง)
+  const otherBookings = dayBookings
+    .filter((b) => b.appointmentAt && !isPresetSlot(toThaiTimeStr(b.appointmentAt)))
+    .sort((a, b) => a.appointmentAt!.getTime() - b.appointmentAt!.getTime());
 
   // grid ของเดือน (คำนวณแบบไม่ผูก timezone)
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -213,8 +219,31 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                 </div>
               );
             })}
+            {otherBookings.map((b) => (
+              <Link
+                key={b.id}
+                href={`/orders/${b.id}`}
+                className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono font-semibold tabular-nums">
+                    {toThaiTimeStr(b.appointmentAt!)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {b.pet ? `${speciesEmoji[b.pet.species]} ` : ""}
+                    {b.customer.name}
+                  </span>
+                </div>
+                <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[b.status])}>
+                  {orderStatusLabel[b.status]}
+                </Badge>
+              </Link>
+            ))}
+
+            <CustomSlotPicker date={selectedDate} customerId={customerId} />
+
             <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5" /> เลือกช่วงเวลาที่ว่างเพื่อสร้างออเดอร์ในคิวนั้น
+              <CheckCircle2 className="h-3.5 w-3.5" /> เลือกช่วงเวลาว่าง หรือกำหนดเวลาเอง เพื่อสร้างออเดอร์
             </p>
           </CardContent>
         </Card>
