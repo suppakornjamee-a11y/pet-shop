@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="th" className={`${notoThai.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-muted/30 font-sans">
+      <body className="min-h-full flex flex-col bg-gradient-to-br from-background via-background to-primary/[0.05] font-sans">
         {children}
         <Toaster richColors position="top-center" />
       </body>
