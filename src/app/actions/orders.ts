@@ -92,24 +92,35 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
   const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
   const total = subtotal;
 
-  const code = await generateOrderCode();
-
-  const order = await prisma.order.create({
-    data: {
-      code,
-      customerId: data.customerId,
-      petId: data.petId || null,
-      roomId: room && data.nights > 0 ? room.id : null,
-      nights: room && data.nights > 0 ? data.nights : 0,
-      subtotal,
-      total,
-      note: data.note || null,
-      createdById: user.id,
-      updatedById: user.id,
-      status: "PENDING_PAYMENT",
-      items: { create: items },
-    },
-  });
+  // ลองสร้างพร้อม retry เผื่อรหัสชนกัน (P2002)
+  let order: { id: string } | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = await generateOrderCode();
+    try {
+      order = await prisma.order.create({
+        data: {
+          code,
+          customerId: data.customerId,
+          petId: data.petId || null,
+          roomId: room && data.nights > 0 ? room.id : null,
+          nights: room && data.nights > 0 ? data.nights : 0,
+          subtotal,
+          total,
+          note: data.note || null,
+          createdById: user.id,
+          updatedById: user.id,
+          status: "PENDING_PAYMENT",
+          items: { create: items },
+        },
+      });
+      break;
+    } catch (e) {
+      const isDup = (e as { code?: string })?.code === "P2002";
+      if (isDup && attempt < 4) continue; // รหัสชน — สร้างเลขใหม่แล้วลองอีก
+      throw e;
+    }
+  }
+  if (!order) return { ok: false, error: "สร้างออเดอร์ไม่สำเร็จ กรุณาลองใหม่" };
 
   // สร้าง Payment + QR PromptPay ทันที
   await createPaymentWithQr(order.id, total);
