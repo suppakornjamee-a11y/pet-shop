@@ -74,3 +74,7 @@ export function isValidTimeStr(s: string): boolean {
 export function isPresetSlot(s: string): boolean {
   return (TIME_SLOTS as readonly string[]).includes(s);
 }
+/** slot นี้เป็นเวลาที่ผ่านมาแล้ว (จองย้อนหลังไม่ได้) */
+export function isPastSlot(dateStr: string, timeStr: string): boolean {
+  return buildSlotDate(dateStr, timeStr).getTime() < Date.now();
+}

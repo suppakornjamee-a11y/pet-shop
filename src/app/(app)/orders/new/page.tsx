@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarClock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/app/actions/orders";
-import { isValidDateStr, isValidTimeStr } from "@/lib/slots";
+import { isValidDateStr, isValidTimeStr, isPastSlot } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,10 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
   // ต้องเลือกวัน-เวลาคิวจากปฏิทินก่อนเสมอ
   if (!isValidDateStr(date) || !isValidTimeStr(time)) {
     redirect("/calendar");
+  }
+  // จองย้อนหลังไม่ได้
+  if (isPastSlot(date, time)) {
+    redirect(`/calendar?date=${date}`);
   }
   // ถ้าช่วงเวลาถูกจองไปแล้ว ให้กลับไปเลือกใหม่
   if (!(await isSlotAvailable(date, time))) {

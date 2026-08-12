@@ -9,6 +9,7 @@ import {
   thaiMonthRange,
   isValidDateStr,
   isPresetSlot,
+  isPastSlot,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
 import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
@@ -137,6 +138,36 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                 const count = countByDay.get(dateStr) ?? 0;
                 const isSelected = dateStr === selectedDate;
                 const isToday = dateStr === today;
+                const isPastDay = dateStr < today;
+
+                const badge = count > 0 && (
+                  <span
+                    className={cn(
+                      "mt-0.5 rounded-full px-1.5 text-[10px] font-medium",
+                      isSelected ? "bg-white/25" : "bg-primary/15 text-primary"
+                    )}
+                  >
+                    {count} คิว
+                  </span>
+                );
+
+                // วันที่ผ่านมาแล้ว — จองไม่ได้ (แต่ยังคลิกดูได้)
+                if (isPastDay) {
+                  return (
+                    <Link
+                      key={dateStr}
+                      href={`/calendar?month=${monthStr}&date=${dateStr}${cq}`}
+                      className={cn(
+                        "flex aspect-square flex-col items-center justify-center rounded-lg border border-transparent text-sm text-muted-foreground/40 transition-colors hover:bg-accent/50",
+                        isSelected && "border-border bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <span>{day}</span>
+                      {badge}
+                    </Link>
+                  );
+                }
+
                 return (
                   <Link
                     key={dateStr}
@@ -152,16 +183,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                     <span className={cn(isToday && !isSelected && "font-bold text-primary")}>
                       {day}
                     </span>
-                    {count > 0 && (
-                      <span
-                        className={cn(
-                          "mt-0.5 rounded-full px-1.5 text-[10px] font-medium",
-                          isSelected ? "bg-white/25" : "bg-primary/15 text-primary"
-                        )}
-                      >
-                        {count} คิว
-                      </span>
-                    )}
+                    {badge}
                   </Link>
                 );
               })}
@@ -200,25 +222,31 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   </Link>
                 );
               }
+              const past = isPastSlot(selectedDate, slot);
               return (
                 <div
                   key={slot}
-                  className="flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm"
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm",
+                    past && "opacity-50"
+                  )}
                 >
                   <div className="flex items-center gap-2.5 text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span className="font-mono font-semibold tabular-nums">{slot}</span>
-                    <span className="text-xs">ว่าง</span>
+                    <span className="text-xs">{past ? "ผ่านมาแล้ว" : "ว่าง"}</span>
                   </div>
-                  <Button
-                    render={
-                      <Link href={`/orders/new?date=${selectedDate}&time=${slot}${cq}`} />
-                    }
-                    nativeButton={false}
-                    size="sm"
-                  >
-                    <Plus /> สร้างออเดอร์
-                  </Button>
+                  {!past && (
+                    <Button
+                      render={
+                        <Link href={`/orders/new?date=${selectedDate}&time=${slot}${cq}`} />
+                      }
+                      nativeButton={false}
+                      size="sm"
+                    >
+                      <Plus /> สร้างออเดอร์
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -243,7 +271,13 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
               </Link>
             ))}
 
-            <CustomSlotPicker date={selectedDate} customerId={customerId} />
+            {selectedDate >= today ? (
+              <CustomSlotPicker date={selectedDate} customerId={customerId} />
+            ) : (
+              <p className="rounded-lg border border-dashed px-3 py-2.5 text-center text-xs text-muted-foreground">
+                วันที่ผ่านมาแล้ว — จองคิวย้อนหลังไม่ได้
+              </p>
+            )}
 
             <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
               <CheckCircle2 className="h-3.5 w-3.5" /> เลือกช่วงเวลาว่าง หรือกำหนดเวลาเอง เพื่อสร้างออเดอร์

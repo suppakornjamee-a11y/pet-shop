@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Clock3, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,11 @@ export function CustomSlotPicker({
 
   function go() {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+    // จองย้อนหลังไม่ได้
+    if (new Date(`${date}T${time}:00+07:00`).getTime() < Date.now()) {
+      toast.error("จองคิวย้อนหลังไม่ได้ กรุณาเลือกเวลาในอนาคต");
+      return;
+    }
     const cq = customerId ? `&customerId=${customerId}` : "";
     router.push(`/orders/new?date=${date}&time=${time}${cq}`);
   }

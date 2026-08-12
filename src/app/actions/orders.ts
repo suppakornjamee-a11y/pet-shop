@@ -74,6 +74,9 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
     return { ok: false, error: "กรุณาเลือกวันและเวลาคิวจากปฏิทินก่อนสร้างออเดอร์" };
   }
   const appointmentAt = buildSlotDate(appointmentDate, appointmentTime);
+  if (appointmentAt.getTime() < Date.now()) {
+    return { ok: false, error: "ไม่สามารถจองคิวย้อนหลังได้ กรุณาเลือกเวลาในอนาคต" };
+  }
   if (!(await isSlotAvailable(appointmentDate, appointmentTime))) {
     return { ok: false, error: "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกช่วงเวลาอื่น" };
   }
