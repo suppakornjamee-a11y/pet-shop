@@ -17,7 +17,7 @@ export default async function LoginPage() {
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
       {/* Brand panel */}
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-primary via-primary to-teal-700 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <div className="relative hidden overflow-hidden bg-primary p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-16 text-[22rem] leading-none opacity-10 select-none"
@@ -52,10 +52,10 @@ export default async function LoginPage() {
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/[0.06] p-6">
+      <div className="flex items-center justify-center bg-background p-6">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-3xl shadow-lg shadow-primary/25">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl">
               🐾
             </div>
             <h1 className="text-xl font-extrabold tracking-tight">PetCare</h1>

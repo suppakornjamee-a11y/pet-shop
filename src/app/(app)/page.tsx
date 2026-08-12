@@ -124,18 +124,18 @@ export default async function DashboardPage(props: PageProps<"/">) {
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label} className={cn("bg-gradient-to-br to-card", s.tint)}>
-              <CardContent className="flex items-center gap-4 py-2">
+            <Card key={s.label}>
+              <CardContent className="flex items-center gap-3.5 py-2">
                 <div
                   className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-xl shadow-sm",
+                    "flex h-11 w-11 items-center justify-center rounded-lg",
                     s.color
                   )}
                 >
-                  <Icon className="h-6 w-6" />
+                  <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-2xl font-bold tracking-tight">{s.value}</div>
+                  <div className="truncate text-2xl font-semibold tracking-tight">{s.value}</div>
                   <div className="text-xs text-muted-foreground">{s.label}</div>
                 </div>
               </CardContent>
