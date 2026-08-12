@@ -3,7 +3,7 @@ import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
-const notoThai = Noto_Sans_Thai({
+const fontSans = Noto_Sans_Thai({
   variable: "--font-sans",
   subsets: ["thai", "latin"],
   weight: ["300", "400", "500", "600", "700"],
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="th" className={`${notoThai.variable} h-full antialiased`}>
+    <html lang="th" className={`${fontSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-gradient-to-br from-background via-background to-primary/[0.05] font-sans">
         {children}
         <Toaster richColors position="top-center" />
