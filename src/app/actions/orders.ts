@@ -11,6 +11,7 @@ import {
   isValidDateStr,
   isValidTimeStr,
 } from "@/lib/slots";
+import { isSlotHolding } from "@/lib/booking";
 import type { ActionResult } from "./customers";
 
 const PAYMENT_TTL_MS = 15 * 60 * 1000; // 15 นาที
@@ -29,7 +30,7 @@ const createOrderSchema = z.object({
   appointmentTime: z.string().optional(),
 });
 
-/** เช็คว่า slot นี้ว่างไหม (ไม่มีออเดอร์ที่ยังไม่ยกเลิกจองไว้) */
+/** เช็คว่า slot นี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่) */
 export async function isSlotAvailable(
   dateStr: string,
   timeStr: string,
@@ -37,15 +38,17 @@ export async function isSlotAvailable(
 ): Promise<boolean> {
   if (!isValidDateStr(dateStr) || !isValidTimeStr(timeStr)) return false;
   const at = buildSlotDate(dateStr, timeStr);
-  const clash = await prisma.order.findFirst({
+  const orders = await prisma.order.findMany({
     where: {
       appointmentAt: at,
-      status: { not: "CANCELLED" },
       ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
     },
-    select: { id: true },
+    select: {
+      status: true,
+      payment: { select: { status: true, expiresAt: true } },
+    },
   });
-  return !clash;
+  return !orders.some((o) => isSlotHolding(o));
 }
 
 export async function createOrder(input: unknown): Promise<ActionResult> {

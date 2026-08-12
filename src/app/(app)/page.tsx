@@ -74,24 +74,28 @@ export default async function DashboardPage(props: PageProps<"/">) {
       value: dayOrders.toString(),
       icon: ReceiptText,
       color: "text-sky-600 bg-sky-100 dark:bg-sky-950 dark:text-sky-400",
+      tint: "from-sky-50 dark:from-sky-950/30",
     },
     {
       label: `รายรับ${isToday ? "วันนี้" : ""}`,
       value: formatBaht(revenueDay),
       icon: TrendingUp,
       color: "text-emerald-600 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400",
+      tint: "from-emerald-50 dark:from-emerald-950/30",
     },
     {
       label: "รอชำระเงิน",
       value: pendingPayments.toString(),
       icon: Clock,
       color: "text-amber-600 bg-amber-100 dark:bg-amber-950 dark:text-amber-400",
+      tint: "from-amber-50 dark:from-amber-950/30",
     },
     {
       label: "ลูกค้าทั้งหมด",
       value: customerCount.toString(),
       icon: PawPrint,
       color: "text-violet-600 bg-violet-100 dark:bg-violet-950 dark:text-violet-400",
+      tint: "from-violet-50 dark:from-violet-950/30",
     },
   ];
 
@@ -120,13 +124,18 @@ export default async function DashboardPage(props: PageProps<"/">) {
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label}>
+            <Card key={s.label} className={cn("bg-gradient-to-br to-card", s.tint)}>
               <CardContent className="flex items-center gap-4 py-2">
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", s.color)}>
+                <div
+                  className={cn(
+                    "flex h-12 w-12 items-center justify-center rounded-xl shadow-sm",
+                    s.color
+                  )}
+                >
                   <Icon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-xl font-bold">{s.value}</div>
+                  <div className="truncate text-2xl font-bold tracking-tight">{s.value}</div>
                   <div className="text-xs text-muted-foreground">{s.label}</div>
                 </div>
               </CardContent>

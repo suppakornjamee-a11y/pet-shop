@@ -10,6 +10,7 @@ import {
   isValidDateStr,
   isPresetSlot,
 } from "@/lib/slots";
+import { isSlotHolding } from "@/lib/booking";
 import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
@@ -34,16 +35,18 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
 
   const [y, m] = monthStr.split("-").map(Number);
 
-  // จองในเดือนนี้ (ไม่รวมที่ยกเลิก)
+  // จองในเดือนนี้ — เก็บเฉพาะที่ยัง "กันคิว" อยู่ (จ่ายแล้ว หรือรอชำระยังไม่หมดอายุ)
   const { start, end } = thaiMonthRange(monthStr);
-  const bookings = await prisma.order.findMany({
-    where: {
-      appointmentAt: { gte: start, lt: end },
-      status: { not: "CANCELLED" },
+  const rawBookings = await prisma.order.findMany({
+    where: { appointmentAt: { gte: start, lt: end } },
+    include: {
+      customer: true,
+      pet: true,
+      payment: { select: { status: true, expiresAt: true } },
     },
-    include: { customer: true, pet: true },
     orderBy: { appointmentAt: "asc" },
   });
+  const bookings = rawBookings.filter((b) => isSlotHolding(b));
 
   // นับต่อวัน + หาคิวของวันที่เลือก
   const countByDay = new Map<string, number>();
