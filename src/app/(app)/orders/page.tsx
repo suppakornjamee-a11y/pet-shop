@@ -39,8 +39,8 @@ export default async function OrdersPage(props: PageProps<"/orders">) {
         title="ออเดอร์ทั้งหมด"
         description="รายการออเดอร์ล่าสุด"
         action={
-          <Button render={<Link href="/orders/new" />} nativeButton={false}>
-            <ClipboardPlus /> สร้างออเดอร์
+          <Button render={<Link href="/calendar" />} nativeButton={false}>
+            <ClipboardPlus /> จองคิว / สร้างออเดอร์
           </Button>
         }
       />

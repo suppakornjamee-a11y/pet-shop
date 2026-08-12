@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   PawPrint,
-  ClipboardPlus,
+  CalendarDays,
   Users,
   ReceiptText,
   Settings,
@@ -53,7 +53,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/", label: "แดชบอร์ด", icon: LayoutDashboard },
       { href: "/register", label: "ลงทะเบียนสัตว์เลี้ยง", icon: PawPrint },
-      { href: "/orders/new", label: "สร้างออเดอร์", icon: ClipboardPlus },
+      { href: "/calendar", label: "ปฏิทินคิว / จองคิว", icon: CalendarDays },
       { href: "/orders", label: "ออเดอร์ทั้งหมด", icon: ReceiptText },
       { href: "/customers", label: "ประวัติลูกค้า", icon: Users },
     ],

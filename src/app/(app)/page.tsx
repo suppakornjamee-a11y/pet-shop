@@ -105,8 +105,8 @@ export default async function DashboardPage(props: PageProps<"/">) {
             <Button render={<Link href="/register" />} nativeButton={false} variant="outline">
               <PawPrint /> ลงทะเบียน
             </Button>
-            <Button render={<Link href="/orders/new" />} nativeButton={false}>
-              <ClipboardPlus /> สร้างออเดอร์
+            <Button render={<Link href="/calendar" />} nativeButton={false}>
+              <ClipboardPlus /> จองคิว / สร้างออเดอร์
             </Button>
           </>
         }
@@ -147,8 +147,8 @@ export default async function DashboardPage(props: PageProps<"/">) {
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <Wallet className="h-10 w-10 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">ไม่มีออเดอร์ใน{dateLabel}</p>
-              <Button render={<Link href="/orders/new" />} nativeButton={false} size="sm">
-                สร้างออเดอร์
+              <Button render={<Link href="/calendar" />} nativeButton={false} size="sm">
+                จองคิว / สร้างออเดอร์
               </Button>
             </div>
           ) : (

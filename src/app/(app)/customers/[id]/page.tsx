@@ -73,8 +73,8 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                 note: customer.note,
               }}
             />
-            <Button render={<Link href={`/orders/new?customerId=${customer.id}`} />} nativeButton={false}>
-              <ClipboardPlus /> สร้างออเดอร์
+            <Button render={<Link href={`/calendar?customerId=${customer.id}`} />} nativeButton={false}>
+              <ClipboardPlus /> จองคิว / สร้างออเดอร์
             </Button>
           </>
         }

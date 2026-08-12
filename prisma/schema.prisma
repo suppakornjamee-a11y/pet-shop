@@ -241,10 +241,11 @@ model Order {
   petId       String?
   room        Room?       @relation(fields: [roomId], references: [id])
   roomId      String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
-  status      OrderStatus @default(PENDING_PAYMENT)
-  checkInAt   DateTime?
-  checkOutAt  DateTime?
-  nights      Int         @default(0)
+  status        OrderStatus @default(PENDING_PAYMENT)
+  appointmentAt DateTime? // วัน-เวลาคิวที่จอง (slot)
+  checkInAt     DateTime?
+  checkOutAt    DateTime?
+  nights        Int         @default(0)
   subtotal    Int         @default(0)
   discount    Int         @default(0)
   total       Int         @default(0)
@@ -262,6 +263,7 @@ model Order {
   @@index([customerId])
   @@index([status])
   @@index([createdAt])
+  @@index([appointmentAt])
 }
 
 model OrderItem {

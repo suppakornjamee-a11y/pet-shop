@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Printer, ArrowLeft, PawPrint, Pencil } from "lucide-react";
+import { Printer, ArrowLeft, PawPrint, Pencil, CalendarClock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import {
@@ -78,6 +78,18 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               </Badge>
             </CardHeader>
             <CardContent className="space-y-4">
+              {order.appointmentAt && (
+                <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+                  <CalendarClock className="h-4 w-4" />
+                  คิว:{" "}
+                  {new Intl.DateTimeFormat("th-TH", {
+                    dateStyle: "long",
+                    timeStyle: "short",
+                    timeZone: "Asia/Bangkok",
+                  }).format(order.appointmentAt)}{" "}
+                  น.
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-xs text-muted-foreground">เจ้าของ</div>

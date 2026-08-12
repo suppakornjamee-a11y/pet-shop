@@ -78,6 +78,8 @@ export function OrderForm({
   mode = "create",
   orderId,
   initial,
+  appointmentDate,
+  appointmentTime,
 }: {
   services: Service[];
   rooms: Room[];
@@ -86,6 +88,8 @@ export function OrderForm({
   mode?: "create" | "edit";
   orderId?: string;
   initial?: OrderInitial;
+  appointmentDate?: string;
+  appointmentTime?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -184,6 +188,8 @@ export function OrderForm({
       serviceIds: [...serviceIds],
       productLines,
       note,
+      appointmentDate,
+      appointmentTime,
     };
 
     startTransition(async () => {

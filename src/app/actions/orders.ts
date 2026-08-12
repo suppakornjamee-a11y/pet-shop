@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { generateOrderCode } from "@/lib/order-code";
 import { buildPromptPayPayload } from "@/lib/promptpay";
+import {
+  buildSlotDate,
+  isValidDateStr,
+  isValidTimeStr,
+} from "@/lib/slots";
 import type { ActionResult } from "./customers";
 
 const PAYMENT_TTL_MS = 15 * 60 * 1000; // 15 นาที
@@ -20,7 +25,28 @@ const createOrderSchema = z.object({
   productLines: z
     .array(z.object({ productId: z.string(), quantity: z.coerce.number().int().min(1) }))
     .default([]),
+  appointmentDate: z.string().optional(),
+  appointmentTime: z.string().optional(),
 });
+
+/** เช็คว่า slot นี้ว่างไหม (ไม่มีออเดอร์ที่ยังไม่ยกเลิกจองไว้) */
+export async function isSlotAvailable(
+  dateStr: string,
+  timeStr: string,
+  excludeOrderId?: string
+): Promise<boolean> {
+  if (!isValidDateStr(dateStr) || !isValidTimeStr(timeStr)) return false;
+  const at = buildSlotDate(dateStr, timeStr);
+  const clash = await prisma.order.findFirst({
+    where: {
+      appointmentAt: at,
+      status: { not: "CANCELLED" },
+      ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
+    },
+    select: { id: true },
+  });
+  return !clash;
+}
 
 export async function createOrder(input: unknown): Promise<ActionResult> {
   const user = await requireUser();
@@ -32,6 +58,21 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
     data.serviceIds.length > 0 || data.productLines.length > 0 || (data.roomId && data.nights > 0);
   if (!hasSomething) {
     return { ok: false, error: "กรุณาเพิ่มบริการ ห้องพัก หรือสินค้าอย่างน้อย 1 รายการ" };
+  }
+
+  // ต้องเลือกวัน-เวลาคิว และต้องไม่ชนกับคิวเดิม
+  const { appointmentDate, appointmentTime } = data;
+  if (
+    !appointmentDate ||
+    !appointmentTime ||
+    !isValidDateStr(appointmentDate) ||
+    !isValidTimeStr(appointmentTime)
+  ) {
+    return { ok: false, error: "กรุณาเลือกวันและเวลาคิวจากปฏิทินก่อนสร้างออเดอร์" };
+  }
+  const appointmentAt = buildSlotDate(appointmentDate, appointmentTime);
+  if (!(await isSlotAvailable(appointmentDate, appointmentTime))) {
+    return { ok: false, error: "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกช่วงเวลาอื่น" };
   }
 
   // ดึงราคาจริงจากฐานข้อมูล (ไม่เชื่อราคาจาก client)
@@ -104,6 +145,7 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
           petId: data.petId || null,
           roomId: room && data.nights > 0 ? room.id : null,
           nights: room && data.nights > 0 ? data.nights : 0,
+          appointmentAt,
           subtotal,
           total,
           note: data.note || null,
