@@ -33,9 +33,14 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
 
   if (!order) notFound();
 
-  const qrDataUrl = order.payment?.qrPayload
-    ? await payloadToDataUrl(order.payment.qrPayload)
-    : null;
+  let qrDataUrl: string | null = null;
+  if (order.payment?.qrPayload) {
+    try {
+      qrDataUrl = await payloadToDataUrl(order.payment.qrPayload);
+    } catch (e) {
+      console.error("สร้าง QR ไม่สำเร็จ:", e);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl">

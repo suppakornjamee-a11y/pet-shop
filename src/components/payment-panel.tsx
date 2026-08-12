@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -123,13 +122,13 @@ export function PaymentPanel({
                     isUnusable && "opacity-30 blur-[2px]"
                   )}
                 >
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={qrDataUrl}
                     alt="PromptPay QR"
                     width={220}
                     height={220}
                     className="mx-auto"
-                    unoptimized
                   />
                 </div>
               ) : (
