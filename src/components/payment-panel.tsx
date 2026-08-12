@@ -44,7 +44,7 @@ function useCountdown(expiresAt: string | null) {
 export function PaymentPanel({
   orderId,
   orderStatus,
-  qrDataUrl,
+  qrPayload,
   amount,
   status,
   expiresAt,
@@ -53,7 +53,7 @@ export function PaymentPanel({
 }: {
   orderId: string;
   orderStatus: OrderStatus;
-  qrDataUrl: string | null;
+  qrPayload: string | null;
   amount: number;
   status: PaymentStatus;
   expiresAt: string | null;
@@ -63,6 +63,34 @@ export function PaymentPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const remaining = useCountdown(expiresAt);
+
+  // สร้าง QR ฝั่งเบราว์เซอร์ จาก payload (เลี่ยงปัญหา serverless บน Vercel)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (!qrPayload) {
+      setQrDataUrl(null);
+      return;
+    }
+    import("qrcode")
+      .then((mod) =>
+        mod.default.toDataURL(qrPayload, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 320,
+          color: { dark: "#0f172a", light: "#ffffff" },
+        })
+      )
+      .then((url) => {
+        if (active) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (active) setQrDataUrl(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [qrPayload]);
 
   const isVerified = status === "VERIFIED";
   const isCancelled = orderStatus === "CANCELLED";

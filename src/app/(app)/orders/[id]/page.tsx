@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Printer, ArrowLeft, PawPrint, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { payloadToDataUrl } from "@/lib/promptpay";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import {
   orderStatusLabel,
@@ -33,14 +32,6 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
 
   if (!order) notFound();
 
-  let qrDataUrl: string | null = null;
-  if (order.payment?.qrPayload) {
-    try {
-      qrDataUrl = await payloadToDataUrl(order.payment.qrPayload);
-    } catch (e) {
-      console.error("สร้าง QR ไม่สำเร็จ:", e);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -162,7 +153,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             <PaymentPanel
               orderId={order.id}
               orderStatus={order.status}
-              qrDataUrl={qrDataUrl}
+              qrPayload={order.payment.qrPayload}
               amount={order.payment.amount}
               status={order.payment.status}
               expiresAt={order.payment.expiresAt?.toISOString() ?? null}
