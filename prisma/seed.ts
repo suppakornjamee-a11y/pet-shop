@@ -51,17 +51,81 @@ async function main() {
     if (!exists) await prisma.service.create({ data: s });
   }
 
-  // ----- Rooms -----
-  const rooms = [
-    { name: "A1", size: "SMALL" as const, hasAir: false, hasFan: true, pricePerNight: 250, equipment: "ที่นอน,ชามอาหาร" },
-    { name: "A2", size: "SMALL" as const, hasAir: false, hasFan: true, pricePerNight: 250, equipment: "ที่นอน,ชามอาหาร" },
-    { name: "B1", size: "MEDIUM" as const, hasAir: true, hasFan: false, pricePerNight: 400, equipment: "ที่นอน,ชามอาหาร,ของเล่น" },
-    { name: "B2", size: "MEDIUM" as const, hasAir: true, hasFan: false, pricePerNight: 400, equipment: "ที่นอน,ชามอาหาร,ของเล่น" },
-    { name: "VIP1", size: "LARGE" as const, hasAir: true, hasFan: true, pricePerNight: 650, equipment: "ที่นอนพิเศษ,กล้องวงจรปิด,ของเล่น" },
-    { name: "VIP2", size: "XLARGE" as const, hasAir: true, hasFan: true, pricePerNight: 900, equipment: "ที่นอนพิเศษ,กล้องวงจรปิด,ของเล่น,พื้นที่วิ่งเล่น" },
+  // ----- Room categories + rooms -----
+  // หมวดหมู่ตามระบบจองจริงของร้าน (Daycare / Nanny Room / Big Dog / Small Dog / Cat / Pawsome)
+  // ราคาตั้งไว้ 0 บาทเป็นค่าเริ่มต้น (ไม่มีราคาจริงในชีทตัวอย่าง) — ปรับได้ที่หน้า "ตั้งค่า > ห้องพัก"
+  const categoryDefs = [
+    { name: "Daycare", billingUnit: "PER_VISIT" as const, sortOrder: 10 },
+    { name: "Nanny Room", billingUnit: "PER_NIGHT" as const, sortOrder: 20 },
+    { name: "BIG DOG", billingUnit: "PER_NIGHT" as const, sortOrder: 30 },
+    { name: "SMALL DOG", billingUnit: "PER_NIGHT" as const, sortOrder: 40 },
+    { name: "CAT", billingUnit: "PER_NIGHT" as const, sortOrder: 50 },
+    { name: "Pawsome Play", billingUnit: "PER_VISIT" as const, sortOrder: 60, description: "ห้องวิ่งเล่นสุนัข/แมวไซส์เล็ก" },
+    { name: "Pawsome Park", billingUnit: "PER_VISIT" as const, sortOrder: 70, description: "สนามวิ่งเล่นสุนัขกลางแจ้ง" },
+    { name: "Pawsome Fountain", billingUnit: "PER_VISIT" as const, sortOrder: 80, description: "ลานน้ำพุสุนัขเล็ก/ใหญ่" },
   ];
-  for (const r of rooms) {
-    await prisma.room.upsert({ where: { name: r.name }, update: {}, create: r });
+  const categoryByName: Record<string, { id: string }> = {};
+  for (const c of categoryDefs) {
+    const cat = await prisma.roomCategory.upsert({ where: { name: c.name }, update: {}, create: c });
+    categoryByName[c.name] = cat;
+  }
+
+  const roomsByCategory: Record<string, { name: string; equipment?: string; sortOrder: number }[]> = {
+    Daycare: [
+      { name: "Small Dog เลนที่ 1", sortOrder: 1 },
+      { name: "Small Dog เลนที่ 2", sortOrder: 2 },
+      { name: "Small Dog เลนที่ 3", sortOrder: 3 },
+      { name: "Small Dog เลนที่ 4", sortOrder: 4 },
+      { name: "Big Dog", sortOrder: 5 },
+      { name: "Cat", sortOrder: 6 },
+    ],
+    "Nanny Room": [
+      { name: "Dog (มีห้องน้ำ)", equipment: "มีห้องน้ำ,+150/คืน", sortOrder: 1 },
+      { name: "Dog (ห้อง Store)", equipment: "ห้อง Store,+150/คืน", sortOrder: 2 },
+      { name: "ห้องเดี่ยวไม่ได้เดี่ยว (Small Dog)", equipment: "+150/คืน", sortOrder: 3 },
+      { name: "Small Dog คอกพลาสติก 1", equipment: "คอกพลาสติก,+100/คืน", sortOrder: 4 },
+      { name: "Small Dog คอกพลาสติก 2", equipment: "คอกพลาสติก,+100/คืน", sortOrder: 5 },
+      { name: "Small Dog คอกพลาสติก 3", equipment: "คอกพลาสติก,+100/คืน", sortOrder: 6 },
+      { name: "Big Dog คอกพลาสติก", equipment: "คอกพลาสติก,+100/คืน", sortOrder: 7 },
+    ],
+    "BIG DOG": [
+      { name: "1 (พิเศษช่วงปีใหม่)", equipment: "สำหรับสุนัขที่อุ้มขึ้นได้", sortOrder: 1 },
+      { name: "2 (พิเศษช่วงปีใหม่)", equipment: "สำหรับสุนัขที่อุ้มขึ้นได้", sortOrder: 2 },
+      { name: "3 (พิเศษช่วงปีใหม่)", equipment: "สำหรับสุนัขที่อุ้มขึ้นได้", sortOrder: 3 },
+      { name: "1 (คอกเบอร์ 5)", sortOrder: 4 },
+      { name: "2 (คอกเบอร์ 6)", sortOrder: 5 },
+      { name: "3 (คอกเบอร์ 7)", equipment: "+50", sortOrder: 6 },
+      { name: "4 (คอกเบอร์ 8)", equipment: "+50", sortOrder: 7 },
+    ],
+    "SMALL DOG": Array.from({ length: 14 }, (_, i) => ({ name: String(i + 1), sortOrder: i + 1 })),
+    CAT: Array.from({ length: 8 }, (_, i) => ({ name: String(i + 1), sortOrder: i + 1 })),
+    "Pawsome Play": [
+      { name: "เลนที่ 1", sortOrder: 1 },
+      { name: "เลนที่ 2", sortOrder: 2 },
+      { name: "เลนที่ 3", sortOrder: 3 },
+    ],
+    "Pawsome Park": [{ name: "สนามวิ่งเล่น", sortOrder: 1 }],
+    "Pawsome Fountain": [
+      { name: "ลานน้ำพุ (เล็ก)", sortOrder: 1 },
+      { name: "ลานน้ำพุ (ใหญ่)", sortOrder: 2 },
+    ],
+  };
+
+  for (const [categoryName, rooms] of Object.entries(roomsByCategory)) {
+    const category = categoryByName[categoryName];
+    for (const r of rooms) {
+      await prisma.room.upsert({
+        where: { categoryId_name: { categoryId: category.id, name: r.name } },
+        update: {},
+        create: {
+          categoryId: category.id,
+          name: r.name,
+          sortOrder: r.sortOrder,
+          pricePerNight: 0,
+          equipment: r.equipment,
+        },
+      });
+    }
   }
 
   // ----- Products (pet) -----

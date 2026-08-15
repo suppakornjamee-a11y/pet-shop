@@ -6,6 +6,8 @@ import type {
   OrderStatus,
   PaymentStatus,
   ProductTarget,
+  BillingUnit,
+  PaymentPurpose,
 } from "@/generated/prisma/enums";
 
 export const speciesLabel: Record<Species, string> = {
@@ -40,6 +42,7 @@ export const roomSizeLabel: Record<RoomSize, string> = {
 
 export const orderStatusLabel: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "รอชำระเงิน",
+  DEPOSIT_PAID: "มัดจำแล้ว รอชำระส่วนที่เหลือ",
   PAID: "ชำระแล้ว",
   IN_PROGRESS: "กำลังดำเนินการ",
   COMPLETED: "เสร็จสิ้น",
@@ -49,10 +52,21 @@ export const orderStatusLabel: Record<OrderStatus, string> = {
 // Tailwind classes for status badges
 export const orderStatusColor: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
+  DEPOSIT_PAID: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900",
   PAID: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-900",
   IN_PROGRESS: "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-900",
   COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
   CANCELLED: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900",
+};
+
+export const billingUnitLabel: Record<BillingUnit, string> = {
+  PER_NIGHT: "ต่อคืน",
+  PER_VISIT: "ต่อครั้ง",
+};
+
+export const paymentPurposeLabel: Record<PaymentPurpose, string> = {
+  DEPOSIT: "มัดจำ",
+  BALANCE: "ยอดคงเหลือ",
 };
 
 export const paymentStatusLabel: Record<PaymentStatus, string> = {

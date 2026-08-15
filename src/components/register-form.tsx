@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
+  CardAction,
   CardContent,
   CardHeader,
   CardTitle,
@@ -140,19 +141,21 @@ export function RegisterForm() {
       {/* สัตว์เลี้ยง */}
       {pets.map((pet, i) => (
         <Card key={i}>
-          <CardHeader className="flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-base">
               {pet.species === "CAT" ? "🐱" : "🐶"} สัตว์เลี้ยงตัวที่ {i + 1}
             </CardTitle>
             {pets.length > 1 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setPets((prev) => prev.filter((_, idx) => idx !== i))}
-              >
-                <Trash2 className="text-destructive" />
-              </Button>
+              <CardAction>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPets((prev) => prev.filter((_, idx) => idx !== i))}
+                >
+                  <Trash2 className="text-destructive" />
+                </Button>
+              </CardAction>
             )}
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">

@@ -73,12 +73,55 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   return { ok: true, message: "ลบสินค้าเรียบร้อย" };
 }
 
+/* ---------------- Room categories ---------------- */
+
+const roomCategorySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "กรุณากรอกชื่อหมวดหมู่"),
+  billingUnit: z.enum(["PER_NIGHT", "PER_VISIT"]),
+  sortOrder: z.coerce.number().int().default(0),
+  description: z.string().optional(),
+  active: z.coerce.boolean().default(true),
+});
+
+export async function upsertRoomCategory(input: unknown): Promise<ActionResult> {
+  await requireUser();
+  const parsed = roomCategorySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { id, ...data } = parsed.data;
+
+  try {
+    if (id) {
+      await prisma.roomCategory.update({ where: { id }, data });
+    } else {
+      await prisma.roomCategory.create({ data });
+    }
+  } catch {
+    return { ok: false, error: "ชื่อหมวดหมู่นี้มีอยู่แล้ว" };
+  }
+  revalidatePath("/settings/rooms");
+  return { ok: true, message: "บันทึกหมวดหมู่เรียบร้อย" };
+}
+
+export async function deleteRoomCategory(id: string): Promise<ActionResult> {
+  await requireUser();
+  const roomCount = await prisma.room.count({ where: { categoryId: id } });
+  if (roomCount > 0) {
+    return { ok: false, error: "ลบไม่ได้ ยังมีห้อง/พื้นที่ในหมวดนี้อยู่ กรุณาย้ายหรือลบห้องก่อน" };
+  }
+  await prisma.roomCategory.delete({ where: { id } });
+  revalidatePath("/settings/rooms");
+  return { ok: true, message: "ลบหมวดหมู่เรียบร้อย" };
+}
+
 /* ---------------- Rooms ---------------- */
 
 const roomSchema = z.object({
   id: z.string().optional(),
+  categoryId: z.string().min(1, "กรุณาเลือกหมวดหมู่"),
   name: z.string().min(1, "กรุณากรอกชื่อ/เลขห้อง"),
-  size: z.enum(["SMALL", "MEDIUM", "LARGE", "XLARGE"]),
+  sortOrder: z.coerce.number().int().default(0),
+  size: z.enum(["SMALL", "MEDIUM", "LARGE", "XLARGE"]).optional(),
   hasAir: z.coerce.boolean().default(false),
   hasFan: z.coerce.boolean().default(false),
   pricePerNight: z.coerce.number().int().min(0),
@@ -100,7 +143,7 @@ export async function upsertRoom(input: unknown): Promise<ActionResult> {
       await prisma.room.create({ data });
     }
   } catch {
-    return { ok: false, error: "ชื่อ/เลขห้องนี้มีอยู่แล้ว" };
+    return { ok: false, error: "ชื่อ/เลขยูนิตนี้มีอยู่แล้วในหมวดนี้" };
   }
   revalidatePath("/settings/rooms");
   return { ok: true, message: "บันทึกห้องพักเรียบร้อย" };

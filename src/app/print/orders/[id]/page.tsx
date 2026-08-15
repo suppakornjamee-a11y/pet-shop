@@ -16,7 +16,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
 
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { customer: true, pet: true, room: true, items: true, payment: true },
+    include: { customer: true, pet: true, room: true, items: true },
   });
   if (!order) notFound();
 

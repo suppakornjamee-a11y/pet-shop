@@ -8,10 +8,13 @@ import { generateOrderCode } from "@/lib/order-code";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import {
   buildSlotDate,
+  daysBetween,
   isValidDateStr,
   isValidTimeStr,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
+import { isRoomAvailable } from "@/lib/room-availability";
+import type { RoomModel, RoomCategoryModel } from "@/generated/prisma/models";
 import type { ActionResult } from "./customers";
 
 const PAYMENT_TTL_MS = 15 * 60 * 1000; // 15 นาที
@@ -20,7 +23,15 @@ const createOrderSchema = z.object({
   customerId: z.string().min(1, "กรุณาเลือกลูกค้า"),
   petId: z.string().optional().nullable(),
   roomId: z.string().optional().nullable(),
-  nights: z.coerce.number().int().min(0).default(0),
+  checkInDate: z.string().optional(),
+  checkInTime: z.string().optional(),
+  checkOutDate: z.string().optional(),
+  checkOutTime: z.string().optional(),
+  nanny: z.coerce.boolean().default(false),
+  depositAmount: z.coerce.number().int().min(0).default(0),
+  vaccineComplete: z.coerce.boolean().default(false),
+  lastFleaTickDate: z.string().optional(),
+  fleaTickMedicine: z.string().optional(),
   note: z.string().optional(),
   serviceIds: z.array(z.string()).default([]),
   productLines: z
@@ -30,7 +41,9 @@ const createOrderSchema = z.object({
   appointmentTime: z.string().optional(),
 });
 
-/** เช็คว่า slot นี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่) */
+type OrderFormData = z.infer<typeof createOrderSchema>;
+
+/** เช็คว่า slot คิวส่วนกลาง (อาบน้ำ/ตัดขน) นี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่) */
 export async function isSlotAvailable(
   dateStr: string,
   timeStr: string,
@@ -45,62 +58,121 @@ export async function isSlotAvailable(
     },
     select: {
       status: true,
-      payment: { select: { status: true, expiresAt: true } },
+      payments: { select: { status: true, expiresAt: true } },
     },
   });
   return !orders.some((o) => isSlotHolding(o));
 }
 
-export async function createOrder(input: unknown): Promise<ActionResult> {
-  const user = await requireUser();
-  const parsed = createOrderSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const data = parsed.data;
+type OrderItemInput = {
+  itemType: "SERVICE" | "ROOM" | "PRODUCT";
+  refId: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+};
 
+type RoomWithCategory = RoomModel & { category: RoomCategoryModel };
+
+/**
+ * ประมวลผล + ตรวจสอบข้อมูลฟอร์มออเดอร์ทั้งหมด (ใช้ร่วมกันทั้งสร้างและแก้ไข)
+ * - ถ้ามีบริการอาบน้ำ/ตัดขน (คิวส่วนกลาง) หรือไม่มีห้อง → ต้องเลือกคิวจากปฏิทิน
+ * - ถ้ามีห้อง → ต้องระบุวัน-เวลาเช็คอิน/เช็คเอาท์ และห้องต้องว่างในช่วงนั้น
+ */
+async function buildOrderPlan(
+  data: OrderFormData,
+  excludeOrderId?: string
+): Promise<
+  | {
+      ok: true;
+      appointmentAt: Date | null;
+      checkInAt: Date | null;
+      checkOutAt: Date | null;
+      nights: number;
+      items: OrderItemInput[];
+      subtotal: number;
+      room: NonNullable<RoomWithCategory>;
+    }
+  | { ok: true; room: null; appointmentAt: Date | null; checkInAt: null; checkOutAt: null; nights: 0; items: OrderItemInput[]; subtotal: number }
+  | { ok: false; error: string }
+> {
   const hasSomething =
-    data.serviceIds.length > 0 || data.productLines.length > 0 || (data.roomId && data.nights > 0);
+    data.serviceIds.length > 0 || data.productLines.length > 0 || !!data.roomId;
   if (!hasSomething) {
     return { ok: false, error: "กรุณาเพิ่มบริการ ห้องพัก หรือสินค้าอย่างน้อย 1 รายการ" };
   }
 
-  // ต้องเลือกวัน-เวลาคิว และต้องไม่ชนกับคิวเดิม
-  const { appointmentDate, appointmentTime } = data;
-  if (
-    !appointmentDate ||
-    !appointmentTime ||
-    !isValidDateStr(appointmentDate) ||
-    !isValidTimeStr(appointmentTime)
-  ) {
-    return { ok: false, error: "กรุณาเลือกวันและเวลาคิวจากปฏิทินก่อนสร้างออเดอร์" };
-  }
-  const appointmentAt = buildSlotDate(appointmentDate, appointmentTime);
-  if (appointmentAt.getTime() < Date.now()) {
-    return { ok: false, error: "ไม่สามารถจองคิวย้อนหลังได้ กรุณาเลือกเวลาในอนาคต" };
-  }
-  if (!(await isSlotAvailable(appointmentDate, appointmentTime))) {
-    return { ok: false, error: "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกช่วงเวลาอื่น" };
-  }
-
-  // ดึงราคาจริงจากฐานข้อมูล (ไม่เชื่อราคาจาก client)
   const [services, room, products] = await Promise.all([
     data.serviceIds.length
       ? prisma.service.findMany({ where: { id: { in: data.serviceIds } } })
       : Promise.resolve([]),
-    data.roomId ? prisma.room.findUnique({ where: { id: data.roomId } }) : Promise.resolve(null),
+    data.roomId
+      ? prisma.room.findUnique({ where: { id: data.roomId }, include: { category: true } })
+      : Promise.resolve(null),
     data.productLines.length
       ? prisma.product.findMany({ where: { id: { in: data.productLines.map((p) => p.productId) } } })
       : Promise.resolve([]),
   ]);
 
-  const items: {
-    itemType: "SERVICE" | "ROOM" | "PRODUCT";
-    refId: string;
-    name: string;
-    unitPrice: number;
-    quantity: number;
-    subtotal: number;
-  }[] = [];
+  const hasQueueService = services.some((s) => s.category === "BATH" || s.category === "GROOMING");
+  const needsAppointment = hasQueueService || !room;
 
+  let appointmentAt: Date | null = null;
+  if (needsAppointment) {
+    const { appointmentDate, appointmentTime } = data;
+    if (
+      !appointmentDate ||
+      !appointmentTime ||
+      !isValidDateStr(appointmentDate) ||
+      !isValidTimeStr(appointmentTime)
+    ) {
+      return { ok: false, error: "กรุณาเลือกวันและเวลาคิวจากปฏิทินก่อนสร้างออเดอร์" };
+    }
+    appointmentAt = buildSlotDate(appointmentDate, appointmentTime);
+    if (appointmentAt.getTime() < Date.now()) {
+      return { ok: false, error: "ไม่สามารถจองคิวย้อนหลังได้ กรุณาเลือกเวลาในอนาคต" };
+    }
+    if (!(await isSlotAvailable(appointmentDate, appointmentTime, excludeOrderId))) {
+      return { ok: false, error: "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกช่วงเวลาอื่น" };
+    }
+  }
+
+  let checkInAt: Date | null = null;
+  let checkOutAt: Date | null = null;
+  let nights = 0;
+  if (room) {
+    const { checkInDate, checkInTime, checkOutDate, checkOutTime } = data;
+    if (
+      !checkInDate ||
+      !checkInTime ||
+      !checkOutDate ||
+      !checkOutTime ||
+      !isValidDateStr(checkInDate) ||
+      !isValidTimeStr(checkInTime) ||
+      !isValidDateStr(checkOutDate) ||
+      !isValidTimeStr(checkOutTime)
+    ) {
+      return { ok: false, error: "กรุณาระบุวัน-เวลาเช็คอินและเช็คเอาท์ของห้อง/พื้นที่" };
+    }
+    checkInAt = buildSlotDate(checkInDate, checkInTime);
+    checkOutAt = buildSlotDate(checkOutDate, checkOutTime);
+    if (checkOutAt.getTime() <= checkInAt.getTime()) {
+      return { ok: false, error: "เวลาเช็คเอาท์ต้องอยู่หลังเวลาเช็คอิน" };
+    }
+    if (room.category.billingUnit === "PER_VISIT" && checkInDate !== checkOutDate) {
+      return { ok: false, error: "การจองแบบรายครั้ง (Daycare/Pawsome) ต้องเช็คอิน-เช็คเอาท์วันเดียวกัน" };
+    }
+    nights =
+      room.category.billingUnit === "PER_NIGHT"
+        ? Math.max(1, daysBetween(checkInDate, checkOutDate))
+        : 0;
+    if (!(await isRoomAvailable(room.id, checkInAt, checkOutAt, excludeOrderId))) {
+      return { ok: false, error: "ห้อง/พื้นที่นี้ถูกจองในช่วงเวลาดังกล่าวแล้ว กรุณาเลือกห้องหรือช่วงเวลาอื่น" };
+    }
+  }
+
+  const items: OrderItemInput[] = [];
   for (const s of services) {
     items.push({
       itemType: "SERVICE",
@@ -111,18 +183,18 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
       subtotal: s.price,
     });
   }
-
-  if (room && data.nights > 0) {
+  if (room) {
+    const qty = nights > 0 ? nights : 1;
+    const unitLabel = nights > 0 ? `${nights} คืน` : "1 ครั้ง";
     items.push({
       itemType: "ROOM",
       refId: room.id,
-      name: `ห้องพัก ${room.name} (${data.nights} คืน)`,
+      name: `${room.category.name} ${room.name} (${unitLabel})`,
       unitPrice: room.pricePerNight,
-      quantity: data.nights,
-      subtotal: room.pricePerNight * data.nights,
+      quantity: qty,
+      subtotal: room.pricePerNight * qty,
     });
   }
-
   for (const line of data.productLines) {
     const p = products.find((x) => x.id === line.productId);
     if (!p) continue;
@@ -137,7 +209,31 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
   }
 
   const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
-  const total = subtotal;
+  if (data.depositAmount > subtotal) {
+    return { ok: false, error: "มัดจำต้องไม่มากกว่ายอดรวมออเดอร์" };
+  }
+
+  if (room) {
+    return { ok: true, appointmentAt, checkInAt, checkOutAt, nights, items, subtotal, room };
+  }
+  return { ok: true, appointmentAt, checkInAt: null, checkOutAt: null, nights: 0, items, subtotal, room: null };
+}
+
+function parseFleaTickDate(dateStr: string | undefined): Date | null {
+  return dateStr && isValidDateStr(dateStr) ? buildSlotDate(dateStr, "00:00") : null;
+}
+
+export async function createOrder(input: unknown): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = createOrderSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const data = parsed.data;
+
+  const plan = await buildOrderPlan(data);
+  if (!plan.ok) return plan;
+
+  const total = plan.subtotal;
+  const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
 
   // ลองสร้างพร้อม retry เผื่อรหัสชนกัน (P2002)
   let order: { id: string } | null = null;
@@ -149,16 +245,23 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
           code,
           customerId: data.customerId,
           petId: data.petId || null,
-          roomId: room && data.nights > 0 ? room.id : null,
-          nights: room && data.nights > 0 ? data.nights : 0,
-          appointmentAt,
-          subtotal,
+          roomId: plan.room?.id ?? null,
+          nights: plan.nights,
+          appointmentAt: plan.appointmentAt,
+          checkInAt: plan.checkInAt,
+          checkOutAt: plan.checkOutAt,
+          nanny: data.nanny,
+          depositAmount: data.depositAmount,
+          vaccineComplete: data.vaccineComplete,
+          lastFleaTickAt,
+          fleaTickMedicine: data.fleaTickMedicine || null,
+          subtotal: plan.subtotal,
           total,
           note: data.note || null,
           createdById: user.id,
           updatedById: user.id,
           status: "PENDING_PAYMENT",
-          items: { create: items },
+          items: { create: plan.items },
         },
       });
       break;
@@ -170,76 +273,22 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
   }
   if (!order) return { ok: false, error: "สร้างออเดอร์ไม่สำเร็จ กรุณาลองใหม่" };
 
-  // สร้าง Payment + QR PromptPay ทันที
-  await createPaymentWithQr(order.id, total);
+  if (data.petId) {
+    await prisma.pet.update({
+      where: { id: data.petId },
+      data: {
+        vaccineComplete: data.vaccineComplete,
+        lastFleaTickAt,
+        fleaTickMedicine: data.fleaTickMedicine || null,
+      },
+    });
+  }
+
+  await createInitialPayments(order.id, total, data.depositAmount);
 
   revalidatePath("/orders");
+  revalidatePath("/boarding");
   return { ok: true, id: order.id, message: "สร้างออเดอร์เรียบร้อย" };
-}
-
-/** ดึงราคาจริงจาก DB แล้วประกอบเป็นรายการออเดอร์ (ใช้ร่วมกันทั้งสร้างและแก้ไข) */
-async function resolveOrderItems(data: {
-  roomId?: string | null;
-  nights: number;
-  serviceIds: string[];
-  productLines: { productId: string; quantity: number }[];
-}) {
-  const [services, room, products] = await Promise.all([
-    data.serviceIds.length
-      ? prisma.service.findMany({ where: { id: { in: data.serviceIds } } })
-      : Promise.resolve([]),
-    data.roomId ? prisma.room.findUnique({ where: { id: data.roomId } }) : Promise.resolve(null),
-    data.productLines.length
-      ? prisma.product.findMany({ where: { id: { in: data.productLines.map((p) => p.productId) } } })
-      : Promise.resolve([]),
-  ]);
-
-  const items: {
-    itemType: "SERVICE" | "ROOM" | "PRODUCT";
-    refId: string;
-    name: string;
-    unitPrice: number;
-    quantity: number;
-    subtotal: number;
-  }[] = [];
-
-  for (const s of services) {
-    items.push({
-      itemType: "SERVICE",
-      refId: s.id,
-      name: s.name,
-      unitPrice: s.price,
-      quantity: 1,
-      subtotal: s.price,
-    });
-  }
-
-  if (room && data.nights > 0) {
-    items.push({
-      itemType: "ROOM",
-      refId: room.id,
-      name: `ห้องพัก ${room.name} (${data.nights} คืน)`,
-      unitPrice: room.pricePerNight,
-      quantity: data.nights,
-      subtotal: room.pricePerNight * data.nights,
-    });
-  }
-
-  for (const line of data.productLines) {
-    const p = products.find((x) => x.id === line.productId);
-    if (!p) continue;
-    items.push({
-      itemType: "PRODUCT",
-      refId: p.id,
-      name: p.name,
-      unitPrice: p.price,
-      quantity: line.quantity,
-      subtotal: p.price * line.quantity,
-    });
-  }
-
-  const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
-  return { items, subtotal, room };
 }
 
 export async function updateOrder(orderId: string, input: unknown): Promise<ActionResult> {
@@ -254,55 +303,80 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
     return { ok: false, error: "แก้ไขได้เฉพาะออเดอร์ที่ยังรอชำระเงินเท่านั้น" };
   }
 
-  const hasSomething =
-    data.serviceIds.length > 0 || data.productLines.length > 0 || (data.roomId && data.nights > 0);
-  if (!hasSomething) {
-    return { ok: false, error: "กรุณาเพิ่มบริการ ห้องพัก หรือสินค้าอย่างน้อย 1 รายการ" };
-  }
+  const plan = await buildOrderPlan(data, orderId);
+  if (!plan.ok) return plan;
 
-  const { items, subtotal, room } = await resolveOrderItems(data);
-  const total = subtotal;
+  const total = plan.subtotal;
+  const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
 
   await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
+    // สถานะยังเป็น PENDING_PAYMENT แน่นอน (เช็คไว้ข้างบน) จึงยังไม่มี payment ที่ VERIFIED
+    await tx.payment.deleteMany({ where: { orderId, status: { not: "VERIFIED" } } });
     await tx.order.update({
       where: { id: orderId },
       data: {
         petId: data.petId || null,
-        roomId: room && data.nights > 0 ? room.id : null,
-        nights: room && data.nights > 0 ? data.nights : 0,
-        subtotal,
+        roomId: plan.room?.id ?? null,
+        nights: plan.nights,
+        appointmentAt: plan.appointmentAt,
+        checkInAt: plan.checkInAt,
+        checkOutAt: plan.checkOutAt,
+        nanny: data.nanny,
+        depositAmount: data.depositAmount,
+        vaccineComplete: data.vaccineComplete,
+        lastFleaTickAt,
+        fleaTickMedicine: data.fleaTickMedicine || null,
+        subtotal: plan.subtotal,
         total,
         note: data.note || null,
         updatedById: user.id,
-        items: { create: items },
+        items: { create: plan.items },
       },
     });
   });
 
-  // สร้าง QR ใหม่ + รีเซ็ตเวลา 15 นาที ตามยอดใหม่
-  await createPaymentWithQr(orderId, total);
+  if (data.petId) {
+    await prisma.pet.update({
+      where: { id: data.petId },
+      data: {
+        vaccineComplete: data.vaccineComplete,
+        lastFleaTickAt,
+        fleaTickMedicine: data.fleaTickMedicine || null,
+      },
+    });
+  }
+
+  await createInitialPayments(orderId, total, data.depositAmount);
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
+  revalidatePath("/boarding");
   return { ok: true, id: orderId, message: "แก้ไขออเดอร์เรียบร้อย สร้าง QR ใหม่แล้ว (15 นาที)" };
 }
 
-async function createPaymentWithQr(orderId: string, amount: number) {
-  const account =
+async function defaultPromptPayAccount() {
+  return (
     (await prisma.bankAccount.findFirst({
       where: { type: "PROMPTPAY", active: true, isDefault: true },
-    })) ??
-    (await prisma.bankAccount.findFirst({ where: { type: "PROMPTPAY", active: true } }));
+    })) ?? (await prisma.bankAccount.findFirst({ where: { type: "PROMPTPAY", active: true } }))
+  );
+}
 
+async function insertPayment(
+  orderId: string,
+  amount: number,
+  purpose: "DEPOSIT" | "BALANCE"
+) {
+  const account = await defaultPromptPayAccount();
   const qrPayload =
     account?.promptpayId ? buildPromptPayPayload(account.promptpayId, amount) : null;
   const expiresAt = new Date(Date.now() + PAYMENT_TTL_MS);
 
-  await prisma.payment.upsert({
-    where: { orderId },
-    create: {
+  return prisma.payment.create({
+    data: {
       orderId,
+      purpose,
       amount,
       method: "PROMPTPAY",
       status: "PENDING",
@@ -310,8 +384,66 @@ async function createPaymentWithQr(orderId: string, amount: number) {
       qrPayload,
       expiresAt,
     },
-    update: {
-      amount,
+  });
+}
+
+/** สร้าง payment แรกของออเดอร์ — ถ้ามีมัดจำ สร้างแค่ยอดมัดจำก่อน ถ้าไม่มีมัดจำ สร้างเต็มยอด */
+async function createInitialPayments(orderId: string, total: number, depositAmount: number) {
+  if (depositAmount > 0) {
+    await insertPayment(orderId, depositAmount, "DEPOSIT");
+  } else {
+    await insertPayment(orderId, total, "BALANCE");
+  }
+}
+
+/** เก็บส่วนที่เหลือ (หลังมัดจำยืนยันแล้ว) */
+export async function createBalancePayment(orderId: string): Promise<ActionResult> {
+  await requireUser();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true },
+  });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.status !== "DEPOSIT_PAID") {
+    return { ok: false, error: "ออเดอร์นี้ยังไม่ได้มัดจำ หรือชำระครบแล้ว" };
+  }
+  const hasOpenPayment = order.payments.some((p) => p.status !== "VERIFIED" && p.status !== "REJECTED");
+  if (hasOpenPayment) {
+    return { ok: false, error: "มีรายการชำระเงินที่ยังไม่เสร็จสิ้นอยู่แล้ว" };
+  }
+  const verifiedSum = order.payments
+    .filter((p) => p.status === "VERIFIED")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const remaining = order.total - verifiedSum;
+  if (remaining <= 0) {
+    return { ok: false, error: "ไม่มียอดคงเหลือให้เก็บแล้ว" };
+  }
+
+  await insertPayment(orderId, remaining, "BALANCE");
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "สร้าง QR ยอดคงเหลือเรียบร้อย" };
+}
+
+export async function regeneratePayment(paymentId: string): Promise<ActionResult> {
+  await requireUser();
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: { order: true },
+  });
+  if (!payment) return { ok: false, error: "ไม่พบรายการชำระเงิน" };
+  if (payment.status === "VERIFIED") {
+    return { ok: false, error: "รายการนี้ยืนยันแล้ว ไม่ต้องสร้าง QR ใหม่" };
+  }
+  if (!["PENDING_PAYMENT", "DEPOSIT_PAID"].includes(payment.order.status)) {
+    return { ok: false, error: "ออเดอร์นี้ไม่สามารถสร้าง QR ใหม่ได้แล้ว" };
+  }
+  const account = await defaultPromptPayAccount();
+  const qrPayload =
+    account?.promptpayId ? buildPromptPayPayload(account.promptpayId, payment.amount) : null;
+  const expiresAt = new Date(Date.now() + PAYMENT_TTL_MS);
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: {
       status: "PENDING",
       bankAccountId: account?.id ?? null,
       qrPayload,
@@ -321,92 +453,97 @@ async function createPaymentWithQr(orderId: string, amount: number) {
       rejectReason: null,
     },
   });
-}
-
-export async function regeneratePayment(orderId: string): Promise<ActionResult> {
-  await requireUser();
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  if (order.status !== "PENDING_PAYMENT") {
-    return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ในสถานะรอชำระเงิน" };
-  }
-  await createPaymentWithQr(orderId, order.total);
-  revalidatePath(`/orders/${orderId}`);
+  revalidatePath(`/orders/${payment.orderId}`);
   return { ok: true, message: "สร้าง QR ใหม่เรียบร้อย (มีเวลา 15 นาที)" };
 }
 
-export async function markSlipSubmitted(orderId: string, slipUrl?: string): Promise<ActionResult> {
+export async function markSlipSubmitted(paymentId: string, slipUrl?: string): Promise<ActionResult> {
   await requireUser();
-  await prisma.payment.update({
-    where: { orderId },
+  const payment = await prisma.payment.update({
+    where: { id: paymentId },
     data: { status: "SUBMITTED", submittedAt: new Date(), slipUrl: slipUrl || null },
   });
-  revalidatePath(`/orders/${orderId}`);
+  revalidatePath(`/orders/${payment.orderId}`);
   return { ok: true, message: "บันทึกการอัปโหลดสลิปแล้ว รอตรวจสอบ" };
 }
 
-export async function verifyPayment(orderId: string): Promise<ActionResult> {
+export async function verifyPayment(paymentId: string): Promise<ActionResult> {
   const user = await requireUser();
 
+  const lookup = await prisma.payment.findUnique({ where: { id: paymentId }, select: { orderId: true } });
+  if (!lookup) return { ok: false, error: "ไม่พบรายการชำระเงิน" };
+  const orderId = lookup.orderId;
+
   const result = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: true, payment: true },
+    const payment = await tx.payment.findUnique({
+      where: { id: paymentId },
+      include: { order: { include: { items: true, payments: true } } },
     });
-    if (!order) return { ok: false as const, error: "ไม่พบออเดอร์" };
-    if (order.payment?.status === "VERIFIED") {
+    if (!payment) return { ok: false as const, error: "ไม่พบรายการชำระเงิน" };
+    if (payment.status === "VERIFIED") {
       return { ok: false as const, error: "ชำระเงินนี้ยืนยันไปแล้ว" };
     }
 
     await tx.payment.update({
-      where: { orderId },
+      where: { id: paymentId },
       data: { status: "VERIFIED", verifiedAt: new Date(), verifiedById: user.id, rejectReason: null },
     });
 
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: "PAID", updatedById: user.id },
-    });
+    const order = payment.order;
+    const verifiedSum = order.payments.reduce(
+      (sum, p) => sum + (p.id === paymentId || p.status === "VERIFIED" ? p.amount : 0),
+      0
+    );
+    const alreadyFullyPaid = (["PAID", "IN_PROGRESS", "COMPLETED"] as string[]).includes(order.status);
 
-    // ตัดสต็อกสินค้า
-    for (const it of order.items) {
-      if (it.itemType === "PRODUCT" && it.refId) {
-        await tx.product.update({
-          where: { id: it.refId },
-          data: { stockQty: { decrement: it.quantity } },
-        });
-        await tx.stockMovement.create({
-          data: {
-            productId: it.refId,
-            type: "OUT",
-            quantity: it.quantity,
-            reason: `ขายในออเดอร์ ${order.code}`,
-            createdById: user.id,
-          },
-        });
+    if (!alreadyFullyPaid && verifiedSum >= order.total) {
+      await tx.order.update({ where: { id: order.id }, data: { status: "PAID", updatedById: user.id } });
+
+      // ตัดสต็อกสินค้า (เฉพาะตอนชำระครบยอดแล้วเท่านั้น)
+      for (const it of order.items) {
+        if (it.itemType === "PRODUCT" && it.refId) {
+          await tx.product.update({
+            where: { id: it.refId },
+            data: { stockQty: { decrement: it.quantity } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: it.refId,
+              type: "OUT",
+              quantity: it.quantity,
+              reason: `ขายในออเดอร์ ${order.code}`,
+              createdById: user.id,
+            },
+          });
+        }
       }
+    } else if (!alreadyFullyPaid && payment.purpose === "DEPOSIT") {
+      await tx.order.update({ where: { id: order.id }, data: { status: "DEPOSIT_PAID", updatedById: user.id } });
     }
+
     return { ok: true as const };
   });
 
-  if (!result.ok) return result;
   revalidatePath(`/orders/${orderId}`);
+  if (!result.ok) return result;
   revalidatePath("/orders");
+  revalidatePath("/boarding");
   return { ok: true, message: "ยืนยันการชำระเงินเรียบร้อย" };
 }
 
-export async function rejectPayment(orderId: string, reason: string): Promise<ActionResult> {
+export async function rejectPayment(paymentId: string, reason: string): Promise<ActionResult> {
   await requireUser();
-  await prisma.payment.update({
-    where: { orderId },
+  const payment = await prisma.payment.update({
+    where: { id: paymentId },
     data: { status: "REJECTED", rejectReason: reason || "ยอดไม่ตรง / สลิปไม่ถูกต้อง" },
   });
-  revalidatePath(`/orders/${orderId}`);
+  revalidatePath(`/orders/${payment.orderId}`);
   return { ok: true, message: "ปฏิเสธการชำระเงินแล้ว แจ้งลูกค้าให้ส่งสลิปใหม่" };
 }
 
 const statusSchema = z.enum([
   "PENDING_PAYMENT",
+  "DEPOSIT_PAID",
   "PAID",
   "IN_PROGRESS",
   "COMPLETED",
@@ -424,5 +561,6 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   });
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
+  revalidatePath("/boarding");
   return { ok: true, message: "อัปเดตสถานะเรียบร้อย" };
 }

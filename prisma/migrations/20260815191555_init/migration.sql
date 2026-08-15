@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'MANAGER');
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'USER');
 
 -- CreateEnum
 CREATE TYPE "Species" AS ENUM ('DOG', 'CAT');
@@ -14,7 +14,13 @@ CREATE TYPE "ServiceCategory" AS ENUM ('BATH', 'GROOMING', 'BOARDING', 'OTHER');
 CREATE TYPE "RoomSize" AS ENUM ('SMALL', 'MEDIUM', 'LARGE', 'XLARGE');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('PENDING_PAYMENT', 'PAID', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+CREATE TYPE "OrderStatus" AS ENUM ('PENDING_PAYMENT', 'DEPOSIT_PAID', 'PAID', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "BillingUnit" AS ENUM ('PER_NIGHT', 'PER_VISIT');
+
+-- CreateEnum
+CREATE TYPE "PaymentPurpose" AS ENUM ('DEPOSIT', 'BALANCE');
 
 -- CreateEnum
 CREATE TYPE "OrderItemType" AS ENUM ('SERVICE', 'ROOM', 'PRODUCT');
@@ -41,7 +47,7 @@ CREATE TABLE "User" (
     "name" TEXT NOT NULL,
     "email" TEXT,
     "passwordHash" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'ADMIN',
+    "role" "Role" NOT NULL DEFAULT 'USER',
     "active" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -78,6 +84,9 @@ CREATE TABLE "Pet" (
     "allergies" TEXT,
     "note" TEXT,
     "photoUrl" TEXT,
+    "vaccineComplete" BOOLEAN,
+    "lastFleaTickAt" TIMESTAMP(3),
+    "fleaTickMedicine" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -99,10 +108,26 @@ CREATE TABLE "Service" (
 );
 
 -- CreateTable
-CREATE TABLE "Room" (
+CREATE TABLE "RoomCategory" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "size" "RoomSize" NOT NULL,
+    "billingUnit" "BillingUnit" NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "description" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RoomCategory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Room" (
+    "id" TEXT NOT NULL,
+    "categoryId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "size" "RoomSize",
     "hasAir" BOOLEAN NOT NULL DEFAULT false,
     "hasFan" BOOLEAN NOT NULL DEFAULT false,
     "pricePerNight" INTEGER NOT NULL,
@@ -127,6 +152,8 @@ CREATE TABLE "Product" (
     "stockQty" INTEGER NOT NULL DEFAULT 0,
     "unit" TEXT NOT NULL DEFAULT 'ชิ้น',
     "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdById" TEXT,
+    "updatedById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -170,14 +197,21 @@ CREATE TABLE "Order" (
     "petId" TEXT,
     "roomId" TEXT,
     "status" "OrderStatus" NOT NULL DEFAULT 'PENDING_PAYMENT',
+    "appointmentAt" TIMESTAMP(3),
     "checkInAt" TIMESTAMP(3),
     "checkOutAt" TIMESTAMP(3),
     "nights" INTEGER NOT NULL DEFAULT 0,
+    "nanny" BOOLEAN NOT NULL DEFAULT false,
+    "depositAmount" INTEGER NOT NULL DEFAULT 0,
+    "vaccineComplete" BOOLEAN NOT NULL DEFAULT false,
+    "lastFleaTickAt" TIMESTAMP(3),
+    "fleaTickMedicine" TEXT,
     "subtotal" INTEGER NOT NULL DEFAULT 0,
     "discount" INTEGER NOT NULL DEFAULT 0,
     "total" INTEGER NOT NULL DEFAULT 0,
     "note" TEXT,
     "createdById" TEXT,
+    "updatedById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -202,6 +236,7 @@ CREATE TABLE "OrderItem" (
 CREATE TABLE "Payment" (
     "id" TEXT NOT NULL,
     "orderId" TEXT NOT NULL,
+    "purpose" "PaymentPurpose" NOT NULL DEFAULT 'BALANCE',
     "bankAccountId" TEXT,
     "method" "PaymentMethod" NOT NULL DEFAULT 'PROMPTPAY',
     "amount" INTEGER NOT NULL,
@@ -246,7 +281,13 @@ CREATE INDEX "Customer_name_idx" ON "Customer"("name");
 CREATE INDEX "Pet_customerId_idx" ON "Pet"("customerId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Room_name_key" ON "Room"("name");
+CREATE UNIQUE INDEX "RoomCategory_name_key" ON "RoomCategory"("name");
+
+-- CreateIndex
+CREATE INDEX "Room_categoryId_idx" ON "Room"("categoryId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Room_categoryId_name_key" ON "Room"("categoryId", "name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Product_sku_key" ON "Product"("sku");
@@ -270,16 +311,37 @@ CREATE INDEX "Order_status_idx" ON "Order"("status");
 CREATE INDEX "Order_createdAt_idx" ON "Order"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "Order_appointmentAt_idx" ON "Order"("appointmentAt");
+
+-- CreateIndex
+CREATE INDEX "Order_roomId_idx" ON "Order"("roomId");
+
+-- CreateIndex
+CREATE INDEX "Order_checkInAt_idx" ON "Order"("checkInAt");
+
+-- CreateIndex
+CREATE INDEX "Order_checkOutAt_idx" ON "Order"("checkOutAt");
+
+-- CreateIndex
 CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Payment_orderId_key" ON "Payment"("orderId");
+CREATE INDEX "Payment_orderId_idx" ON "Payment"("orderId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Setting_key_key" ON "Setting"("key");
 
 -- AddForeignKey
 ALTER TABLE "Pet" ADD CONSTRAINT "Pet_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Room" ADD CONSTRAINT "Room_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "RoomCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StockMovement" ADD CONSTRAINT "StockMovement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -298,6 +360,9 @@ ALTER TABLE "Order" ADD CONSTRAINT "Order_roomId_fkey" FOREIGN KEY ("roomId") RE
 
 -- AddForeignKey
 ALTER TABLE "Order" ADD CONSTRAINT "Order_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;

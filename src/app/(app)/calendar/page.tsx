@@ -43,7 +43,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
     include: {
       customer: true,
       pet: true,
-      payment: { select: { status: true, expiresAt: true } },
+      payments: { select: { status: true, expiresAt: true } },
     },
     orderBy: { appointmentAt: "asc" },
   });

@@ -15,11 +15,14 @@ import {
   Plus,
   X,
   ClipboardCheck,
+  Syringe,
+  Bug,
 } from "lucide-react";
 import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
 import { formatBaht } from "@/lib/format";
-import { serviceCategoryLabel, roomSizeLabel, speciesEmoji } from "@/lib/labels";
+import { toThaiDateStr, addDaysThai, daysBetween } from "@/lib/slots";
+import { serviceCategoryLabel, speciesEmoji, billingUnitLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +33,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -38,8 +43,10 @@ import {
 type Service = { id: string; name: string; category: string; price: number };
 type Room = {
   id: string;
+  categoryId: string;
+  categoryName: string;
+  billingUnit: "PER_NIGHT" | "PER_VISIT";
   name: string;
-  size: "SMALL" | "MEDIUM" | "LARGE" | "XLARGE";
   pricePerNight: number;
   hasAir: boolean;
   hasFan: boolean;
@@ -53,7 +60,14 @@ type Product = {
   unit: string;
   stockQty: number;
 };
-type Pet = { id: string; name: string; species: "DOG" | "CAT" };
+type Pet = {
+  id: string;
+  name: string;
+  species: "DOG" | "CAT";
+  vaccineComplete: boolean | null;
+  lastFleaTickAt: string | null;
+  fleaTickMedicine: string | null;
+};
 type CustomerWithPets = {
   id: string;
   name: string;
@@ -65,10 +79,20 @@ type OrderInitial = {
   petId?: string | null;
   serviceIds?: string[];
   roomId?: string | null;
-  nights?: number;
+  checkInDate?: string;
+  checkInTime?: string;
+  checkOutDate?: string;
+  checkOutTime?: string;
+  nanny?: boolean;
+  depositAmount?: number;
+  vaccineComplete?: boolean;
+  lastFleaTickDate?: string;
+  fleaTickMedicine?: string;
   productQty?: Record<string, number>;
   note?: string | null;
 };
+
+const todayStr = () => toThaiDateStr(new Date());
 
 export function OrderForm({
   services,
@@ -107,18 +131,41 @@ export function OrderForm({
     new Set(initial?.serviceIds ?? [])
   );
   const [roomId, setRoomId] = useState<string>(initial?.roomId ?? "");
-  const [nights, setNights] = useState(initial?.nights && initial.nights > 0 ? initial.nights : 1);
+  const [checkInDate, setCheckInDate] = useState(initial?.checkInDate || todayStr());
+  const [checkInTime, setCheckInTime] = useState(initial?.checkInTime || "13:00");
+  const [checkOutDate, setCheckOutDate] = useState(
+    initial?.checkOutDate || addDaysThai(initial?.checkInDate || todayStr(), 1)
+  );
+  const [checkOutTime, setCheckOutTime] = useState(initial?.checkOutTime || "11:00");
+  const [nanny, setNanny] = useState(initial?.nanny ?? false);
+  const [depositAmount, setDepositAmount] = useState(String(initial?.depositAmount ?? 0));
+  const [vaccineComplete, setVaccineComplete] = useState(initial?.vaccineComplete ?? false);
+  const [lastFleaTickDate, setLastFleaTickDate] = useState(initial?.lastFleaTickDate ?? "");
+  const [fleaTickMedicine, setFleaTickMedicine] = useState(initial?.fleaTickMedicine ?? "");
   const [productQty, setProductQty] = useState<Record<string, number>>(
     initial?.productQty ?? {}
   );
   const [note, setNote] = useState(initial?.note ?? "");
 
   const selectedRoom = rooms.find((r) => r.id === roomId) ?? null;
+  const isPerVisit = selectedRoom?.billingUnit === "PER_VISIT";
+  const nights =
+    selectedRoom && !isPerVisit ? Math.max(1, daysBetween(checkInDate, checkOutDate)) : 0;
+
+  const roomsByCategory = useMemo(() => {
+    const map = new Map<string, { categoryName: string; rooms: Room[] }>();
+    for (const r of rooms) {
+      const entry = map.get(r.categoryId) ?? { categoryName: r.categoryName, rooms: [] };
+      entry.rooms.push(r);
+      map.set(r.categoryId, entry);
+    }
+    return [...map.values()];
+  }, [rooms]);
 
   const total = useMemo(() => {
     let sum = 0;
     for (const s of services) if (serviceIds.has(s.id)) sum += s.price;
-    if (selectedRoom && nights > 0) sum += selectedRoom.pricePerNight * nights;
+    if (selectedRoom) sum += selectedRoom.pricePerNight * (nights > 0 ? nights : 1);
     for (const p of products) sum += (productQty[p.id] ?? 0) * p.price;
     return sum;
   }, [services, serviceIds, selectedRoom, nights, products, productQty]);
@@ -132,11 +179,25 @@ export function OrderForm({
     });
   }
 
+  function prefillFromPet(pet?: Pet) {
+    if (!pet) return;
+    setVaccineComplete(pet.vaccineComplete ?? false);
+    setLastFleaTickDate(pet.lastFleaTickAt ? toThaiDateStr(new Date(pet.lastFleaTickAt)) : "");
+    setFleaTickMedicine(pet.fleaTickMedicine ?? "");
+  }
+
   function pickCustomer(c: CustomerWithPets) {
     setCustomer(c);
-    setPetId(c.pets[0]?.id ?? "");
+    const firstPet = c.pets[0];
+    setPetId(firstPet?.id ?? "");
+    prefillFromPet(firstPet);
     setResults([]);
     setQuery("");
+  }
+
+  function onPetChange(id: string) {
+    setPetId(id);
+    prefillFromPet(customer?.pets.find((p) => p.id === id));
   }
 
   function toggleService(id: string) {
@@ -158,6 +219,22 @@ export function OrderForm({
       }
       return next;
     });
+  }
+
+  function onRoomChange(id: string) {
+    setRoomId(id);
+    const room = rooms.find((r) => r.id === id);
+    if (room?.billingUnit === "PER_VISIT") {
+      setCheckOutDate(checkInDate);
+    } else if (checkOutDate <= checkInDate) {
+      setCheckOutDate(addDaysThai(checkInDate, 1));
+    }
+  }
+
+  function onCheckInDateChange(v: string) {
+    setCheckInDate(v);
+    if (isPerVisit) setCheckOutDate(v);
+    else if (checkOutDate <= v) setCheckOutDate(addDaysThai(v, 1));
   }
 
   function setQty(id: string, delta: number) {
@@ -184,7 +261,15 @@ export function OrderForm({
       customerId: customer.id,
       petId: petId || null,
       roomId: roomId || null,
-      nights: roomId ? nights : 0,
+      checkInDate: roomId ? checkInDate : undefined,
+      checkInTime: roomId ? checkInTime : undefined,
+      checkOutDate: roomId ? checkOutDate : undefined,
+      checkOutTime: roomId ? checkOutTime : undefined,
+      nanny: roomId ? nanny : false,
+      depositAmount: roomId ? Number(depositAmount || 0) : 0,
+      vaccineComplete: roomId ? vaccineComplete : false,
+      lastFleaTickDate: roomId ? lastFleaTickDate : undefined,
+      fleaTickMedicine: roomId ? fleaTickMedicine : undefined,
       serviceIds: [...serviceIds],
       productLines,
       note,
@@ -287,7 +372,7 @@ export function OrderForm({
                 <Label>สัตว์เลี้ยง</Label>
                 <Select
                   value={petId}
-                  onValueChange={(v) => setPetId(v ?? "")}
+                  onValueChange={(v) => onPetChange(v ?? "")}
                   items={customer.pets.map((p) => ({
                     value: p.id,
                     label: `${speciesEmoji[p.species]} ${p.name}`,
@@ -350,60 +435,157 @@ export function OrderForm({
           </CardContent>
         </Card>
 
-        {/* 3. ห้องพัก */}
+        {/* 3. ห้องพัก / คอก / พื้นที่ */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BedDouble className="h-4 w-4" /> 3. ห้องพัก (ฝากเลี้ยง)
+              <BedDouble className="h-4 w-4" /> 3. ห้องพัก / คอก / พื้นที่ (ฝากเลี้ยง)
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <Select
-                value={roomId}
-                onValueChange={(v) => setRoomId(v ?? "")}
-                items={rooms.map((r) => ({
-                  value: r.id,
-                  label: `${r.name} · ${roomSizeLabel[r.size]} · ${formatBaht(r.pricePerNight)}/คืน`,
-                }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="เลือกห้อง (ถ้ามีการฝากเลี้ยง)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name} · {roomSizeLabel[r.size]} · {formatBaht(r.pricePerNight)}/คืน
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {roomId && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm">จำนวนคืน</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={nights}
-                    onChange={(e) => setNights(Math.max(1, Number(e.target.value)))}
-                    className="w-20"
-                  />
-                </div>
-              )}
-            </div>
+          <CardContent className="space-y-4">
+            <Select
+              value={roomId}
+              onValueChange={(v) => onRoomChange(v ?? "")}
+              items={rooms.map((r) => ({
+                value: r.id,
+                label: `${r.categoryName} · ${r.name} · ${formatBaht(r.pricePerNight)}/${
+                  r.billingUnit === "PER_NIGHT" ? "คืน" : "ครั้ง"
+                }`,
+              }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="เลือกห้อง/คอก/พื้นที่ (ถ้ามีการฝากเลี้ยง)" />
+              </SelectTrigger>
+              <SelectContent>
+                {roomsByCategory.map(({ categoryName, rooms: roomsInCat }) => (
+                  <SelectGroup key={categoryName}>
+                    <SelectLabel>{categoryName}</SelectLabel>
+                    {roomsInCat.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name} · {formatBaht(r.pricePerNight)}/
+                        {r.billingUnit === "PER_NIGHT" ? "คืน" : "ครั้ง"}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+
             {selectedRoom && (
-              <div className="flex flex-wrap gap-2 text-xs">
-                {selectedRoom.hasAir && <Badge variant="secondary">แอร์</Badge>}
-                {selectedRoom.hasFan && <Badge variant="secondary">พัดลม</Badge>}
-                {selectedRoom.equipment
-                  ?.split(",")
-                  .filter(Boolean)
-                  .map((e) => (
-                    <Badge key={e} variant="outline">
-                      {e.trim()}
-                    </Badge>
-                  ))}
-              </div>
+              <>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant="secondary">{billingUnitLabel[selectedRoom.billingUnit]}</Badge>
+                  {selectedRoom.hasAir && <Badge variant="secondary">แอร์</Badge>}
+                  {selectedRoom.hasFan && <Badge variant="secondary">พัดลม</Badge>}
+                  {selectedRoom.equipment
+                    ?.split(",")
+                    .filter(Boolean)
+                    .map((e) => (
+                      <Badge key={e} variant="outline">
+                        {e.trim()}
+                      </Badge>
+                    ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">เช็คอิน</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={checkInDate}
+                        onChange={(e) => onCheckInDateChange(e.target.value)}
+                      />
+                      <Input
+                        type="time"
+                        value={checkInTime}
+                        onChange={(e) => setCheckInTime(e.target.value)}
+                        className="w-28"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">เช็คเอาท์</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={checkOutDate}
+                        min={checkInDate}
+                        disabled={isPerVisit}
+                        onChange={(e) => setCheckOutDate(e.target.value)}
+                      />
+                      <Input
+                        type="time"
+                        value={checkOutTime}
+                        onChange={(e) => setCheckOutTime(e.target.value)}
+                        className="w-28"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {!isPerVisit && (
+                  <p className="text-xs text-muted-foreground">{nights} คืน</p>
+                )}
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={nanny}
+                    onChange={(e) => setNanny(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  มีพี่เลี้ยงดูแลพิเศษ (Nanny)
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">มัดจำ (บาท)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="self-end"
+                    onClick={() => setDepositAmount(String(Math.round(total / 2 / 10) * 10))}
+                  >
+                    มัดจำ 50%
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={vaccineComplete}
+                      onChange={(e) => setVaccineComplete(e.target.checked)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <Syringe className="h-4 w-4 text-muted-foreground" /> วัคซีนครบ
+                  </label>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1 text-xs">
+                      <Bug className="h-3.5 w-3.5" /> ยาเห็บหมัดล่าสุด
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={lastFleaTickDate}
+                        onChange={(e) => setLastFleaTickDate(e.target.value)}
+                      />
+                      <Input
+                        value={fleaTickMedicine}
+                        onChange={(e) => setFleaTickMedicine(e.target.value)}
+                        placeholder="ชื่อยา เช่น Nexgard Spectra"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -481,12 +663,13 @@ export function OrderForm({
                   </div>
                 );
               })}
-              {selectedRoom && nights > 0 && (
+              {selectedRoom && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
-                    ห้อง {selectedRoom.name} × {nights} คืน
+                    {selectedRoom.categoryName} {selectedRoom.name}
+                    {nights > 0 ? ` × ${nights} คืน` : " × 1 ครั้ง"}
                   </span>
-                  <span>{formatBaht(selectedRoom.pricePerNight * nights)}</span>
+                  <span>{formatBaht(selectedRoom.pricePerNight * (nights > 0 ? nights : 1))}</span>
                 </div>
               )}
               {Object.entries(productQty).map(([id, qty]) => {
@@ -523,6 +706,14 @@ export function OrderForm({
               <span>ยอดรวม</span>
               <span className="text-primary">{formatBaht(total)}</span>
             </div>
+            {roomId && Number(depositAmount || 0) > 0 && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>มัดจำตอนนี้ / คงเหลือ</span>
+                <span>
+                  {formatBaht(Number(depositAmount || 0))} / {formatBaht(total - Number(depositAmount || 0))}
+                </span>
+              </div>
+            )}
 
             <Button
               className="w-full"

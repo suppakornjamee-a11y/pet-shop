@@ -40,7 +40,7 @@ export function OrderStatusControl({
         <CardTitle className="text-base">จัดการสถานะงาน</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        {status === "PAID" && (
+        {(status === "PAID" || status === "DEPOSIT_PAID") && (
           <Button onClick={() => change("IN_PROGRESS")} disabled={isPending}>
             {isPending ? <Loader2 className="animate-spin" /> : <PlayCircle />}
             เริ่มดำเนินการ

@@ -4,22 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import {
-  LayoutDashboard,
-  PawPrint,
-  CalendarDays,
-  Users,
-  ReceiptText,
-  Settings,
-  Boxes,
-  BedDouble,
-  Landmark,
-  UserCog,
-  LogOut,
-  Menu,
-} from "lucide-react";
+import { Settings, LogOut, Menu } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import {
+  CustomerRecordFlatIcon,
+  DocumentFlatIcon,
+  ClipboardFlatIcon,
+  StockFlatIcon,
+  CalendarDayFlatIcon,
+  CalendarRangeFlatIcon,
+  DashboardFlatIcon,
+  UserAvatarFlatIcon,
+  BankPaymentFlatIcon,
+  BedFlatIcon,
+} from "@/components/nav-icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -51,20 +50,21 @@ type NavGroup = {
 const navGroups: NavGroup[] = [
   {
     items: [
-      { href: "/", label: "แดชบอร์ด", icon: LayoutDashboard },
-      { href: "/register", label: "ลงทะเบียนสัตว์เลี้ยง", icon: PawPrint },
-      { href: "/calendar", label: "ปฏิทินคิว / จองคิว", icon: CalendarDays },
-      { href: "/orders", label: "ออเดอร์ทั้งหมด", icon: ReceiptText },
-      { href: "/customers", label: "ประวัติลูกค้า", icon: Users },
+      { href: "/", label: "แดชบอร์ด", icon: DashboardFlatIcon },
+      { href: "/register", label: "ลงทะเบียนสัตว์เลี้ยง", icon: ClipboardFlatIcon },
+      { href: "/calendar", label: "ปฏิทินคิว / จองคิว", icon: CalendarDayFlatIcon },
+      { href: "/boarding", label: "ปฏิทินห้องพัก / เข้าพัก", icon: CalendarRangeFlatIcon },
+      { href: "/orders", label: "ออเดอร์ทั้งหมด", icon: DocumentFlatIcon },
+      { href: "/customers", label: "ประวัติลูกค้า", icon: CustomerRecordFlatIcon },
     ],
   },
   {
     title: "ตั้งค่า (Setting)",
     items: [
-      { href: "/settings/stock", label: "สินค้า / สต็อก", icon: Boxes },
-      { href: "/settings/rooms", label: "ห้องพัก", icon: BedDouble },
-      { href: "/settings/bank-accounts", label: "บัญชีธนาคาร", icon: Landmark, adminOnly: true },
-      { href: "/settings/users", label: "ผู้ใช้งาน", icon: UserCog, adminOnly: true },
+      { href: "/settings/stock", label: "สินค้า / สต็อก", icon: StockFlatIcon },
+      { href: "/settings/rooms", label: "ห้องพัก", icon: BedFlatIcon },
+      { href: "/settings/bank-accounts", label: "บัญชีธนาคาร", icon: BankPaymentFlatIcon, adminOnly: true },
+      { href: "/settings/users", label: "ผู้ใช้งาน", icon: UserAvatarFlatIcon, adminOnly: true },
     ],
   },
 ];
@@ -124,7 +124,7 @@ function SidebarContent({
                             : "font-medium text-foreground/65 hover:bg-accent/70 hover:text-foreground"
                         )}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        <Icon className="h-5 w-5 shrink-0" />
                         {item.label}
                       </Link>
                     </li>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, BedDouble } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/app/actions/orders";
 import { isValidDateStr, isValidTimeStr, isPastSlot } from "@/lib/slots";
@@ -13,23 +13,30 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
     typeof searchParams.customerId === "string" ? searchParams.customerId : undefined;
   const date = typeof searchParams.date === "string" ? searchParams.date : "";
   const time = typeof searchParams.time === "string" ? searchParams.time : "";
+  const roomId = typeof searchParams.roomId === "string" ? searchParams.roomId : "";
+  const checkIn = typeof searchParams.checkIn === "string" ? searchParams.checkIn : "";
 
-  // ต้องเลือกวัน-เวลาคิวจากปฏิทินก่อนเสมอ
-  if (!isValidDateStr(date) || !isValidTimeStr(time)) {
+  const hasQueueEntry = isValidDateStr(date) && isValidTimeStr(time);
+  const hasRoomEntry = roomId.length > 0;
+
+  // ต้องมาจาก /calendar (คิวอาบน้ำ/ตัดขน) หรือ /boarding (จองห้อง/พื้นที่) อย่างใดอย่างหนึ่งเสมอ
+  if (!hasQueueEntry && !hasRoomEntry) {
     redirect("/calendar");
   }
-  // จองย้อนหลังไม่ได้
-  if (isPastSlot(date, time)) {
-    redirect(`/calendar?date=${date}`);
-  }
-  // ถ้าช่วงเวลาถูกจองไปแล้ว ให้กลับไปเลือกใหม่
-  if (!(await isSlotAvailable(date, time))) {
-    redirect(`/calendar?date=${date}`);
+  if (hasQueueEntry) {
+    // จองย้อนหลังไม่ได้
+    if (isPastSlot(date, time)) redirect(`/calendar?date=${date}`);
+    // ถ้าช่วงเวลาถูกจองไปแล้ว ให้กลับไปเลือกใหม่
+    if (!(await isSlotAvailable(date, time))) redirect(`/calendar?date=${date}`);
   }
 
   const [services, rooms, products, preselected] = await Promise.all([
     prisma.service.findMany({ where: { active: true }, orderBy: { category: "asc" } }),
-    prisma.room.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.room.findMany({
+      where: { active: true },
+      include: { category: true },
+      orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+    }),
     prisma.product.findMany({
       where: { active: true, target: "PET" },
       orderBy: { name: "asc" },
@@ -39,10 +46,12 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
       : Promise.resolve(null),
   ]);
 
-  const dateLabel = new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "full",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T00:00:00Z`));
+  const dateLabel = hasQueueEntry
+    ? new Intl.DateTimeFormat("th-TH", {
+        dateStyle: "full",
+        timeZone: "UTC",
+      }).format(new Date(`${date}T00:00:00Z`))
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -50,19 +59,51 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
         title="สร้างออเดอร์"
         description="เลือกบริการ ห้องพัก และสินค้า แล้วสร้าง QR ให้ลูกค้าชำระเงิน"
         action={
-          <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
-            <CalendarClock className="h-4 w-4 text-primary" />
-            คิว: {dateLabel} · {time} น.
-          </Badge>
+          hasQueueEntry ? (
+            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              คิว: {dateLabel} · {time} น.
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
+              <BedDouble className="h-4 w-4 text-primary" />
+              จองห้อง/คอก/พื้นที่
+            </Badge>
+          )
         }
       />
       <OrderForm
         services={services}
-        rooms={rooms}
+        rooms={rooms.map((r) => ({
+          id: r.id,
+          categoryId: r.categoryId,
+          categoryName: r.category.name,
+          billingUnit: r.category.billingUnit,
+          name: r.name,
+          pricePerNight: r.pricePerNight,
+          hasAir: r.hasAir,
+          hasFan: r.hasFan,
+          equipment: r.equipment,
+        }))}
         products={products}
-        preselected={preselected}
-        appointmentDate={date}
-        appointmentTime={time}
+        preselected={
+          preselected
+            ? {
+                ...preselected,
+                pets: preselected.pets.map((p) => ({
+                  ...p,
+                  lastFleaTickAt: p.lastFleaTickAt?.toISOString() ?? null,
+                })),
+              }
+            : null
+        }
+        appointmentDate={hasQueueEntry ? date : undefined}
+        appointmentTime={hasQueueEntry ? time : undefined}
+        initial={
+          hasRoomEntry
+            ? { roomId, checkInDate: isValidDateStr(checkIn) ? checkIn : undefined }
+            : undefined
+        }
       />
     </div>
   );

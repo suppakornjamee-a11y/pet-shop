@@ -78,3 +78,25 @@ export function isPresetSlot(s: string): boolean {
 export function isPastSlot(dateStr: string, timeStr: string): boolean {
   return buildSlotDate(dateStr, timeStr).getTime() < Date.now();
 }
+
+/** จำนวนวัน (คืน) ระหว่างวันที่ A ถึง B แบบปฏิทิน (ไม่ผูก timezone) */
+export function daysBetween(dateStrA: string, dateStrB: string): number {
+  const a = new Date(`${dateStrA}T00:00:00Z`).getTime();
+  const b = new Date(`${dateStrB}T00:00:00Z`).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+/** สร้างรายการวันที่ (YYYY-MM-DD) ต่อเนื่อง n วัน เริ่มจาก startDateStr */
+export function dateRangeThai(startDateStr: string, count: number): string[] {
+  const start = new Date(`${startDateStr}T00:00:00Z`);
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(start.getTime() + i * 86400000);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+/** เพิ่ม/ลด n วันจาก dateStr แล้วคืนค่าเป็น YYYY-MM-DD */
+export function addDaysThai(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10);
+}

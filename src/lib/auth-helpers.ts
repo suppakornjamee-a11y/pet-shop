@@ -1,9 +1,20 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
+/**
+ * คืนค่า user จาก session — เช็คกับฐานข้อมูลจริงด้วยว่ายังมีอยู่/ยัง active อยู่หรือไม่
+ * (session เป็น JWT ไม่ผูกกับ DB โดยตรง ถ้า user ถูกลบ/ปิดใช้งานไปแล้ว ต้องไม่ถือว่า login อยู่)
+ */
 export async function getSessionUser() {
   const session = await auth();
-  return session?.user ?? null;
+  if (!session?.user?.id) return null;
+  const exists = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, active: true },
+  });
+  if (!exists || !exists.active) return null;
+  return session.user;
 }
 
 /** ต้องล็อกอิน — ไม่งั้นเด้งไป /login */

@@ -11,20 +11,34 @@ import {
   Upload,
   Clock,
   QrCode,
+  Wallet,
 } from "lucide-react";
 import {
   regeneratePayment,
   verifyPayment,
   rejectPayment,
   markSlipSubmitted,
+  createBalancePayment,
 } from "@/app/actions/orders";
-import type { PaymentStatus, OrderStatus } from "@/generated/prisma/enums";
+import type { PaymentStatus, PaymentPurpose, OrderStatus } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
-import { paymentStatusLabel, paymentStatusColor } from "@/lib/labels";
+import { paymentStatusLabel, paymentStatusColor, paymentPurposeLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+type PaymentRow = {
+  id: string;
+  purpose: PaymentPurpose;
+  amount: number;
+  status: PaymentStatus;
+  qrPayload: string | null;
+  expiresAt: string | null;
+  slipUrl: string | null;
+  rejectReason: string | null;
+  bankAccount: { bankName: string; accountName: string; accountNumber: string } | null;
+};
 
 function useCountdown(expiresAt: string | null) {
   const [remaining, setRemaining] = useState<number>(() =>
@@ -44,37 +58,124 @@ function useCountdown(expiresAt: string | null) {
 export function PaymentPanel({
   orderId,
   orderStatus,
-  qrPayload,
-  amount,
-  status,
-  expiresAt,
-  rejectReason,
-  account,
+  orderTotal,
+  payments,
 }: {
   orderId: string;
   orderStatus: OrderStatus;
-  qrPayload: string | null;
-  amount: number;
-  status: PaymentStatus;
-  expiresAt: string | null;
-  rejectReason: string | null;
-  account: { bankName: string; accountName: string; accountNumber: string } | null;
+  orderTotal: number;
+  payments: PaymentRow[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const remaining = useCountdown(expiresAt);
+
+  const verifiedSum = payments
+    .filter((p) => p.status === "VERIFIED")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const fullyPaid = verifiedSum >= orderTotal && orderTotal > 0;
+  const activePayment = [...payments].reverse().find((p) => p.status !== "VERIFIED") ?? null;
+  const showPurposeLabel = payments.length > 1;
+
+  return (
+    <Card className="lg:sticky lg:top-20">
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <QrCode className="h-4 w-4" /> ชำระเงิน
+        </CardTitle>
+        {activePayment && (
+          <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>
+            {showPurposeLabel && `${paymentPurposeLabel[activePayment.purpose]} · `}
+            {paymentStatusLabel[activePayment.status]}
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {payments.length > 1 && (
+          <div className="space-y-1.5 rounded-lg border bg-muted/30 p-2.5 text-xs">
+            {payments.map((p) => (
+              <div key={p.id} className="flex items-center justify-between">
+                <span className="text-muted-foreground">{paymentPurposeLabel[p.purpose]}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium">{formatBaht(p.amount)}</span>
+                  <Badge variant="outline" className={cn("text-[10px]", paymentStatusColor[p.status])}>
+                    {paymentStatusLabel[p.status]}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activePayment ? (
+          <ActivePaymentPanel
+            key={activePayment.id}
+            orderStatus={orderStatus}
+            payment={activePayment}
+            showPurposeLabel={showPurposeLabel}
+          />
+        ) : fullyPaid ? (
+          <div className="flex flex-col items-center gap-2 rounded-lg bg-emerald-50 p-6 text-center dark:bg-emerald-950/40">
+            <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+            <div className="font-medium text-emerald-700 dark:text-emerald-400">
+              ชำระเงินครบถ้วนแล้ว
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 rounded-lg bg-teal-50 p-4 text-center dark:bg-teal-950/30">
+            <Wallet className="mx-auto h-8 w-8 text-teal-600" />
+            <div>
+              <div className="font-medium text-teal-800 dark:text-teal-300">
+                มัดจำแล้ว {formatBaht(verifiedSum)}
+              </div>
+              <div className="text-sm text-teal-700/80 dark:text-teal-400/80">
+                ยอดคงเหลือ {formatBaht(orderTotal - verifiedSum)}
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await createBalancePayment(orderId);
+                  if (!res.ok) toast.error(res.error);
+                  else {
+                    toast.success(res.message);
+                    router.refresh();
+                  }
+                })
+              }
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <QrCode />}
+              เก็บส่วนที่เหลือ
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivePaymentPanel({
+  orderStatus,
+  payment,
+  showPurposeLabel,
+}: {
+  orderStatus: OrderStatus;
+  payment: PaymentRow;
+  showPurposeLabel: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const remaining = useCountdown(payment.expiresAt);
 
   // สร้าง QR ฝั่งเบราว์เซอร์ จาก payload (เลี่ยงปัญหา serverless บน Vercel)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   useEffect(() => {
+    if (!payment.qrPayload) return;
     let active = true;
-    if (!qrPayload) {
-      setQrDataUrl(null);
-      return;
-    }
     import("qrcode")
       .then((mod) =>
-        mod.default.toDataURL(qrPayload, {
+        mod.default.toDataURL(payment.qrPayload!, {
           errorCorrectionLevel: "M",
           margin: 1,
           width: 320,
@@ -90,20 +191,19 @@ export function PaymentPanel({
     return () => {
       active = false;
     };
-  }, [qrPayload]);
+  }, [payment.qrPayload]);
 
-  const isVerified = status === "VERIFIED";
   const isCancelled = orderStatus === "CANCELLED";
   const isExpired =
-    !isVerified &&
-    !isCancelled &&
-    status !== "SUBMITTED" &&
-    expiresAt !== null &&
+    isCancelled === false &&
+    payment.status !== "SUBMITTED" &&
+    payment.expiresAt !== null &&
     remaining <= 0;
   // QR ใช้ไม่ได้แล้ว (หมดอายุ หรือ ออเดอร์ถูกยกเลิก) → เบลอทิ้ง
   const isUnusable = isExpired || isCancelled;
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
+  const account = payment.bankAccount;
 
   function run(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
     startTransition(async () => {
@@ -117,146 +217,147 @@ export function PaymentPanel({
   }
 
   return (
-    <Card className="lg:sticky lg:top-20">
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <QrCode className="h-4 w-4" /> ชำระเงิน
-        </CardTitle>
-        <Badge variant="outline" className={cn("text-xs", paymentStatusColor[status])}>
-          {paymentStatusLabel[status]}
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground">ยอดที่ต้องชำระ</div>
-          <div className="text-3xl font-bold text-primary">{formatBaht(amount)}</div>
+    <>
+      <div className="text-center">
+        <div className="text-xs text-muted-foreground">
+          {showPurposeLabel ? `ยอดที่ต้องชำระ (${paymentPurposeLabel[payment.purpose]})` : "ยอดที่ต้องชำระ"}
         </div>
+        <div className="text-3xl font-bold text-primary">{formatBaht(payment.amount)}</div>
+      </div>
 
-        {isVerified ? (
-          <div className="flex flex-col items-center gap-2 rounded-lg bg-emerald-50 p-6 text-center dark:bg-emerald-950/40">
-            <CheckCircle2 className="h-12 w-12 text-emerald-600" />
-            <div className="font-medium text-emerald-700 dark:text-emerald-400">
-              ชำระเงินเรียบร้อยแล้ว
+      {/* QR แบบ Thai QR Payment / PromptPay */}
+      <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
+        <div className="overflow-hidden rounded-3xl bg-white">
+          <div className="flex items-center justify-center gap-2.5 bg-[#0b2f6b] px-6 py-3 text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/15">
+              <QrCode className="h-4.5 w-4.5" />
+            </span>
+            <div className="text-left text-sm leading-tight font-extrabold tracking-wide">
+              <div>THAI QR</div>
+              <div>PAYMENT</div>
             </div>
           </div>
-        ) : (
-          <>
-            {/* QR */}
-            <div className="relative mx-auto w-fit">
-              {qrDataUrl ? (
-                <div
-                  className={cn(
-                    "rounded-xl border bg-white p-3 transition",
-                    isUnusable && "opacity-30 blur-[2px]"
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={qrDataUrl}
-                    alt="PromptPay QR"
-                    width={220}
-                    height={220}
-                    className="mx-auto"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-[246px] w-[246px] items-center justify-center rounded-xl border bg-muted text-center text-sm text-muted-foreground">
-                  ยังไม่มี QR<br />(ตั้งค่าบัญชี PromptPay ก่อน)
-                </div>
-              )}
-              {isUnusable && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
-                  {isCancelled ? (
-                    <>
-                      <XCircle className="h-8 w-8 text-rose-500" />
-                      <span className="font-medium">ออเดอร์ถูกยกเลิก</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="h-8 w-8 text-muted-foreground" />
-                      <span className="font-medium">QR หมดอายุ</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
 
-            {/* Countdown */}
-            {!isUnusable && expiresAt && status !== "SUBMITTED" && (
-              <div className="flex items-center justify-center gap-1.5 text-sm">
-                <Clock className="h-4 w-4 text-amber-600" />
-                <span className="text-muted-foreground">เหลือเวลา</span>
-                <span className="font-mono font-semibold tabular-nums">
-                  {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
-                </span>
+          <div className="flex flex-col items-center gap-0.5 pt-3">
+            <span className="text-[9px] font-medium text-[#0b2f6b]">พร้อมเพย์</span>
+            <div className="flex overflow-hidden rounded border border-[#0b2f6b] text-xs font-bold">
+              <span className="px-1.5 py-0.5 text-[#0b2f6b]">Prompt</span>
+              <span className="bg-[#0b2f6b] px-1.5 py-0.5 text-white">Pay</span>
+            </div>
+          </div>
+
+          <div className="relative p-4">
+            {qrDataUrl ? (
+              <div className={cn("relative transition", isUnusable && "opacity-30 blur-[2px]")}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrDataUrl}
+                  alt="PromptPay QR"
+                  width={220}
+                  height={220}
+                  className="mx-auto"
+                />
+                <div className="absolute top-1/2 left-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border-2 border-[#0b2f6b] bg-white shadow">
+                  <QrCode className="h-4 w-4 text-[#0b2f6b]" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-zinc-400">
+                ยังไม่มี QR<br />(ตั้งค่าบัญชี PromptPay ก่อน)
               </div>
             )}
-
-            {account && (
-              <div className="rounded-lg bg-muted/40 p-3 text-center text-xs text-muted-foreground">
-                {account.bankName} · {account.accountName}
-                <br />
-                {account.accountNumber}
+            {isUnusable && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 text-center">
+                {isCancelled ? (
+                  <>
+                    <XCircle className="h-8 w-8 text-rose-500" />
+                    <span className="font-medium text-zinc-800">ออเดอร์ถูกยกเลิก</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-8 w-8 text-zinc-500" />
+                    <span className="font-medium text-zinc-800">QR หมดอายุ</span>
+                  </>
+                )}
               </div>
             )}
-
-            {!isCancelled && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => run(() => regeneratePayment(orderId))}
-                disabled={isPending}
-              >
-                {isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                สร้าง QR ใหม่ (15 นาที)
-              </Button>
-            )}
-          </>
-        )}
-
-        {rejectReason && status === "REJECTED" && (
-          <div className="rounded-lg bg-rose-50 p-3 text-center text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
-            ถูกปฏิเสธ: {rejectReason}
           </div>
-        )}
 
-        {/* Admin actions */}
-        {!isVerified && orderStatus === "PENDING_PAYMENT" && (
-          <div className="space-y-2 border-t pt-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              การตรวจสอบ (แอดมิน)
+          {account && (
+            <div className="px-4 pb-4 text-center">
+              <div className="text-base font-bold text-zinc-800">{account.accountName}</div>
+              <div className="mt-1 text-xs text-zinc-500">บัญชี: {account.accountName}</div>
+              <div className="text-xs tracking-wide text-zinc-400">
+                เลขอ้างอิง: {account.accountNumber}
+              </div>
             </div>
-            {status === "PENDING" && (
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => run(() => markSlipSubmitted(orderId))}
-                disabled={isPending}
-              >
-                <Upload /> ลูกค้าแจ้งชำระ / อัปโหลดสลิปแล้ว
-              </Button>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => run(() => verifyPayment(orderId))}
-                disabled={isPending}
-              >
-                <CheckCircle2 /> ยืนยัน
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() =>
-                  run(() => rejectPayment(orderId, "ยอดไม่ตรง / สลิปไม่ถูกต้อง"))
-                }
-                disabled={isPending}
-              >
-                <XCircle /> ปฏิเสธ
-              </Button>
-            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Countdown */}
+      {!isUnusable && payment.expiresAt && payment.status !== "SUBMITTED" && (
+        <div className="flex items-center justify-center gap-1.5 text-sm">
+          <Clock className="h-4 w-4 text-amber-600" />
+          <span className="text-muted-foreground">เหลือเวลา</span>
+          <span className="font-mono font-semibold tabular-nums">
+            {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
+          </span>
+        </div>
+      )}
+
+      {!isCancelled && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => run(() => regeneratePayment(payment.id))}
+          disabled={isPending}
+        >
+          {isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          สร้าง QR ใหม่ (15 นาที)
+        </Button>
+      )}
+
+      {payment.rejectReason && payment.status === "REJECTED" && (
+        <div className="rounded-lg bg-rose-50 p-3 text-center text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
+          ถูกปฏิเสธ: {payment.rejectReason}
+        </div>
+      )}
+
+      {/* Admin actions */}
+      {["PENDING_PAYMENT", "DEPOSIT_PAID"].includes(orderStatus) && (
+        <div className="space-y-2 border-t pt-3">
+          <div className="text-xs font-medium text-muted-foreground">
+            การตรวจสอบ (แอดมิน)
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {payment.status === "PENDING" && (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => run(() => markSlipSubmitted(payment.id))}
+              disabled={isPending}
+            >
+              <Upload /> ลูกค้าแจ้งชำระ / อัปโหลดสลิปแล้ว
+            </Button>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => run(() => verifyPayment(payment.id))}
+              disabled={isPending}
+            >
+              <CheckCircle2 /> ยืนยัน
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => run(() => rejectPayment(payment.id, "ยอดไม่ตรง / สลิปไม่ถูกต้อง"))}
+              disabled={isPending}
+            >
+              <XCircle /> ปฏิเสธ
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

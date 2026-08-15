@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Printer, ArrowLeft, PawPrint, Pencil, CalendarClock } from "lucide-react";
+import {
+  Printer,
+  ArrowLeft,
+  PawPrint,
+  Pencil,
+  CalendarClock,
+  BedDouble,
+  Syringe,
+  Bug,
+  UserCheck,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import {
-  orderStatusLabel,
-  orderStatusColor,
-  speciesEmoji,
-} from "@/lib/labels";
+import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,9 +30,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
     include: {
       customer: true,
       pet: true,
-      room: true,
+      room: { include: { category: true } },
       items: true,
-      payment: { include: { bankAccount: true } },
+      payments: { orderBy: { createdAt: "asc" }, include: { bankAccount: true } },
     },
   });
 
@@ -88,6 +94,58 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     timeZone: "Asia/Bangkok",
                   }).format(order.appointmentAt)}{" "}
                   น.
+                </div>
+              )}
+
+              {order.room && order.checkInAt && order.checkOutAt && (
+                <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <BedDouble className="h-4 w-4 text-primary" />
+                    {order.room.category.name} · {order.room.name}
+                    {order.nights > 0 && ` · ${order.nights} คืน`}
+                  </div>
+                  <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div>
+                      เช็คอิน:{" "}
+                      {new Intl.DateTimeFormat("th-TH", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Asia/Bangkok",
+                      }).format(order.checkInAt)}{" "}
+                      น.
+                    </div>
+                    <div>
+                      เช็คเอาท์:{" "}
+                      {new Intl.DateTimeFormat("th-TH", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Asia/Bangkok",
+                      }).format(order.checkOutAt)}{" "}
+                      น.
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 text-xs">
+                    {order.nanny && (
+                      <Badge variant="secondary" className="gap-1">
+                        <UserCheck className="h-3 w-3" /> มีพี่เลี้ยง
+                      </Badge>
+                    )}
+                    <Badge variant={order.vaccineComplete ? "secondary" : "outline"} className="gap-1">
+                      <Syringe className="h-3 w-3" />
+                      {order.vaccineComplete ? "วัคซีนครบ" : "วัคซีนไม่ครบ/ไม่ทราบ"}
+                    </Badge>
+                    {order.fleaTickMedicine && (
+                      <Badge variant="outline" className="gap-1">
+                        <Bug className="h-3 w-3" />
+                        {order.fleaTickMedicine}
+                        {order.lastFleaTickAt &&
+                          ` · ${new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeZone: "Asia/Bangkok" }).format(order.lastFleaTickAt)}`}
+                      </Badge>
+                    )}
+                    {order.depositAmount > 0 && (
+                      <Badge variant="outline">มัดจำ {formatBaht(order.depositAmount)}</Badge>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -161,24 +219,28 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         </div>
 
         <div className="lg:col-span-1">
-          {order.payment ? (
+          {order.payments.length > 0 ? (
             <PaymentPanel
               orderId={order.id}
               orderStatus={order.status}
-              qrPayload={order.payment.qrPayload}
-              amount={order.payment.amount}
-              status={order.payment.status}
-              expiresAt={order.payment.expiresAt?.toISOString() ?? null}
-              rejectReason={order.payment.rejectReason}
-              account={
-                order.payment.bankAccount
+              orderTotal={order.total}
+              payments={order.payments.map((p) => ({
+                id: p.id,
+                purpose: p.purpose,
+                amount: p.amount,
+                status: p.status,
+                qrPayload: p.qrPayload,
+                expiresAt: p.expiresAt?.toISOString() ?? null,
+                slipUrl: p.slipUrl,
+                rejectReason: p.rejectReason,
+                bankAccount: p.bankAccount
                   ? {
-                      bankName: order.payment.bankAccount.bankName,
-                      accountName: order.payment.bankAccount.accountName,
-                      accountNumber: order.payment.bankAccount.accountNumber,
+                      bankName: p.bankAccount.bankName,
+                      accountName: p.bankAccount.accountName,
+                      accountNumber: p.bankAccount.accountNumber,
                     }
-                  : null
-              }
+                  : null,
+              }))}
             />
           ) : (
             <Card>

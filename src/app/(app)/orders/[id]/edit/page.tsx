@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { toThaiDateStr, toThaiTimeStr } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";
 
@@ -22,7 +23,11 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
 
   const [services, rooms, products] = await Promise.all([
     prisma.service.findMany({ where: { active: true }, orderBy: { category: "asc" } }),
-    prisma.room.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.room.findMany({
+      where: { active: true },
+      include: { category: true },
+      orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+    }),
     prisma.product.findMany({ where: { active: true, target: "PET" }, orderBy: { name: "asc" } }),
   ]);
 
@@ -44,7 +49,17 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
         mode="edit"
         orderId={order.id}
         services={services}
-        rooms={rooms}
+        rooms={rooms.map((r) => ({
+          id: r.id,
+          categoryId: r.categoryId,
+          categoryName: r.category.name,
+          billingUnit: r.category.billingUnit,
+          name: r.name,
+          pricePerNight: r.pricePerNight,
+          hasAir: r.hasAir,
+          hasFan: r.hasFan,
+          equipment: r.equipment,
+        }))}
         products={products}
         preselected={{
           id: order.customer.id,
@@ -54,13 +69,26 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
             id: p.id,
             name: p.name,
             species: p.species,
+            vaccineComplete: p.vaccineComplete,
+            lastFleaTickAt: p.lastFleaTickAt?.toISOString() ?? null,
+            fleaTickMedicine: p.fleaTickMedicine,
           })),
         }}
+        appointmentDate={order.appointmentAt ? toThaiDateStr(order.appointmentAt) : undefined}
+        appointmentTime={order.appointmentAt ? toThaiTimeStr(order.appointmentAt) : undefined}
         initial={{
           petId: order.petId,
           serviceIds,
           roomId: order.roomId,
-          nights: order.nights,
+          checkInDate: order.checkInAt ? toThaiDateStr(order.checkInAt) : undefined,
+          checkInTime: order.checkInAt ? toThaiTimeStr(order.checkInAt) : undefined,
+          checkOutDate: order.checkOutAt ? toThaiDateStr(order.checkOutAt) : undefined,
+          checkOutTime: order.checkOutAt ? toThaiTimeStr(order.checkOutAt) : undefined,
+          nanny: order.nanny,
+          depositAmount: order.depositAmount,
+          vaccineComplete: order.vaccineComplete,
+          lastFleaTickDate: order.lastFleaTickAt ? toThaiDateStr(order.lastFleaTickAt) : undefined,
+          fleaTickMedicine: order.fleaTickMedicine ?? undefined,
           productQty,
           note: order.note,
         }}
