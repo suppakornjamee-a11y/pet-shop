@@ -216,14 +216,14 @@ function SectionRows({
                 <Link
                   href={`/orders/${seg.booking.orderId}`}
                   className={cn(
-                    "flex h-12 flex-col justify-center overflow-hidden rounded border px-1.5 py-0.5 text-[11px] leading-tight transition-opacity hover:opacity-80",
+                    "flex h-12 flex-col items-center justify-center overflow-hidden rounded border px-1.5 py-0.5 text-center text-[11px] leading-tight transition-opacity hover:opacity-80",
                     orderStatusColor[seg.booking.status]
                   )}
                 >
-                  <div className="truncate font-semibold">
-                    {seg.continuesFromBefore && "← "}
+                  <div className="truncate font-bold">
+                    {seg.continuesFromBefore && seg.booking.status !== "COMPLETED" && "← "}
                     {seg.booking.petName ?? seg.booking.customerName}
-                    {seg.continuesAfter && " →"}
+                    {seg.continuesAfter && seg.booking.status !== "COMPLETED" && " →"}
                   </div>
                   <div className="truncate opacity-80">
                     {t.labels.orderStatus[seg.booking.status]}
