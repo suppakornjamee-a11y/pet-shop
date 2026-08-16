@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { toThaiDateStr, toThaiTimeStr } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit">) {
   const { id } = await props.params;
@@ -38,12 +40,13 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
   const serviceIds = order.items
     .filter((i) => i.itemType === "SERVICE" && i.refId)
     .map((i) => i.refId as string);
+  const t = getDictionary(await getLocale());
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title={`แก้ไขออเดอร์ ${order.code}`}
-        description="ปรับบริการ ห้องพัก หรือสินค้า แล้วยืนยันเพื่อสร้าง QR ใหม่ (นับเวลา 15 นาทีใหม่)"
+        title={t.orders.editTitle(order.code)}
+        description={t.orders.editDescription}
       />
       <OrderForm
         mode="edit"

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
-import { addPet, updatePet } from "@/app/actions/customers";
+import { addPet } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,18 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type PetData = {
-  id: string;
-  name: string;
-  species: "DOG" | "CAT";
-  gender: "MALE" | "FEMALE" | "UNKNOWN";
-  breed: string | null;
-  color: string | null;
-  weightKg: number | null;
-  allergies: string | null;
-  note: string | null;
-};
+import { useI18n } from "@/components/i18n-provider";
 
 const emptyForm = {
   name: "",
@@ -50,31 +39,16 @@ const emptyForm = {
 
 export function PetFormDialog({
   customerId,
-  pet,
   trigger,
 }: {
   customerId: string;
-  pet?: PetData;
   trigger: React.ReactElement;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
-  const isEdit = !!pet;
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [form, setForm] = useState(
-    pet
-      ? {
-          name: pet.name,
-          species: pet.species,
-          gender: pet.gender,
-          breed: pet.breed ?? "",
-          color: pet.color ?? "",
-          weightKg: pet.weightKg != null ? String(pet.weightKg) : "",
-          allergies: pet.allergies ?? "",
-          note: pet.note ?? "",
-        }
-      : emptyForm
-  );
+  const [form, setForm] = useState(emptyForm);
 
   function submit() {
     startTransition(async () => {
@@ -82,16 +56,14 @@ export function PetFormDialog({
         ...form,
         weightKg: form.weightKg ? Number(form.weightKg) : undefined,
       };
-      const res = isEdit
-        ? await updatePet({ id: pet!.id, customerId, pet: petPayload })
-        : await addPet({ customerId, pet: petPayload });
+      const res = await addPet({ customerId, pet: petPayload });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       toast.success(res.message);
       setOpen(false);
-      if (!isEdit) setForm(emptyForm);
+      setForm(emptyForm);
       router.refresh();
     });
   }
@@ -101,58 +73,62 @@ export function PetFormDialog({
       <DialogTrigger render={trigger} />
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "แก้ไขสัตว์เลี้ยง" : "เพิ่มสัตว์เลี้ยง"}</DialogTitle>
+          <DialogTitle>{t.customers.petDialog.addTitle}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label>ชื่อ *</Label>
+            <Label>{t.customers.petDialog.nameLabel}</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>ชนิด</Label>
+            <Label>{t.customers.petDialog.speciesLabel}</Label>
             <Select
               value={form.species}
               onValueChange={(v) => setForm({ ...form, species: v as "DOG" | "CAT" })}
-              items={{ DOG: "🐶 สุนัข", CAT: "🐱 แมว" }}
+              items={{ DOG: t.customers.petDialog.dog, CAT: t.customers.petDialog.cat }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="DOG">🐶 สุนัข</SelectItem>
-                <SelectItem value="CAT">🐱 แมว</SelectItem>
+                <SelectItem value="DOG">{t.customers.petDialog.dog}</SelectItem>
+                <SelectItem value="CAT">{t.customers.petDialog.cat}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>เพศ</Label>
+            <Label>{t.customers.petDialog.genderLabel}</Label>
             <Select
               value={form.gender}
               onValueChange={(v) =>
                 setForm({ ...form, gender: v as "MALE" | "FEMALE" | "UNKNOWN" })
               }
-              items={{ MALE: "เพศผู้", FEMALE: "เพศเมีย", UNKNOWN: "ไม่ระบุ" }}
+              items={{
+                MALE: t.customers.petDialog.male,
+                FEMALE: t.customers.petDialog.female,
+                UNKNOWN: t.customers.petDialog.unknown,
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MALE">เพศผู้</SelectItem>
-                <SelectItem value="FEMALE">เพศเมีย</SelectItem>
-                <SelectItem value="UNKNOWN">ไม่ระบุ</SelectItem>
+                <SelectItem value="MALE">{t.customers.petDialog.male}</SelectItem>
+                <SelectItem value="FEMALE">{t.customers.petDialog.female}</SelectItem>
+                <SelectItem value="UNKNOWN">{t.customers.petDialog.unknown}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>สายพันธุ์</Label>
+            <Label>{t.customers.petDialog.breedLabel}</Label>
             <Input value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>สี</Label>
+            <Label>{t.customers.petDialog.colorLabel}</Label>
             <Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>น้ำหนัก (กก.)</Label>
+            <Label>{t.customers.petDialog.weightLabel}</Label>
             <Input
               type="number"
               step="0.1"
@@ -161,7 +137,7 @@ export function PetFormDialog({
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label>อาการแพ้ / ยาที่แพ้</Label>
+            <Label>{t.customers.petDialog.allergiesLabel}</Label>
             <Textarea
               value={form.allergies}
               onChange={(e) => setForm({ ...form, allergies: e.target.value })}
@@ -169,7 +145,7 @@ export function PetFormDialog({
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label>หมายเหตุ</Label>
+            <Label>{t.customers.petDialog.noteLabel}</Label>
             <Textarea
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -180,7 +156,7 @@ export function PetFormDialog({
         <DialogFooter>
           <Button onClick={submit} disabled={isPending || !form.name}>
             {isPending ? <Loader2 className="animate-spin" /> : <Save />}
-            บันทึก
+            {t.common.save}
           </Button>
         </DialogFooter>
       </DialogContent>

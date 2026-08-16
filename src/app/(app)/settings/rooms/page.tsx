@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/page-header";
 import { RoomManager } from "@/components/settings/room-manager";
 import { RoomCategoryManager } from "@/components/settings/room-category-manager";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function RoomsSettingsPage() {
   const [categories, rooms] = await Promise.all([
@@ -12,18 +14,19 @@ export default async function RoomsSettingsPage() {
       orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
     }),
   ]);
+  const t = getDictionary(await getLocale());
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="ห้องพัก"
-        description="กำหนดหมวดหมู่ (Daycare, Nanny Room, Big Dog, Small Dog, Cat, Pawsome ฯลฯ) และห้อง/คอก/พื้นที่แต่ละยูนิต"
+        title={t.settings.rooms.title}
+        description={t.settings.rooms.description}
       />
 
       <Tabs defaultValue="rooms">
         <TabsList>
-          <TabsTrigger value="rooms">ห้อง/พื้นที่ทั้งหมด</TabsTrigger>
-          <TabsTrigger value="categories">หมวดหมู่</TabsTrigger>
+          <TabsTrigger value="rooms">{t.settings.rooms.tabRooms}</TabsTrigger>
+          <TabsTrigger value="categories">{t.settings.rooms.tabCategories}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="rooms" className="mt-4">
@@ -44,6 +47,9 @@ export default async function RoomsSettingsPage() {
               size: r.size,
               hasAir: r.hasAir,
               hasFan: r.hasFan,
+              hasCctv: r.hasCctv,
+              cctvModel: r.cctvModel,
+              cctvSerial: r.cctvSerial,
               pricePerNight: r.pricePerNight,
               equipment: r.equipment,
               description: r.description,

@@ -7,23 +7,25 @@ import { searchCustomers } from "@/app/actions/customers";
 import { speciesEmoji } from "@/lib/labels";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { useI18n } from "@/components/i18n-provider";
 
 type Pet = { id: string; name: string; species: "DOG" | "CAT" };
 type Customer = { id: string; name: string; phone: string; pets: Pet[] };
 
 export function CustomerSearch({ initial }: { initial: Customer[] }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Customer[]>(initial);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       startTransition(async () => {
         const res = await searchCustomers(query);
         setResults(res as Customer[]);
       });
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timeoutId);
   }, [query]);
 
   return (
@@ -33,7 +35,7 @@ export function CustomerSearch({ initial }: { initial: Customer[] }) {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="ค้นหาด้วยชื่อลูกค้าหรือเบอร์โทร..."
+          placeholder={t.customers.searchPlaceholder}
           className="pl-9"
         />
       </div>
@@ -42,7 +44,7 @@ export function CustomerSearch({ initial }: { initial: Customer[] }) {
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
             <Users className="h-10 w-10 opacity-40" />
-            {isPending ? "กำลังค้นหา..." : "ไม่พบลูกค้า"}
+            {isPending ? t.customers.searching : t.customers.notFound}
           </CardContent>
         </Card>
       ) : (
@@ -59,7 +61,7 @@ export function CustomerSearch({ initial }: { initial: Customer[] }) {
                     <div className="mt-1 text-sm">
                       {c.pets.length > 0
                         ? c.pets.map((p) => `${speciesEmoji[p.species]} ${p.name}`).join("  ")
-                        : "— ยังไม่มีสัตว์เลี้ยง"}
+                        : t.customers.noPetsYet}
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />

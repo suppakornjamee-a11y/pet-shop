@@ -8,6 +8,7 @@ import { updateOrderStatus } from "@/app/actions/orders";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-provider";
 
 export function OrderStatusControl({
   orderId,
@@ -16,6 +17,7 @@ export function OrderStatusControl({
   orderId: string;
   status: OrderStatus;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -37,13 +39,13 @@ export function OrderStatusControl({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">จัดการสถานะงาน</CardTitle>
+        <CardTitle className="text-base">{t.orders.statusControlTitle}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
         {(status === "PAID" || status === "DEPOSIT_PAID") && (
           <Button onClick={() => change("IN_PROGRESS")} disabled={isPending}>
             {isPending ? <Loader2 className="animate-spin" /> : <PlayCircle />}
-            เริ่มดำเนินการ
+            {t.orders.startWork}
           </Button>
         )}
         {status === "IN_PROGRESS" && (
@@ -53,11 +55,11 @@ export function OrderStatusControl({
             disabled={isPending}
           >
             {isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-            เสร็จสิ้นงาน
+            {t.orders.finishWork}
           </Button>
         )}
         <Button variant="outline" onClick={() => change("CANCELLED")} disabled={isPending}>
-          <Ban /> ยกเลิกออเดอร์
+          <Ban /> {t.orders.cancelOrder}
         </Button>
       </CardContent>
     </Card>

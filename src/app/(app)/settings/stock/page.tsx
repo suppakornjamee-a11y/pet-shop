@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { StockManager } from "@/components/settings/stock-manager";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function StockSettingsPage() {
   const products = await prisma.product.findMany({ orderBy: { createdAt: "desc" } });
+  const t = getDictionary(await getLocale());
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="สินค้า / สต็อก"
-        description="จัดการสินค้าของสัตว์ (ขนม อาหารเปียก ฯลฯ) และจำนวนคงเหลือ"
+        title={t.settings.stock.title}
+        description={t.settings.stock.description}
       />
       <StockManager
         products={products.map((p) => ({

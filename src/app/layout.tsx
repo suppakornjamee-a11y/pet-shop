@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { I18nProvider } from "@/components/i18n-provider";
+import { getLocale } from "@/i18n/get-locale";
 
 const fontSans = Prompt({
   variable: "--font-sans",
@@ -14,12 +17,22 @@ export const metadata: Metadata = {
   description: "ระบบจัดการร้านอาบน้ำ ตัดขน ฝากเลี้ยงสัตว์เลี้ยง และคลังสินค้า",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
+
   return (
-    <html lang="th" className={`${fontSans.variable} h-full antialiased`}>
+    <html
+      lang={locale}
+      className={`${fontSans.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col bg-muted/40 font-sans">
-        {children}
-        <Toaster richColors position="top-center" />
+        <ThemeProvider>
+          <I18nProvider locale={locale}>
+            {children}
+            <Toaster richColors position="top-center" />
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

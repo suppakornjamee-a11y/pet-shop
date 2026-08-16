@@ -15,20 +15,15 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
-import {
-  speciesLabel,
-  speciesEmoji,
-  genderLabel,
-  orderStatusLabel,
-  orderStatusColor,
-} from "@/lib/labels";
+import { speciesEmoji, orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PetFormDialog } from "@/components/pet-form-dialog";
-import { EditCustomerDialog } from "@/components/edit-customer-dialog";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function CustomerDetailPage(props: PageProps<"/customers/[id]">) {
   const { id } = await props.params;
@@ -54,27 +49,24 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
   const completedOrders = customer.orders.filter((o) => o.status === "COMPLETED");
   const visitCount = completedOrders.length;
   const lastVisit = completedOrders[0]?.createdAt;
+  const t = getDictionary(await getLocale());
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={customer.name}
-        description={`ลูกค้าตั้งแต่ ${formatDate(customer.createdAt)}`}
+        description={t.customers.customerSince(formatDate(customer.createdAt))}
         action={
           <>
-            <EditCustomerDialog
-              customer={{
-                id: customer.id,
-                name: customer.name,
-                phone: customer.phone,
-                email: customer.email,
-                address: customer.address,
-                lineId: customer.lineId,
-                note: customer.note,
-              }}
-            />
+            <Button
+              render={<Link href={`/customers/${customer.id}/edit`} />}
+              nativeButton={false}
+              variant="outline"
+            >
+              <Pencil /> {t.customers.editInfo}
+            </Button>
             <Button render={<Link href={`/calendar?customerId=${customer.id}`} />} nativeButton={false}>
-              <ClipboardPlus /> จองคิว / สร้างออเดอร์
+              <ClipboardPlus /> {t.customers.bookOrder}
             </Button>
           </>
         }
@@ -83,9 +75,9 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
       {/* ===== Section 1: ข้อมูลเจ้าของ + สัตว์เลี้ยง ===== */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">ข้อมูลเจ้าของ &amp; สัตว์เลี้ยง</CardTitle>
+          <CardTitle className="text-base">{t.customers.ownerPetInfoTitle}</CardTitle>
           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <History className="h-3 w-3" /> แก้ไขล่าสุด {formatDateTime(customer.updatedAt)}
+            <History className="h-3 w-3" /> {t.customers.lastEdited(formatDateTime(customer.updatedAt))}
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -112,13 +104,13 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
 
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-muted-foreground">
-              สัตว์เลี้ยง ({customer.pets.length})
+              {t.customers.petsCountLabel(customer.pets.length)}
             </div>
             <PetFormDialog
               customerId={customer.id}
               trigger={
                 <Button variant="outline" size="sm">
-                  <Plus /> เพิ่มสัตว์เลี้ยง
+                  <Plus /> {t.customers.addPet}
                 </Button>
               }
             />
@@ -133,47 +125,37 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                     <div>
                       <div className="font-semibold">{pet.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {speciesLabel[pet.species]} · {genderLabel[pet.gender]}
+                        {t.labels.species[pet.species]} · {t.labels.gender[pet.gender]}
                       </div>
                     </div>
                   </div>
-                  <PetFormDialog
-                    customerId={customer.id}
-                    pet={{
-                      id: pet.id,
-                      name: pet.name,
-                      species: pet.species,
-                      gender: pet.gender,
-                      breed: pet.breed,
-                      color: pet.color,
-                      weightKg: pet.weightKg,
-                      allergies: pet.allergies,
-                      note: pet.note,
-                    }}
-                    trigger={
-                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    }
-                  />
+                  <Button
+                    render={<Link href={`/customers/${customer.id}/edit`} />}
+                    nativeButton={false}
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
                 <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                  {pet.breed && <div>สายพันธุ์: {pet.breed}</div>}
-                  {pet.color && <div>สี: {pet.color}</div>}
-                  {pet.weightKg != null && <div>น้ำหนัก: {pet.weightKg} กก.</div>}
+                  {pet.breed && <div>{t.customers.breedLabel(pet.breed)}</div>}
+                  {pet.color && <div>{t.customers.colorLabel(pet.color)}</div>}
+                  {pet.weightKg != null && <div>{t.customers.weightLabel(pet.weightKg)}</div>}
                 </div>
                 {pet.allergies && (
                   <div className="mt-2 rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
-                    ⚠️ แพ้: {pet.allergies}
+                    {t.customers.allergyWarning(pet.allergies)}
                   </div>
                 )}
                 <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                  <History className="h-2.5 w-2.5" /> แก้ไข {formatDateTime(pet.updatedAt)}
+                  <History className="h-2.5 w-2.5" /> {t.customers.editedLabel(formatDateTime(pet.updatedAt))}
                 </div>
               </div>
             ))}
             {customer.pets.length === 0 && (
-              <p className="text-sm text-muted-foreground">ยังไม่มีสัตว์เลี้ยง</p>
+              <p className="text-sm text-muted-foreground">{t.customers.noPets}</p>
             )}
           </div>
         </CardContent>
@@ -188,7 +170,7 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
             </div>
             <div>
               <div className="text-lg font-bold">{formatBaht(totalSpent)}</div>
-              <div className="text-xs text-muted-foreground">ยอดใช้จ่ายสะสม</div>
+              <div className="text-xs text-muted-foreground">{t.customers.totalSpent}</div>
             </div>
           </CardContent>
         </Card>
@@ -199,7 +181,7 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
             </div>
             <div>
               <div className="text-lg font-bold">{visitCount}</div>
-              <div className="text-xs text-muted-foreground">ครั้งที่ใช้บริการ (เสร็จสิ้น)</div>
+              <div className="text-xs text-muted-foreground">{t.customers.visitCountLabel}</div>
             </div>
           </CardContent>
         </Card>
@@ -212,7 +194,7 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
               <div className="text-lg font-bold">
                 {lastVisit ? formatDate(lastVisit) : "-"}
               </div>
-              <div className="text-xs text-muted-foreground">มาล่าสุด</div>
+              <div className="text-xs text-muted-foreground">{t.customers.lastVisit}</div>
             </div>
           </CardContent>
         </Card>
@@ -221,12 +203,12 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
       {/* ===== Section 3: ประวัติการใช้บริการ ===== */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">ประวัติการใช้บริการ</CardTitle>
+          <CardTitle className="text-base">{t.customers.serviceHistoryTitle}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {customer.orders.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              ยังไม่มีประวัติการใช้บริการ
+              {t.customers.noServiceHistory}
             </div>
           ) : (
             <div className="divide-y">
@@ -243,7 +225,7 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                         variant="outline"
                         className={cn("text-[10px]", orderStatusColor[o.status])}
                       >
-                        {orderStatusLabel[o.status]}
+                        {t.labels.orderStatus[o.status]}
                       </Badge>
                     </div>
                     <div className="truncate text-xs text-muted-foreground">

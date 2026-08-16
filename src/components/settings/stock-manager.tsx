@@ -11,8 +11,8 @@ import {
 } from "@/app/actions/settings";
 import type { ProductTarget } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
-import { productTargetLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +57,7 @@ const empty = {
 };
 
 export function StockManager({ products }: { products: Product[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -110,7 +111,7 @@ export function StockManager({ products }: { products: Product[] }) {
   }
 
   function remove(id: string) {
-    if (!confirm("ลบสินค้านี้?")) return;
+    if (!confirm(t.settings.stock.confirmDelete)) return;
     startTransition(async () => {
       const res = await deleteProduct(id);
       if (!res.ok) {
@@ -145,7 +146,7 @@ export function StockManager({ products }: { products: Product[] }) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={openNew}>
-          <Plus /> เพิ่มสินค้า
+          <Plus /> {t.settings.stock.addProduct}
         </Button>
       </div>
 
@@ -155,11 +156,11 @@ export function StockManager({ products }: { products: Product[] }) {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/50 text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium">สินค้า</th>
-                  <th className="px-4 py-2 text-left font-medium">หมวด</th>
-                  <th className="px-4 py-2 text-right font-medium">ราคา</th>
-                  <th className="px-4 py-2 text-center font-medium">คงเหลือ</th>
-                  <th className="px-4 py-2 text-right font-medium">จัดการ</th>
+                  <th className="px-4 py-2 text-left font-medium">{t.settings.stock.columnProduct}</th>
+                  <th className="px-4 py-2 text-left font-medium">{t.settings.stock.columnCategory}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.settings.stock.columnPrice}</th>
+                  <th className="px-4 py-2 text-center font-medium">{t.settings.stock.columnStock}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.settings.stock.columnActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -168,7 +169,7 @@ export function StockManager({ products }: { products: Product[] }) {
                     <td className="px-4 py-2">
                       <div className="font-medium">{p.name}</div>
                       <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                        {productTargetLabel[p.target]}
+                        {t.labels.productTarget[p.target]}
                       </Badge>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{p.category ?? "-"}</td>
@@ -191,7 +192,7 @@ export function StockManager({ products }: { products: Product[] }) {
                           variant="ghost"
                           className="h-8 w-8"
                           onClick={() => setAdjustFor(p)}
-                          title="ปรับสต็อก"
+                          title={t.settings.stock.adjustStock}
                         >
                           <PackagePlus className="h-4 w-4" />
                         </Button>
@@ -218,7 +219,7 @@ export function StockManager({ products }: { products: Product[] }) {
                 {products.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-10 text-center text-muted-foreground">
-                      ยังไม่มีสินค้า
+                      {t.settings.stock.empty}
                     </td>
                   </tr>
                 )}
@@ -232,39 +233,39 @@ export function StockManager({ products }: { products: Product[] }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</DialogTitle>
+            <DialogTitle>{editing ? t.settings.stock.editProduct : t.settings.stock.addProduct}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>ชื่อสินค้า *</Label>
+              <Label>{t.settings.stock.productNameLabel}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>ประเภท</Label>
+              <Label>{t.settings.stock.targetLabel}</Label>
               <Select
                 value={form.target}
                 onValueChange={(v) => setForm({ ...form, target: v as ProductTarget })}
-                items={{ PET: "ของสัตว์", HUMAN: "ของคน (คาเฟ่)" }}
+                items={{ PET: t.settings.stock.targetPet, HUMAN: t.settings.stock.targetHuman }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PET">ของสัตว์</SelectItem>
-                  <SelectItem value="HUMAN">ของคน (คาเฟ่)</SelectItem>
+                  <SelectItem value="PET">{t.settings.stock.targetPet}</SelectItem>
+                  <SelectItem value="HUMAN">{t.settings.stock.targetHuman}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>หมวดหมู่</Label>
+              <Label>{t.common.category}</Label>
               <Input
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder="เช่น ขนม, อาหารเปียก"
+                placeholder={t.settings.stock.categoryPlaceholder}
               />
             </div>
             <div className="space-y-2">
-              <Label>ราคาขาย (บาท) *</Label>
+              <Label>{t.settings.stock.priceSellLabel}</Label>
               <Input
                 type="number"
                 value={form.price}
@@ -272,7 +273,7 @@ export function StockManager({ products }: { products: Product[] }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>ต้นทุน (บาท)</Label>
+              <Label>{t.settings.stock.costLabel}</Label>
               <Input
                 type="number"
                 value={form.cost}
@@ -280,11 +281,11 @@ export function StockManager({ products }: { products: Product[] }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>หน่วย</Label>
+              <Label>{t.settings.stock.unitLabel}</Label>
               <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>จำนวนคงเหลือ</Label>
+              <Label>{t.settings.stock.stockQtyLabel}</Label>
               <Input
                 type="number"
                 value={form.stockQty}
@@ -295,7 +296,7 @@ export function StockManager({ products }: { products: Product[] }) {
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
               {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-              บันทึก
+              {t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -305,28 +306,32 @@ export function StockManager({ products }: { products: Product[] }) {
       <Dialog open={!!adjustFor} onOpenChange={(o) => !o && setAdjustFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>ปรับสต็อก · {adjustFor?.name}</DialogTitle>
+            <DialogTitle>{t.settings.stock.adjustTitle(adjustFor?.name ?? "")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>ประเภท</Label>
+              <Label>{t.settings.stock.targetLabel}</Label>
               <Select
                 value={adjustType}
                 onValueChange={(v) => setAdjustType(v as "IN" | "OUT" | "ADJUST")}
-                items={{ IN: "รับเข้า (+)", OUT: "ตัดออก (−)", ADJUST: "ตั้งค่าเป็นจำนวน" }}
+                items={{
+                  IN: t.settings.stock.adjustTypeInFull,
+                  OUT: t.settings.stock.adjustTypeOutFull,
+                  ADJUST: t.settings.stock.adjustTypeSet,
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="IN">รับเข้า (+)</SelectItem>
-                  <SelectItem value="OUT">ตัดออก (−)</SelectItem>
-                  <SelectItem value="ADJUST">ตั้งค่าเป็นจำนวน</SelectItem>
+                  <SelectItem value="IN">{t.settings.stock.adjustTypeInFull}</SelectItem>
+                  <SelectItem value="OUT">{t.settings.stock.adjustTypeOutFull}</SelectItem>
+                  <SelectItem value="ADJUST">{t.settings.stock.adjustTypeSet}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>จำนวน</Label>
+              <Label>{t.settings.stock.quantityLabel}</Label>
               <Input
                 type="number"
                 value={adjustQty}
@@ -337,7 +342,7 @@ export function StockManager({ products }: { products: Product[] }) {
           <DialogFooter>
             <Button onClick={doAdjust} disabled={isPending || !adjustQty}>
               {isPending ? <Loader2 className="animate-spin" /> : <PackagePlus />}
-              บันทึก
+              {t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>

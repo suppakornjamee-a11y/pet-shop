@@ -1,72 +1,57 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, QrCode, PawPrint, ShieldCheck } from "lucide-react";
 import { getSessionUser } from "@/lib/auth-helpers";
+import { getLocale } from "@/i18n/get-locale";
+import { getDictionary } from "@/i18n/get-dictionary";
 import { LoginForm } from "@/components/login-form";
+import { LanguageToggle } from "@/components/language-toggle";
 
-const features = [
-  { icon: CalendarClock, text: "จองคิว + ปฏิทินร้าน กันคิวชนกันอัตโนมัติ" },
-  { icon: QrCode, text: "รับชำระเงินด้วย QR PromptPay ไม่มีค่าธรรมเนียม" },
-  { icon: PawPrint, text: "ประวัติลูกค้า สัตว์เลี้ยง และคลังสินค้าในที่เดียว" },
-  { icon: ShieldCheck, text: "แยกสิทธิ์แอดมิน / พนักงาน ปลอดภัย" },
-];
+// pattern อุ้งเท้าสัตว์ ซ้ำเป็นพื้นหลัง (SVG inline เพื่อไม่ต้องพึ่งไฟล์ภายนอก)
+const PAW_PATTERN =
+  "PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCcgdmlld0JveD0nMCAwIDI0IDI0JyBmaWxsPScjZjU5ZTBiJyBmaWxsLW9wYWNpdHk9JzAuMTAnPjxjaXJjbGUgY3g9JzEyJyBjeT0nMTYuNScgcj0nNC4yJy8+PGNpcmNsZSBjeD0nNC41JyBjeT0nMTAnIHI9JzIuMycvPjxjaXJjbGUgY3g9JzE5LjUnIGN5PScxMCcgcj0nMi4zJy8+PGNpcmNsZSBjeD0nOCcgY3k9JzQuNScgcj0nMicvPjxjaXJjbGUgY3g9JzE2JyBjeT0nNC41JyByPScyJy8+PC9zdmc+";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) redirect("/");
 
+  const t = getDictionary(await getLocale());
+
   return (
-    <main className="grid min-h-dvh lg:grid-cols-2">
-      {/* Brand panel */}
-      <div className="relative hidden overflow-hidden bg-primary p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 text-[22rem] leading-none opacity-10 select-none"
-        >
-          🐾
-        </div>
-        <div className="relative flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl backdrop-blur">
-            🐾
-          </span>
-          <span className="text-2xl font-extrabold tracking-tight">PetCare</span>
-        </div>
-        <div className="relative">
-          <h2 className="max-w-md text-3xl font-extrabold leading-snug tracking-tight text-balance">
-            ระบบจัดการร้านอาบน้ำ ตัดขน และฝากเลี้ยงสัตว์
-          </h2>
-          <ul className="mt-8 space-y-4">
-            {features.map((f) => {
-              const Icon = f.icon;
-              return (
-                <li key={f.text} className="flex items-center gap-3 text-white/90">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="text-[0.95rem]">{f.text}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-        <div className="relative text-sm text-white/60">© PetCare · ระบบจัดการร้านสัตว์เลี้ยง</div>
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-[#fdf1de] to-[#fbe4c0] p-4 sm:p-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: `url("data:image/svg+xml;base64,${PAW_PATTERN}")`,
+          backgroundSize: "64px 64px",
+        }}
+      />
+
+      <div className="absolute top-4 right-4 z-10">
+        <LanguageToggle />
       </div>
 
-      {/* Form panel */}
-      <div className="flex items-center justify-center bg-background p-6">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl">
-              🐾
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight">PetCare</h1>
+      <div className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-3xl bg-card shadow-2xl md:min-h-[560px] md:grid-cols-2">
+        {/* Photo panel — public/images/login-hero.png (รูปเดี่ยว) */}
+        <div className="relative hidden overflow-hidden md:block">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-200 via-orange-200 to-rose-200" />
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url(/images/login-hero.png)" }}
+          />
+        </div>
+
+        {/* Form panel */}
+        <div className="flex flex-col justify-center p-8 sm:p-12">
+          <h1 className="mb-8 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent sm:text-4xl">
+            Pawsome Space
+          </h1>
+
+          <div>
+            <LoginForm />
           </div>
-          <div className="mb-6 hidden lg:block">
-            <h1 className="text-2xl font-extrabold tracking-tight">ยินดีต้อนรับกลับ 👋</h1>
-            <p className="mt-1 text-sm text-muted-foreground">เข้าสู่ระบบเพื่อจัดการร้านของคุณ</p>
-          </div>
-          <LoginForm />
+
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            บัญชีทดลอง: <span className="font-medium text-foreground">admin / admin</span> ·{" "}
+            {t.login.demoAccountsLabel}: <span className="font-medium text-foreground">admin / admin</span> ·{" "}
             <span className="font-medium text-foreground">user / user</span>
           </p>
         </div>

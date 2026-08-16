@@ -152,6 +152,12 @@ model Pet {
   allergies  String? // อาการแพ้ / ยาที่แพ้
   note       String?
   photoUrl   String?
+  photoUrls        String[] @default([]) // รูปสัตว์เลี้ยง (หลายรูป)
+  aggressiveNotes  String? // หมายเหตุพฤติกรรมก้าวร้าว/ดุ
+  foodNote         String? // อาหารที่กิน / ห้ามกิน
+  vaccinePhotoUrl  String? // รูปสมุดวัคซีน/ใบรับรองวัคซีน (เดิม — เก็บไว้เพื่อ backward compat)
+  vaccinePhotoUrls String[] @default([]) // รูปสมุดวัคซีน/ใบรับรองวัคซีน (หลายรูป)
+  cctvConsent      Boolean   @default(false) // ยินยอมให้บันทึกภาพกล้องวงจรปิดขณะฝากเลี้ยง
   vaccineComplete  Boolean? // วัคซีนครบล่าสุดที่ทราบ (เอาไว้ prefill ตอนจองครั้งถัดไป)
   lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด
   fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด เช่น Nexgard Spectra
@@ -198,6 +204,9 @@ model Room {
   size          RoomSize? // ไม่บังคับ — ไม่เกี่ยวกับ Nanny Room/Daycare/Pawsome
   hasAir        Boolean      @default(false)
   hasFan        Boolean      @default(false)
+  hasCctv       Boolean      @default(false)
+  cctvModel     String? // รุ่นกล้องวงจรปิด
+  cctvSerial    String? // Serial number กล้องวงจรปิด
   pricePerNight Int // ราคา — ต่อคืนหรือต่อครั้งตาม category.billingUnit
   equipment     String? // แท็ก/หมายเหตุราคาเพิ่มเติม คั่นด้วยจุลภาค เช่น "คอกบน,มีกล้องวงจรปิด,+50"
   description   String?

@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { speciesLabel, orderStatusLabel } from "@/lib/labels";
 import { PrintButton } from "@/components/print-button";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 async function getSetting(key: string, fallback: string) {
   const s = await prisma.setting.findUnique({ where: { key } });
@@ -22,6 +23,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
 
   const shopName = await getSetting("shop_name", "PetCare");
   const shopAddress = await getSetting("shop_address", "");
+  const t = getDictionary(await getLocale());
 
   return (
     <div className="min-h-dvh bg-zinc-100 p-6 print:bg-white print:p-0">
@@ -39,7 +41,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
             )}
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold">ใบเสร็จรับเงิน</div>
+            <div className="text-lg font-bold">{t.print.receiptTitle}</div>
             <div className="text-sm text-zinc-500">{order.code}</div>
             <div className="text-sm text-zinc-500">{formatDateTime(order.createdAt)}</div>
           </div>
@@ -47,26 +49,26 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
 
         <div className="grid grid-cols-2 gap-4 py-4 text-sm">
           <div>
-            <div className="text-zinc-400">ลูกค้า</div>
+            <div className="text-zinc-400">{t.print.customerLabel}</div>
             <div className="font-medium">{order.customer.name}</div>
             <div className="text-zinc-500">{order.customer.phone}</div>
           </div>
           <div>
-            <div className="text-zinc-400">สัตว์เลี้ยง</div>
+            <div className="text-zinc-400">{t.print.petLabel}</div>
             <div className="font-medium">
-              {order.pet ? `${order.pet.name} (${speciesLabel[order.pet.species]})` : "-"}
+              {order.pet ? `${order.pet.name} (${t.labels.species[order.pet.species]})` : "-"}
             </div>
-            <div className="text-zinc-500">สถานะ: {orderStatusLabel[order.status]}</div>
+            <div className="text-zinc-500">{t.print.statusLabel(t.labels.orderStatus[order.status])}</div>
           </div>
         </div>
 
         <table className="w-full text-sm">
           <thead>
             <tr className="border-y bg-zinc-50 text-zinc-500">
-              <th className="px-2 py-2 text-left font-medium">รายการ</th>
-              <th className="px-2 py-2 text-center font-medium">จำนวน</th>
-              <th className="px-2 py-2 text-right font-medium">ราคา/หน่วย</th>
-              <th className="px-2 py-2 text-right font-medium">รวม</th>
+              <th className="px-2 py-2 text-left font-medium">{t.print.columnItem}</th>
+              <th className="px-2 py-2 text-center font-medium">{t.print.columnQty}</th>
+              <th className="px-2 py-2 text-right font-medium">{t.print.columnUnitPrice}</th>
+              <th className="px-2 py-2 text-right font-medium">{t.print.columnSubtotal}</th>
             </tr>
           </thead>
           <tbody>
@@ -82,7 +84,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
           <tfoot>
             <tr>
               <td colSpan={3} className="px-2 py-3 text-right font-semibold">
-                ยอดรวมทั้งสิ้น
+                {t.print.grandTotal}
               </td>
               <td className="px-2 py-3 text-right text-lg font-bold">
                 {formatBaht(order.total)}
@@ -92,7 +94,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
         </table>
 
         <div className="mt-6 border-t pt-4 text-center text-sm text-zinc-400">
-          ขอบคุณที่ใช้บริการ 🐾
+          {t.print.thankYou}
         </div>
       </div>
 
@@ -107,23 +109,23 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
           </div>
           <div className="space-y-1 text-sm">
             <div>
-              <span className="text-zinc-400">เจ้าของ:</span> {order.customer.name} ·{" "}
+              <span className="text-zinc-400">{t.print.ownerLabel}</span> {order.customer.name} ·{" "}
               {order.customer.phone}
             </div>
             {order.pet && (
               <div>
-                <span className="text-zinc-400">ชนิด:</span> {speciesLabel[order.pet.species]}
+                <span className="text-zinc-400">{t.print.speciesLabel}</span> {t.labels.species[order.pet.species]}
                 {order.pet.breed ? ` · ${order.pet.breed}` : ""}
               </div>
             )}
             {order.room && (
               <div>
-                <span className="text-zinc-400">ห้อง:</span> {order.room.name}
-                {order.nights ? ` · ${order.nights} คืน` : ""}
+                <span className="text-zinc-400">{t.print.roomLabel}</span> {order.room.name}
+                {order.nights ? t.print.nightsSuffix(order.nights) : ""}
               </div>
             )}
             <div>
-              <span className="text-zinc-400">บริการ:</span>{" "}
+              <span className="text-zinc-400">{t.print.serviceLabel}</span>{" "}
               {order.items
                 .filter((i) => i.itemType !== "PRODUCT")
                 .map((i) => i.name)
@@ -131,7 +133,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
             </div>
             {order.pet?.allergies && (
               <div className="mt-2 rounded-md bg-rose-100 px-2 py-1 font-medium text-rose-700">
-                ⚠️ แพ้: {order.pet.allergies}
+                {t.print.allergyWarning(order.pet.allergies)}
               </div>
             )}
           </div>

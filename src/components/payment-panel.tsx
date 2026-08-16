@@ -22,11 +22,12 @@ import {
 } from "@/app/actions/orders";
 import type { PaymentStatus, PaymentPurpose, OrderStatus } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
-import { paymentStatusLabel, paymentStatusColor, paymentPurposeLabel } from "@/lib/labels";
+import { paymentStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useI18n } from "@/components/i18n-provider";
 
 type PaymentRow = {
   id: string;
@@ -66,6 +67,7 @@ export function PaymentPanel({
   orderTotal: number;
   payments: PaymentRow[];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -80,12 +82,12 @@ export function PaymentPanel({
     <Card className="lg:sticky lg:top-20">
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
-          <QrCode className="h-4 w-4" /> ชำระเงิน
+          <QrCode className="h-4 w-4" /> {t.orders.payment.title}
         </CardTitle>
         {activePayment && (
           <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>
-            {showPurposeLabel && `${paymentPurposeLabel[activePayment.purpose]} · `}
-            {paymentStatusLabel[activePayment.status]}
+            {showPurposeLabel && `${t.labels.paymentPurpose[activePayment.purpose]} · `}
+            {t.labels.paymentStatus[activePayment.status]}
           </Badge>
         )}
       </CardHeader>
@@ -94,11 +96,11 @@ export function PaymentPanel({
           <div className="space-y-1.5 rounded-lg border bg-muted/30 p-2.5 text-xs">
             {payments.map((p) => (
               <div key={p.id} className="flex items-center justify-between">
-                <span className="text-muted-foreground">{paymentPurposeLabel[p.purpose]}</span>
+                <span className="text-muted-foreground">{t.labels.paymentPurpose[p.purpose]}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="font-medium">{formatBaht(p.amount)}</span>
                   <Badge variant="outline" className={cn("text-[10px]", paymentStatusColor[p.status])}>
-                    {paymentStatusLabel[p.status]}
+                    {t.labels.paymentStatus[p.status]}
                   </Badge>
                 </div>
               </div>
@@ -117,7 +119,7 @@ export function PaymentPanel({
           <div className="flex flex-col items-center gap-2 rounded-lg bg-emerald-50 p-6 text-center dark:bg-emerald-950/40">
             <CheckCircle2 className="h-12 w-12 text-emerald-600" />
             <div className="font-medium text-emerald-700 dark:text-emerald-400">
-              ชำระเงินครบถ้วนแล้ว
+              {t.orders.payment.fullyPaid}
             </div>
           </div>
         ) : (
@@ -125,10 +127,10 @@ export function PaymentPanel({
             <Wallet className="mx-auto h-8 w-8 text-teal-600" />
             <div>
               <div className="font-medium text-teal-800 dark:text-teal-300">
-                มัดจำแล้ว {formatBaht(verifiedSum)}
+                {t.orders.payment.depositPaidLabel(formatBaht(verifiedSum))}
               </div>
               <div className="text-sm text-teal-700/80 dark:text-teal-400/80">
-                ยอดคงเหลือ {formatBaht(orderTotal - verifiedSum)}
+                {t.orders.payment.remainingLabel(formatBaht(orderTotal - verifiedSum))}
               </div>
             </div>
             <Button
@@ -146,7 +148,7 @@ export function PaymentPanel({
               }
             >
               {isPending ? <Loader2 className="animate-spin" /> : <QrCode />}
-              เก็บส่วนที่เหลือ
+              {t.orders.payment.collectBalance}
             </Button>
           </div>
         )}
@@ -164,6 +166,7 @@ function ActivePaymentPanel({
   payment: PaymentRow;
   showPurposeLabel: boolean;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const remaining = useCountdown(payment.expiresAt);
@@ -220,7 +223,9 @@ function ActivePaymentPanel({
     <>
       <div className="text-center">
         <div className="text-xs text-muted-foreground">
-          {showPurposeLabel ? `ยอดที่ต้องชำระ (${paymentPurposeLabel[payment.purpose]})` : "ยอดที่ต้องชำระ"}
+          {showPurposeLabel
+            ? t.orders.payment.amountDueWithPurpose(t.labels.paymentPurpose[payment.purpose])
+            : t.orders.payment.amountDue}
         </div>
         <div className="text-3xl font-bold text-primary">{formatBaht(payment.amount)}</div>
       </div>
@@ -263,7 +268,7 @@ function ActivePaymentPanel({
               </div>
             ) : (
               <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-zinc-400">
-                ยังไม่มี QR<br />(ตั้งค่าบัญชี PromptPay ก่อน)
+                {t.orders.payment.noQrYet}<br />{t.orders.payment.noQrHint}
               </div>
             )}
             {isUnusable && (
@@ -271,12 +276,12 @@ function ActivePaymentPanel({
                 {isCancelled ? (
                   <>
                     <XCircle className="h-8 w-8 text-rose-500" />
-                    <span className="font-medium text-zinc-800">ออเดอร์ถูกยกเลิก</span>
+                    <span className="font-medium text-zinc-800">{t.orders.payment.orderCancelled}</span>
                   </>
                 ) : (
                   <>
                     <Clock className="h-8 w-8 text-zinc-500" />
-                    <span className="font-medium text-zinc-800">QR หมดอายุ</span>
+                    <span className="font-medium text-zinc-800">{t.orders.payment.qrExpired}</span>
                   </>
                 )}
               </div>
@@ -286,9 +291,9 @@ function ActivePaymentPanel({
           {account && (
             <div className="px-4 pb-4 text-center">
               <div className="text-base font-bold text-zinc-800">{account.accountName}</div>
-              <div className="mt-1 text-xs text-zinc-500">บัญชี: {account.accountName}</div>
+              <div className="mt-1 text-xs text-zinc-500">{t.orders.payment.accountLabel}{account.accountName}</div>
               <div className="text-xs tracking-wide text-zinc-400">
-                เลขอ้างอิง: {account.accountNumber}
+                {t.orders.payment.refNumber}{account.accountNumber}
               </div>
             </div>
           )}
@@ -299,7 +304,7 @@ function ActivePaymentPanel({
       {!isUnusable && payment.expiresAt && payment.status !== "SUBMITTED" && (
         <div className="flex items-center justify-center gap-1.5 text-sm">
           <Clock className="h-4 w-4 text-amber-600" />
-          <span className="text-muted-foreground">เหลือเวลา</span>
+          <span className="text-muted-foreground">{t.orders.payment.timeRemaining}</span>
           <span className="font-mono font-semibold tabular-nums">
             {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
           </span>
@@ -314,13 +319,13 @@ function ActivePaymentPanel({
           disabled={isPending}
         >
           {isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          สร้าง QR ใหม่ (15 นาที)
+          {t.orders.payment.regenerateQr}
         </Button>
       )}
 
       {payment.rejectReason && payment.status === "REJECTED" && (
         <div className="rounded-lg bg-rose-50 p-3 text-center text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
-          ถูกปฏิเสธ: {payment.rejectReason}
+          {t.orders.payment.rejectedReason(payment.rejectReason)}
         </div>
       )}
 
@@ -328,7 +333,7 @@ function ActivePaymentPanel({
       {["PENDING_PAYMENT", "DEPOSIT_PAID"].includes(orderStatus) && (
         <div className="space-y-2 border-t pt-3">
           <div className="text-xs font-medium text-muted-foreground">
-            การตรวจสอบ (แอดมิน)
+            {t.orders.payment.adminVerification}
           </div>
           {payment.status === "PENDING" && (
             <Button
@@ -337,7 +342,7 @@ function ActivePaymentPanel({
               onClick={() => run(() => markSlipSubmitted(payment.id))}
               disabled={isPending}
             >
-              <Upload /> ลูกค้าแจ้งชำระ / อัปโหลดสลิปแล้ว
+              <Upload /> {t.orders.payment.slipSubmitted}
             </Button>
           )}
           <div className="grid grid-cols-2 gap-2">
@@ -346,14 +351,14 @@ function ActivePaymentPanel({
               onClick={() => run(() => verifyPayment(payment.id))}
               disabled={isPending}
             >
-              <CheckCircle2 /> ยืนยัน
+              <CheckCircle2 /> {t.orders.payment.verify}
             </Button>
             <Button
               variant="destructive"
-              onClick={() => run(() => rejectPayment(payment.id, "ยอดไม่ตรง / สลิปไม่ถูกต้อง"))}
+              onClick={() => run(() => rejectPayment(payment.id, t.orders.payment.rejectReasonDefault))}
               disabled={isPending}
             >
-              <XCircle /> ปฏิเสธ
+              <XCircle /> {t.orders.payment.reject}
             </Button>
           </div>
         </div>

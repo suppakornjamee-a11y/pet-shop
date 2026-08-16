@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { upsertRoomCategory, deleteRoomCategory } from "@/app/actions/settings";
 import type { BillingUnit } from "@/generated/prisma/enums";
-import { billingUnitLabel } from "@/lib/labels";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +44,7 @@ const empty = {
 };
 
 export function RoomCategoryManager({ categories }: { categories: RoomCategoryRow[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -87,7 +88,7 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
   }
 
   function remove(id: string) {
-    if (!confirm("ลบหมวดหมู่นี้?")) return;
+    if (!confirm(t.settings.rooms.confirmDeleteCategory)) return;
     startTransition(async () => {
       const res = await deleteRoomCategory(id);
       if (!res.ok) {
@@ -103,7 +104,7 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={openNew}>
-          <Plus /> เพิ่มหมวดหมู่
+          <Plus /> {t.settings.rooms.addCategory}
         </Button>
       </div>
 
@@ -114,7 +115,7 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
               <div className="flex items-start justify-between">
                 <div className="text-lg font-bold">{c.name}</div>
                 <Badge variant="secondary" className="text-[10px]">
-                  {billingUnitLabel[c.billingUnit]}
+                  {t.labels.billingUnit[c.billingUnit]}
                 </Badge>
               </div>
               {c.description && (
@@ -122,7 +123,7 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
               )}
               <div className="flex justify-end gap-1">
                 <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
-                  <Pencil className="h-4 w-4" /> แก้ไข
+                  <Pencil className="h-4 w-4" /> {t.common.edit}
                 </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => remove(c.id)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
@@ -132,42 +133,42 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
           </Card>
         ))}
         {categories.length === 0 && (
-          <p className="text-sm text-muted-foreground">ยังไม่มีหมวดหมู่</p>
+          <p className="text-sm text-muted-foreground">{t.settings.rooms.noCategoriesEmpty}</p>
         )}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "แก้ไขหมวดหมู่" : "เพิ่มหมวดหมู่"}</DialogTitle>
+            <DialogTitle>{editing ? t.settings.rooms.editCategory : t.settings.rooms.addCategory}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <Label>ชื่อหมวดหมู่ *</Label>
+              <Label>{t.settings.rooms.categoryNameLabel}</Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="เช่น Daycare, Nanny Room, BIG DOG"
+                placeholder={t.settings.rooms.categoryNamePlaceholder}
               />
             </div>
             <div className="space-y-2">
-              <Label>วิธีคิดราคา</Label>
+              <Label>{t.settings.rooms.billingUnitLabel}</Label>
               <Select
                 value={form.billingUnit}
                 onValueChange={(v) => setForm({ ...form, billingUnit: v as BillingUnit })}
-                items={{ PER_NIGHT: "ต่อคืน", PER_VISIT: "ต่อครั้ง" }}
+                items={{ PER_NIGHT: t.settings.rooms.perNight, PER_VISIT: t.settings.rooms.perVisit }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PER_NIGHT">ต่อคืน (ค้างคืน)</SelectItem>
-                  <SelectItem value="PER_VISIT">ต่อครั้ง (Daycare/ไป-กลับ)</SelectItem>
+                  <SelectItem value="PER_NIGHT">{t.settings.rooms.perNightFull}</SelectItem>
+                  <SelectItem value="PER_VISIT">{t.settings.rooms.perVisitFull}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>ลำดับการแสดงผล</Label>
+              <Label>{t.settings.rooms.sortOrderLabel}</Label>
               <Input
                 type="number"
                 value={form.sortOrder}
@@ -175,18 +176,18 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label>คำอธิบาย</Label>
+              <Label>{t.settings.rooms.descriptionLabel}</Label>
               <Input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="เช่น ห้องวิ่งเล่นสุนัข/แมวไซส์เล็ก"
+                placeholder={t.settings.rooms.descriptionPlaceholder}
               />
             </div>
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
               {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-              บันทึก
+              {t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>

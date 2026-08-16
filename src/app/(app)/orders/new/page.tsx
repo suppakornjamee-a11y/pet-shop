@@ -6,6 +6,8 @@ import { isValidDateStr, isValidTimeStr, isPastSlot } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";
 import { Badge } from "@/components/ui/badge";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function NewOrderPage(props: PageProps<"/orders/new">) {
   const searchParams = await props.searchParams;
@@ -46,8 +48,11 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
       : Promise.resolve(null),
   ]);
 
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+
   const dateLabel = hasQueueEntry
-    ? new Intl.DateTimeFormat("th-TH", {
+    ? new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
         dateStyle: "full",
         timeZone: "UTC",
       }).format(new Date(`${date}T00:00:00Z`))
@@ -56,18 +61,18 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="สร้างออเดอร์"
-        description="เลือกบริการ ห้องพัก และสินค้า แล้วสร้าง QR ให้ลูกค้าชำระเงิน"
+        title={t.orders.createTitle}
+        description={t.orders.createDescription}
         action={
           hasQueueEntry ? (
             <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
               <CalendarClock className="h-4 w-4 text-primary" />
-              คิว: {dateLabel} · {time} น.
+              {t.orders.queueBadge(dateLabel ?? "", time)}
             </Badge>
           ) : (
             <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
               <BedDouble className="h-4 w-4 text-primary" />
-              จองห้อง/คอก/พื้นที่
+              {t.orders.roomBookingBadge}
             </Badge>
           )
         }

@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Settings, LogOut, Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
+import type { Dictionary } from "@/i18n/dictionaries/th";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 import {
   CustomerRecordFlatIcon,
   DocumentFlatIcon,
@@ -19,6 +21,8 @@ import {
   BankPaymentFlatIcon,
   BedFlatIcon,
 } from "@/components/nav-icons";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -47,27 +51,29 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const navGroups: NavGroup[] = [
-  {
-    items: [
-      { href: "/", label: "แดชบอร์ด", icon: DashboardFlatIcon },
-      { href: "/register", label: "ลงทะเบียนสัตว์เลี้ยง", icon: ClipboardFlatIcon },
-      { href: "/calendar", label: "ปฏิทินคิว / จองคิว", icon: CalendarDayFlatIcon },
-      { href: "/boarding", label: "ปฏิทินห้องพัก / เข้าพัก", icon: CalendarRangeFlatIcon },
-      { href: "/orders", label: "ออเดอร์ทั้งหมด", icon: DocumentFlatIcon },
-      { href: "/customers", label: "ประวัติลูกค้า", icon: CustomerRecordFlatIcon },
-    ],
-  },
-  {
-    title: "ตั้งค่า (Setting)",
-    items: [
-      { href: "/settings/stock", label: "สินค้า / สต็อก", icon: StockFlatIcon },
-      { href: "/settings/rooms", label: "ห้องพัก", icon: BedFlatIcon },
-      { href: "/settings/bank-accounts", label: "บัญชีธนาคาร", icon: BankPaymentFlatIcon, adminOnly: true },
-      { href: "/settings/users", label: "ผู้ใช้งาน", icon: UserAvatarFlatIcon, adminOnly: true },
-    ],
-  },
-];
+function getNavGroups(t: Dictionary): NavGroup[] {
+  return [
+    {
+      items: [
+        { href: "/", label: t.nav.dashboard, icon: DashboardFlatIcon },
+        { href: "/register", label: t.nav.register, icon: ClipboardFlatIcon },
+        { href: "/calendar", label: t.nav.queueCalendar, icon: CalendarDayFlatIcon },
+        { href: "/boarding", label: t.nav.boardingCalendar, icon: CalendarRangeFlatIcon },
+        { href: "/orders", label: t.nav.orders, icon: DocumentFlatIcon },
+        { href: "/customers", label: t.nav.customers, icon: CustomerRecordFlatIcon },
+      ],
+    },
+    {
+      title: t.nav.settingsGroup,
+      items: [
+        { href: "/settings/stock", label: t.nav.stock, icon: StockFlatIcon },
+        { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon },
+        { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankPaymentFlatIcon, adminOnly: true },
+        { href: "/settings/users", label: t.nav.users, icon: UserAvatarFlatIcon, adminOnly: true },
+      ],
+    },
+  ];
+}
 
 type User = { name: string; username: string; role: Role };
 
@@ -80,19 +86,22 @@ function SidebarContent({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const { t } = useI18n();
+  const navGroups = getNavGroups(t);
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center gap-2.5 border-b px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-lg">
+      <div className="flex h-18 items-center gap-3 border-b px-5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl">
           🐾
         </span>
         <div className="leading-tight">
-          <div className="text-base font-bold tracking-tight">PetCare</div>
-          <div className="text-[11px] text-muted-foreground">ระบบจัดการร้าน</div>
+          <div className="text-lg font-bold tracking-tight">{t.nav.brand}</div>
+          <div className="text-xs text-muted-foreground">{t.nav.brandSubtitle}</div>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-7 overflow-y-auto px-3.5 py-5">
         {navGroups.map((group, gi) => {
           const items = group.items.filter(
             (it) => !it.adminOnly || user.role === "ADMIN"
@@ -101,11 +110,11 @@ function SidebarContent({
           return (
             <div key={gi}>
               {group.title && (
-                <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {group.title}
                 </div>
               )}
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {items.map((item) => {
                   const active =
                     item.href === "/"
@@ -118,13 +127,13 @@ function SidebarContent({
                         href={item.href}
                         onClick={onNavigate}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                          "flex items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] transition-colors",
                           active
                             ? "bg-primary/10 font-semibold text-primary"
                             : "font-medium text-foreground/65 hover:bg-accent/70 hover:text-foreground"
                         )}
                       >
-                        <Icon className="h-5 w-5 shrink-0" />
+                        <Icon className="h-6 w-6 shrink-0" />
                         {item.label}
                       </Link>
                     </li>
@@ -136,26 +145,26 @@ function SidebarContent({
         })}
       </nav>
 
-      <div className="border-t p-3">
+      <div className="border-t p-3.5">
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-primary/10 text-primary text-base font-semibold">
               {user.name.slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-sm font-medium">{user.name}</div>
+            <div className="truncate text-[15px] font-medium">{user.name}</div>
             <Badge variant="secondary" className="mt-0.5 h-4 px-1.5 text-[10px]">
-              {user.role === "ADMIN" ? "แอดมิน" : "พนักงาน"}
+              {user.role === "ADMIN" ? t.nav.admin : t.nav.staff}
             </Badge>
           </div>
         </div>
         <Button
           variant="outline"
-          className="mt-2 w-full justify-start text-destructive hover:text-destructive"
+          className="mt-2.5 w-full justify-start text-destructive hover:text-destructive"
           onClick={() => signOut({ callbackUrl: "/login" })}
         >
-          <LogOut /> ออกจากระบบ
+          <LogOut /> {t.nav.logout}
         </Button>
       </div>
     </div>
@@ -169,13 +178,14 @@ export function AppShell({
   user: User;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r bg-card lg:block">
+      <aside className="hidden w-72 shrink-0 border-r bg-card lg:block">
         <div className="sticky top-0 h-dvh">
           <SidebarContent user={user} pathname={pathname} />
         </div>
@@ -192,7 +202,7 @@ export function AppShell({
               <Menu />
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
-              <SheetTitle className="sr-only">เมนู</SheetTitle>
+              <SheetTitle className="sr-only">{t.nav.brand}</SheetTitle>
               <SidebarContent
                 user={user}
                 pathname={pathname}
@@ -202,6 +212,9 @@ export function AppShell({
           </Sheet>
 
           <div className="flex-1" />
+
+          <LanguageToggle />
+          <ThemeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" />}>
@@ -217,7 +230,7 @@ export function AppShell({
                 <div className="font-medium">{user.name}</div>
                 <div className="text-xs text-muted-foreground">
                   @{user.username} ·{" "}
-                  {user.role === "ADMIN" ? "แอดมิน" : "พนักงาน"}
+                  {user.role === "ADMIN" ? t.nav.admin : t.nav.staff}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -226,7 +239,7 @@ export function AppShell({
                 onClick={() => signOut({ callbackUrl: "/login" })}
               >
                 <LogOut />
-                ออกจากระบบ
+                {t.nav.logout}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

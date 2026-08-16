@@ -22,7 +22,7 @@ import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
 import { formatBaht } from "@/lib/format";
 import { toThaiDateStr, addDaysThai, daysBetween } from "@/lib/slots";
-import { serviceCategoryLabel, speciesEmoji, billingUnitLabel } from "@/lib/labels";
+import { speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useI18n } from "@/components/i18n-provider";
 
 type Service = { id: string; name: string; category: string; price: number };
 type Room = {
@@ -115,6 +116,7 @@ export function OrderForm({
   appointmentDate?: string;
   appointmentTime?: string;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isEdit = mode === "edit";
@@ -250,7 +252,7 @@ export function OrderForm({
 
   function submit() {
     if (!customer) {
-      toast.error("กรุณาเลือกลูกค้า");
+      toast.error(t.orders.form.selectCustomerError);
       return;
     }
     const productLines = Object.entries(productQty)
@@ -284,7 +286,7 @@ export function OrderForm({
         toast.error(res.error);
         return;
       }
-      toast.success(res.message ?? "สำเร็จ");
+      toast.success(res.message ?? t.orders.form.genericSuccess);
       router.push(`/orders/${res.id ?? orderId}`);
     });
   }
@@ -304,7 +306,7 @@ export function OrderForm({
         {/* 1. ลูกค้า */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">1. เลือกลูกค้า</CardTitle>
+            <CardTitle className="text-base">{t.orders.form.step1Title}</CardTitle>
           </CardHeader>
           <CardContent>
             {customer ? (
@@ -315,12 +317,12 @@ export function OrderForm({
                     {customer.name}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {customer.phone} · {customer.pets.length} สัตว์เลี้ยง
+                    {customer.phone} · {t.orders.form.petsCount(customer.pets.length)}
                   </div>
                 </div>
                 {!isEdit && (
                   <Button variant="ghost" size="sm" onClick={() => setCustomer(null)}>
-                    <X /> เปลี่ยน
+                    <X /> {t.orders.form.changeCustomer}
                   </Button>
                 )}
               </div>
@@ -331,11 +333,11 @@ export function OrderForm({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), doSearch())}
-                    placeholder="ค้นหาด้วยชื่อหรือเบอร์โทร"
+                    placeholder={t.orders.form.searchPlaceholder}
                   />
                   <Button type="button" variant="secondary" onClick={doSearch} disabled={searching}>
                     {searching ? <Loader2 className="animate-spin" /> : <Search />}
-                    ค้นหา
+                    {t.common.search}
                   </Button>
                 </div>
                 {results.length > 0 && (
@@ -359,9 +361,9 @@ export function OrderForm({
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  ไม่พบลูกค้า?{" "}
+                  {t.orders.form.noCustomerFound}{" "}
                   <a href="/register" className="text-primary underline">
-                    ลงทะเบียนใหม่
+                    {t.orders.form.registerNew}
                   </a>
                 </p>
               </div>
@@ -369,7 +371,7 @@ export function OrderForm({
 
             {customer && customer.pets.length > 0 && (
               <div className="mt-4 space-y-2">
-                <Label>สัตว์เลี้ยง</Label>
+                <Label>{t.orders.form.petLabel}</Label>
                 <Select
                   value={petId}
                   onValueChange={(v) => onPetChange(v ?? "")}
@@ -379,7 +381,7 @@ export function OrderForm({
                   }))}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="เลือกสัตว์เลี้ยง" />
+                    <SelectValue placeholder={t.orders.form.selectPet} />
                   </SelectTrigger>
                   <SelectContent>
                     {customer.pets.map((p) => (
@@ -397,7 +399,7 @@ export function OrderForm({
         {/* 2. บริการ */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">2. บริการ</CardTitle>
+            <CardTitle className="text-base">{t.orders.form.step2Title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {Object.entries(groupedServices).map(([cat, list]) => {
@@ -406,7 +408,7 @@ export function OrderForm({
                 <div key={cat}>
                   <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     <Icon className="h-4 w-4" />
-                    {serviceCategoryLabel[cat as keyof typeof serviceCategoryLabel]}
+                    {t.labels.serviceCategory[cat as keyof typeof t.labels.serviceCategory]}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {list.map((s) => {
@@ -439,7 +441,7 @@ export function OrderForm({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BedDouble className="h-4 w-4" /> 3. ห้องพัก / คอก / พื้นที่ (ฝากเลี้ยง)
+              <BedDouble className="h-4 w-4" /> {t.orders.form.step3Title}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -449,12 +451,12 @@ export function OrderForm({
               items={rooms.map((r) => ({
                 value: r.id,
                 label: `${r.categoryName} · ${r.name} · ${formatBaht(r.pricePerNight)}/${
-                  r.billingUnit === "PER_NIGHT" ? "คืน" : "ครั้ง"
+                  r.billingUnit === "PER_NIGHT" ? t.orders.form.perNightUnit : t.orders.form.perVisitUnit
                 }`,
               }))}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="เลือกห้อง/คอก/พื้นที่ (ถ้ามีการฝากเลี้ยง)" />
+                <SelectValue placeholder={t.orders.form.selectRoomPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {roomsByCategory.map(({ categoryName, rooms: roomsInCat }) => (
@@ -463,7 +465,7 @@ export function OrderForm({
                     {roomsInCat.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
                         {r.name} · {formatBaht(r.pricePerNight)}/
-                        {r.billingUnit === "PER_NIGHT" ? "คืน" : "ครั้ง"}
+                        {r.billingUnit === "PER_NIGHT" ? t.orders.form.perNightUnit : t.orders.form.perVisitUnit}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -474,9 +476,9 @@ export function OrderForm({
             {selectedRoom && (
               <>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Badge variant="secondary">{billingUnitLabel[selectedRoom.billingUnit]}</Badge>
-                  {selectedRoom.hasAir && <Badge variant="secondary">แอร์</Badge>}
-                  {selectedRoom.hasFan && <Badge variant="secondary">พัดลม</Badge>}
+                  <Badge variant="secondary">{t.labels.billingUnit[selectedRoom.billingUnit]}</Badge>
+                  {selectedRoom.hasAir && <Badge variant="secondary">{t.settings.rooms.hasAir}</Badge>}
+                  {selectedRoom.hasFan && <Badge variant="secondary">{t.settings.rooms.hasFan}</Badge>}
                   {selectedRoom.equipment
                     ?.split(",")
                     .filter(Boolean)
@@ -489,7 +491,7 @@ export function OrderForm({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">เช็คอิน</Label>
+                    <Label className="text-xs">{t.orders.form.checkInLabel}</Label>
                     <div className="flex gap-2">
                       <Input
                         type="date"
@@ -505,7 +507,7 @@ export function OrderForm({
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">เช็คเอาท์</Label>
+                    <Label className="text-xs">{t.orders.form.checkOutLabel}</Label>
                     <div className="flex gap-2">
                       <Input
                         type="date"
@@ -524,7 +526,7 @@ export function OrderForm({
                   </div>
                 </div>
                 {!isPerVisit && (
-                  <p className="text-xs text-muted-foreground">{nights} คืน</p>
+                  <p className="text-xs text-muted-foreground">{t.orders.form.nightsCount(nights)}</p>
                 )}
 
                 <label className="flex items-center gap-2 text-sm">
@@ -534,12 +536,12 @@ export function OrderForm({
                     onChange={(e) => setNanny(e.target.checked)}
                     className="h-4 w-4 accent-primary"
                   />
-                  มีพี่เลี้ยงดูแลพิเศษ (Nanny)
+                  {t.orders.form.nannyCheckbox}
                 </label>
 
                 <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">มัดจำ (บาท)</Label>
+                    <Label className="text-xs">{t.orders.form.depositLabel}</Label>
                     <Input
                       type="number"
                       min={0}
@@ -553,7 +555,7 @@ export function OrderForm({
                     className="self-end"
                     onClick={() => setDepositAmount(String(Math.round(total / 2 / 10) * 10))}
                   >
-                    มัดจำ 50%
+                    {t.orders.form.deposit50}
                   </Button>
                 </div>
 
@@ -565,11 +567,11 @@ export function OrderForm({
                       onChange={(e) => setVaccineComplete(e.target.checked)}
                       className="h-4 w-4 accent-primary"
                     />
-                    <Syringe className="h-4 w-4 text-muted-foreground" /> วัคซีนครบ
+                    <Syringe className="h-4 w-4 text-muted-foreground" /> {t.orders.form.vaccineCompleteCheckbox}
                   </label>
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1 text-xs">
-                      <Bug className="h-3.5 w-3.5" /> ยาเห็บหมัดล่าสุด
+                      <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickLabel}
                     </Label>
                     <div className="flex gap-2">
                       <Input
@@ -580,7 +582,7 @@ export function OrderForm({
                       <Input
                         value={fleaTickMedicine}
                         onChange={(e) => setFleaTickMedicine(e.target.value)}
-                        placeholder="ชื่อยา เช่น Nexgard Spectra"
+                        placeholder={t.orders.form.fleaMedicinePlaceholder}
                       />
                     </div>
                   </div>
@@ -594,7 +596,7 @@ export function OrderForm({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShoppingBag className="h-4 w-4" /> 4. สินค้า / ขนม (เพิ่มเติม)
+              <ShoppingBag className="h-4 w-4" /> {t.orders.form.step4Title}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -612,7 +614,7 @@ export function OrderForm({
                     <div className="min-w-0">
                       <div className="truncate font-medium">{p.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatBaht(p.price)} · เหลือ {p.stockQty} {p.unit}
+                        {formatBaht(p.price)} · {t.orders.form.remainingStock(p.stockQty, p.unit)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -649,7 +651,7 @@ export function OrderForm({
       <div className="lg:col-span-1">
         <Card className="lg:sticky lg:top-20">
           <CardHeader>
-            <CardTitle className="text-base">สรุปออเดอร์</CardTitle>
+            <CardTitle className="text-base">{t.orders.form.orderSummary}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5 text-sm">
@@ -667,7 +669,7 @@ export function OrderForm({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">
                     {selectedRoom.categoryName} {selectedRoom.name}
-                    {nights > 0 ? ` × ${nights} คืน` : " × 1 ครั้ง"}
+                    {nights > 0 ? ` × ${t.orders.form.nightsCount(nights)}` : ` × 1 ${t.orders.form.perVisitUnit}`}
                   </span>
                   <span>{formatBaht(selectedRoom.pricePerNight * (nights > 0 ? nights : 1))}</span>
                 </div>
@@ -686,29 +688,29 @@ export function OrderForm({
               })}
               {total === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                  ยังไม่ได้เลือกรายการ
+                  {t.orders.form.noItemsSelected}
                 </p>
               )}
             </div>
 
             <div className="border-t pt-3">
-              <Label className="text-xs">หมายเหตุ</Label>
+              <Label className="text-xs">{t.orders.form.noteLabel}</Label>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="หมายเหตุออเดอร์ (ถ้ามี)"
+                placeholder={t.orders.form.notePlaceholder}
                 rows={2}
                 className="mt-1"
               />
             </div>
 
             <div className="flex items-center justify-between border-t pt-3 text-lg font-bold">
-              <span>ยอดรวม</span>
+              <span>{t.orders.form.grandTotal}</span>
               <span className="text-primary">{formatBaht(total)}</span>
             </div>
             {roomId && Number(depositAmount || 0) > 0 && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>มัดจำตอนนี้ / คงเหลือ</span>
+                <span>{t.orders.form.depositNowRemaining}</span>
                 <span>
                   {formatBaht(Number(depositAmount || 0))} / {formatBaht(total - Number(depositAmount || 0))}
                 </span>
@@ -722,7 +724,7 @@ export function OrderForm({
               disabled={isPending || total === 0 || !customer}
             >
               {isPending ? <Loader2 className="animate-spin" /> : <ClipboardCheck />}
-              {isEdit ? "บันทึกการแก้ไข + สร้าง QR ใหม่" : "ยืนยันออเดอร์ + สร้าง QR"}
+              {isEdit ? t.orders.form.submitEdit : t.orders.form.submitCreate}
             </Button>
           </CardContent>
         </Card>

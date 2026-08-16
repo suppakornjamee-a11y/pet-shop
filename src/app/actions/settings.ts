@@ -124,6 +124,9 @@ const roomSchema = z.object({
   size: z.enum(["SMALL", "MEDIUM", "LARGE", "XLARGE"]).optional(),
   hasAir: z.coerce.boolean().default(false),
   hasFan: z.coerce.boolean().default(false),
+  hasCctv: z.coerce.boolean().default(false),
+  cctvModel: z.string().optional(),
+  cctvSerial: z.string().optional(),
   pricePerNight: z.coerce.number().int().min(0),
   equipment: z.string().optional(),
   description: z.string().optional(),
@@ -134,7 +137,12 @@ export async function upsertRoom(input: unknown): Promise<ActionResult> {
   await requireUser();
   const parsed = roomSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { id, ...data } = parsed.data;
+  const { id, ...rest } = parsed.data;
+  const data = {
+    ...rest,
+    cctvModel: rest.hasCctv ? (rest.cctvModel ?? null) : null,
+    cctvSerial: rest.hasCctv ? (rest.cctvSerial ?? null) : null,
+  };
 
   try {
     if (id) {

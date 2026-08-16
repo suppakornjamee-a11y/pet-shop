@@ -4,16 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { todayThaiStr, dateRangeThai, addDaysThai, thaiDayRange, isValidDateStr } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
 import { buildRoomGrid, type GridBooking } from "@/lib/room-grid";
-import { orderStatusColor, orderStatusLabel } from "@/lib/labels";
+import { orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
+import type { Dictionary } from "@/i18n/dictionaries/th";
 
 const WINDOW_DAYS = 14;
-const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
 export default async function BoardingPage(props: PageProps<"/boarding">) {
   const sp = await props.searchParams;
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const WEEKDAYS = t.common.weekdaysShort;
+  const intlLocale = locale === "th" ? "th-TH" : "en-US";
   const today = todayThaiStr();
   const start = typeof sp.start === "string" && isValidDateStr(sp.start) ? sp.start : today;
   const dateRange = dateRangeThai(start, WINDOW_DAYS);
@@ -85,17 +91,17 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
     };
   };
 
-  const rangeLabel = `${new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeZone: "UTC" }).format(
+  const rangeLabel = `${new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeZone: "UTC" }).format(
     new Date(`${dateRange[0]}T00:00:00Z`)
-  )} – ${new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeZone: "UTC" }).format(
+  )} – ${new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeZone: "UTC" }).format(
     new Date(`${dateRange[dateRange.length - 1]}T00:00:00Z`)
   )}`;
 
   return (
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
-        title="ปฏิทินห้องพัก / เข้าพัก"
-        description="Daycare, Nanny Room, Big Dog, Small Dog, Cat และ Pawsome — คลิกช่องว่างเพื่อจอง"
+        title={t.boarding.title}
+        description={t.boarding.description}
         action={
           <div className="flex items-center gap-1.5">
             <Button
@@ -124,7 +130,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
           <thead>
             <tr>
               <th className="sticky left-0 top-0 z-20 min-w-[180px] border-r border-b bg-card px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                ห้อง / คอก / พื้นที่
+                {t.boarding.roomColumnHeader}
               </th>
               {dateRange.map((d) => {
                 const { day, weekday, isToday } = dayLabel(d);
@@ -145,12 +151,12 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
           </thead>
           <tbody>
             {sections.map((section) => (
-              <SectionRows key={section.categoryId} section={section} dateRangeLength={dateRange.length} />
+              <SectionRows key={section.categoryId} section={section} dateRangeLength={dateRange.length} t={t} />
             ))}
             {sections.length === 0 && (
               <tr>
                 <td colSpan={dateRange.length + 1} className="px-3 py-10 text-center text-muted-foreground">
-                  ยังไม่มีห้อง/พื้นที่ — ไปที่ &quot;ตั้งค่า &gt; ห้องพัก&quot; เพื่อเพิ่มก่อน
+                  {t.boarding.noRooms}
                 </td>
               </tr>
             )}
@@ -164,9 +170,11 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
 function SectionRows({
   section,
   dateRangeLength,
+  t,
 }: {
   section: ReturnType<typeof buildRoomGrid>[number];
   dateRangeLength: number;
+  t: Dictionary;
 }) {
   return (
     <>
@@ -208,9 +216,9 @@ function SectionRows({
                     {seg.continuesAfter && " →"}
                   </div>
                   <div className="truncate opacity-80">
-                    {orderStatusLabel[seg.booking.status]}
-                    {seg.booking.nanny && " · พี่เลี้ยง"}
-                    {seg.booking.depositAmount > 0 && ` · มัดจำ ${seg.booking.depositAmount}`}
+                    {t.labels.orderStatus[seg.booking.status]}
+                    {seg.booking.nanny && t.boarding.nannyTag}
+                    {seg.booking.depositAmount > 0 && t.boarding.depositTag(seg.booking.depositAmount)}
                   </div>
                 </Link>
               </td>

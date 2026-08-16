@@ -3,25 +3,28 @@ import { ClipboardPlus, ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-const filters: { label: string; value: string }[] = [
-  { label: "ทั้งหมด", value: "all" },
-  { label: "รอชำระเงิน", value: "PENDING_PAYMENT" },
-  { label: "ชำระแล้ว", value: "PAID" },
-  { label: "กำลังดำเนินการ", value: "IN_PROGRESS" },
-  { label: "เสร็จสิ้น", value: "COMPLETED" },
-  { label: "ยกเลิก", value: "CANCELLED" },
-];
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function OrdersPage(props: PageProps<"/orders">) {
   const searchParams = await props.searchParams;
   const status = typeof searchParams.status === "string" ? searchParams.status : "all";
+  const t = getDictionary(await getLocale());
+
+  const filters: { label: string; value: string }[] = [
+    { label: t.orders.filterAll, value: "all" },
+    { label: t.orders.filterPending, value: "PENDING_PAYMENT" },
+    { label: t.orders.filterPaid, value: "PAID" },
+    { label: t.orders.filterInProgress, value: "IN_PROGRESS" },
+    { label: t.orders.filterCompleted, value: "COMPLETED" },
+    { label: t.orders.filterCancelled, value: "CANCELLED" },
+  ];
 
   const where =
     status !== "all" ? { status: status as OrderStatus } : {};
@@ -36,11 +39,11 @@ export default async function OrdersPage(props: PageProps<"/orders">) {
   return (
     <div>
       <PageHeader
-        title="ออเดอร์ทั้งหมด"
-        description="รายการออเดอร์ล่าสุด"
+        title={t.orders.title}
+        description={t.orders.description}
         action={
           <Button render={<Link href="/calendar" />} nativeButton={false}>
-            <ClipboardPlus /> จองคิว / สร้างออเดอร์
+            <ClipboardPlus /> {t.orders.bookOrder}
           </Button>
         }
       />
@@ -66,7 +69,7 @@ export default async function OrdersPage(props: PageProps<"/orders">) {
           {orders.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
               <ReceiptText className="h-10 w-10 opacity-40" />
-              ไม่มีออเดอร์ในหมวดนี้
+              {t.orders.empty}
             </div>
           ) : (
             <div className="divide-y">
@@ -83,7 +86,7 @@ export default async function OrdersPage(props: PageProps<"/orders">) {
                         variant="outline"
                         className={cn("text-[10px]", orderStatusColor[o.status])}
                       >
-                        {orderStatusLabel[o.status]}
+                        {t.labels.orderStatus[o.status]}
                       </Badge>
                     </div>
                     <div className="truncate text-xs text-muted-foreground">

@@ -5,19 +5,14 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 import { Loader2, LogIn } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export function LoginForm() {
   const router = useRouter();
+  const { t } = useI18n();
   const [isPending, startTransition] = useTransition();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin");
@@ -31,58 +26,46 @@ export function LoginForm() {
         redirect: false,
       });
       if (res?.error) {
-        toast.error("เข้าสู่ระบบไม่สำเร็จ", {
-          description: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+        toast.error(t.login.loginFailedTitle, {
+          description: t.login.loginFailedDesc,
         });
         return;
       }
-      toast.success("เข้าสู่ระบบสำเร็จ");
+      toast.success(t.login.loginSuccess);
       router.replace("/");
       router.refresh();
     });
   }
 
   return (
-    <Card className="shadow-xl border-border/60">
-      <CardHeader>
-        <CardTitle className="text-xl">เข้าสู่ระบบ</CardTitle>
-        <CardDescription>กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">ชื่อผู้ใช้</Label>
-            <Input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
-              autoComplete="username"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">รหัสผ่าน</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••"
-              autoComplete="current-password"
-              required
-            />
-          </div>
-          <Button type="submit" size="lg" className="w-full" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <LogIn />
-            )}
-            เข้าสู่ระบบ
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="username">{t.login.username}</Label>
+        <Input
+          id="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="admin"
+          autoComplete="username"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">{t.login.password}</Label>
+        <Input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••"
+          autoComplete="current-password"
+          required
+        />
+      </div>
+      <Button type="submit" size="lg" className="w-full" disabled={isPending}>
+        {isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
+        {t.login.submit}
+      </Button>
+    </form>
   );
 }

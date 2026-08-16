@@ -12,18 +12,22 @@ import {
   isPastSlot,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
-import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSlotPicker } from "@/components/custom-slot-picker";
-
-const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function CalendarPage(props: PageProps<"/calendar">) {
   const sp = await props.searchParams;
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const WEEKDAYS = t.common.weekdaysShort;
+  const intlLocale = locale === "th" ? "th-TH" : "en-US";
   const today = todayThaiStr();
   const monthStr =
     typeof sp.month === "string" && /^\d{4}-\d{2}$/.test(sp.month)
@@ -71,7 +75,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   // grid ของเดือน (คำนวณแบบไม่ผูก timezone)
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const leadingBlank = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
-  const monthLabel = new Intl.DateTimeFormat("th-TH", {
+  const monthLabel = new Intl.DateTimeFormat(intlLocale, {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -87,7 +91,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const selectedLabel = new Intl.DateTimeFormat("th-TH", {
+  const selectedLabel = new Intl.DateTimeFormat(intlLocale, {
     dateStyle: "full",
     timeZone: "UTC",
   }).format(new Date(`${selectedDate}T00:00:00Z`));
@@ -95,8 +99,8 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="ปฏิทินคิว"
-        description="เลือกวันและช่วงเวลาว่างก่อนสร้างออเดอร์ (กันคิวชนกัน)"
+        title={t.calendar.title}
+        description={t.calendar.description}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
@@ -147,7 +151,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                       isSelected ? "bg-white/25" : "bg-primary/15 text-primary"
                     )}
                   >
-                    {count} คิว
+                    {t.calendar.queueCountBadge(count)}
                   </span>
                 );
 
@@ -217,7 +221,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                       variant="outline"
                       className={cn("text-[10px]", orderStatusColor[booked.status])}
                     >
-                      {orderStatusLabel[booked.status]}
+                      {t.labels.orderStatus[booked.status]}
                     </Badge>
                   </Link>
                 );
@@ -234,7 +238,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   <div className="flex items-center gap-2.5 text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span className="font-mono font-semibold tabular-nums">{slot}</span>
-                    <span className="text-xs">{past ? "ผ่านมาแล้ว" : "ว่าง"}</span>
+                    <span className="text-xs">{past ? t.calendar.past : t.calendar.free}</span>
                   </div>
                   {!past && (
                     <Button
@@ -244,7 +248,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                       nativeButton={false}
                       size="sm"
                     >
-                      <Plus /> สร้างออเดอร์
+                      <Plus /> {t.calendar.createOrder}
                     </Button>
                   )}
                 </div>
@@ -266,7 +270,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   </span>
                 </div>
                 <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[b.status])}>
-                  {orderStatusLabel[b.status]}
+                  {t.labels.orderStatus[b.status]}
                 </Badge>
               </Link>
             ))}
@@ -275,12 +279,12 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
               <CustomSlotPicker date={selectedDate} customerId={customerId} />
             ) : (
               <p className="rounded-lg border border-dashed px-3 py-2.5 text-center text-xs text-muted-foreground">
-                วันที่ผ่านมาแล้ว — จองคิวย้อนหลังไม่ได้
+                {t.calendar.pastDateNotice}
               </p>
             )}
 
             <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5" /> เลือกช่วงเวลาว่าง หรือกำหนดเวลาเอง เพื่อสร้างออเดอร์
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t.calendar.pickSlotHint}
             </p>
           </CardContent>
         </Card>

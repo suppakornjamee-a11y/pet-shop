@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusLabel, orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { getLocale } from "@/i18n/get-locale";
 
 export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) {
   const { id } = await props.params;
@@ -38,16 +40,19 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
 
   if (!order) notFound();
 
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const intlLocale = locale === "th" ? "th-TH" : "en-US";
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={order.code}
-        description={`สร้างเมื่อ ${formatDateTime(order.createdAt)}`}
+        description={t.orders.detailCreatedAt(formatDateTime(order.createdAt))}
         action={
           <>
             <Button render={<Link href="/orders" />} nativeButton={false} variant="outline">
-              <ArrowLeft /> กลับ
+              <ArrowLeft /> {t.common.back}
             </Button>
             {order.status === "PENDING_PAYMENT" && (
               <Button
@@ -55,7 +60,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 nativeButton={false}
                 variant="outline"
               >
-                <Pencil /> แก้ไขออเดอร์
+                <Pencil /> {t.orders.editOrder}
               </Button>
             )}
             {["PAID", "IN_PROGRESS", "COMPLETED"].includes(order.status) && (
@@ -64,7 +69,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 nativeButton={false}
                 variant="secondary"
               >
-                <Printer /> พิมพ์เอกสาร
+                <Printer /> {t.orders.printDocument}
               </Button>
             )}
           </>
@@ -75,25 +80,25 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base">รายละเอียดออเดอร์</CardTitle>
+              <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
               <Badge
                 variant="outline"
                 className={cn("text-xs", orderStatusColor[order.status])}
               >
-                {orderStatusLabel[order.status]}
+                {t.labels.orderStatus[order.status]}
               </Badge>
             </CardHeader>
             <CardContent className="space-y-4">
               {order.appointmentAt && (
                 <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
                   <CalendarClock className="h-4 w-4" />
-                  คิว:{" "}
-                  {new Intl.DateTimeFormat("th-TH", {
-                    dateStyle: "long",
-                    timeStyle: "short",
-                    timeZone: "Asia/Bangkok",
-                  }).format(order.appointmentAt)}{" "}
-                  น.
+                  {t.orders.queueLabel(
+                    new Intl.DateTimeFormat(intlLocale, {
+                      dateStyle: "long",
+                      timeStyle: "short",
+                      timeZone: "Asia/Bangkok",
+                    }).format(order.appointmentAt)
+                  )}
                 </div>
               )}
 
@@ -102,60 +107,58 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   <div className="flex items-center gap-2 font-medium">
                     <BedDouble className="h-4 w-4 text-primary" />
                     {order.room.category.name} · {order.room.name}
-                    {order.nights > 0 && ` · ${order.nights} คืน`}
+                    {order.nights > 0 && ` · ${t.orders.nightsLabel(order.nights)}`}
                   </div>
                   <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                     <div>
-                      เช็คอิน:{" "}
-                      {new Intl.DateTimeFormat("th-TH", {
+                      {t.orders.checkIn}:{" "}
+                      {new Intl.DateTimeFormat(intlLocale, {
                         dateStyle: "medium",
                         timeStyle: "short",
                         timeZone: "Asia/Bangkok",
-                      }).format(order.checkInAt)}{" "}
-                      น.
+                      }).format(order.checkInAt)}
                     </div>
                     <div>
-                      เช็คเอาท์:{" "}
-                      {new Intl.DateTimeFormat("th-TH", {
+                      {t.orders.checkOut}:{" "}
+                      {new Intl.DateTimeFormat(intlLocale, {
                         dateStyle: "medium",
                         timeStyle: "short",
                         timeZone: "Asia/Bangkok",
-                      }).format(order.checkOutAt)}{" "}
-                      น.
+                      }).format(order.checkOutAt)}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-1 text-xs">
                     {order.nanny && (
                       <Badge variant="secondary" className="gap-1">
-                        <UserCheck className="h-3 w-3" /> มีพี่เลี้ยง
+                        <UserCheck className="h-3 w-3" /> {t.orders.nannyBadge}
                       </Badge>
                     )}
                     <Badge variant={order.vaccineComplete ? "secondary" : "outline"} className="gap-1">
                       <Syringe className="h-3 w-3" />
-                      {order.vaccineComplete ? "วัคซีนครบ" : "วัคซีนไม่ครบ/ไม่ทราบ"}
+                      {order.vaccineComplete ? t.orders.vaccineComplete : t.orders.vaccineIncomplete}
                     </Badge>
                     {order.fleaTickMedicine && (
                       <Badge variant="outline" className="gap-1">
                         <Bug className="h-3 w-3" />
                         {order.fleaTickMedicine}
                         {order.lastFleaTickAt &&
-                          ` · ${new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeZone: "Asia/Bangkok" }).format(order.lastFleaTickAt)}`}
+                          ` · ${new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeZone: "Asia/Bangkok" }).format(order.lastFleaTickAt)}`}
                       </Badge>
                     )}
                     {order.depositAmount > 0 && (
-                      <Badge variant="outline">มัดจำ {formatBaht(order.depositAmount)}</Badge>
+                      <Badge variant="outline">{t.orders.depositBadge(formatBaht(order.depositAmount))}</Badge>
                     )}
                   </div>
                 </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-xs text-muted-foreground">เจ้าของ</div>
+                  <div className="text-xs text-muted-foreground">{t.orders.owner}</div>
                   <div className="font-medium">{order.customer.name}</div>
                   <div className="text-sm text-muted-foreground">{order.customer.phone}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">สัตว์เลี้ยง</div>
+                  <div className="text-xs text-muted-foreground">{t.orders.pet}</div>
                   <div className="font-medium">
                     {order.pet ? (
                       <>
@@ -166,7 +169,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     )}
                   </div>
                   {order.pet?.allergies && (
-                    <div className="text-sm text-rose-600">⚠️ แพ้: {order.pet.allergies}</div>
+                    <div className="text-sm text-rose-600">{t.orders.allergyWarning(order.pet.allergies)}</div>
                   )}
                 </div>
               </div>
@@ -175,10 +178,10 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium">รายการ</th>
-                      <th className="px-3 py-2 text-center font-medium">จำนวน</th>
-                      <th className="px-3 py-2 text-right font-medium">ราคา</th>
-                      <th className="px-3 py-2 text-right font-medium">รวม</th>
+                      <th className="px-3 py-2 text-left font-medium">{t.orders.columnItem}</th>
+                      <th className="px-3 py-2 text-center font-medium">{t.orders.columnQty}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t.orders.columnPrice}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t.orders.columnSubtotal}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -196,7 +199,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   <tfoot className="border-t bg-muted/30">
                     <tr>
                       <td colSpan={3} className="px-3 py-2 text-right font-semibold">
-                        ยอดรวมทั้งสิ้น
+                        {t.orders.grandTotal}
                       </td>
                       <td className="px-3 py-2 text-right text-base font-bold text-primary">
                         {formatBaht(order.total)}
@@ -208,7 +211,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
 
               {order.note && (
                 <div className="rounded-lg bg-muted/40 p-3 text-sm">
-                  <span className="text-muted-foreground">หมายเหตุ: </span>
+                  <span className="text-muted-foreground">{t.orders.noteLabel}</span>
                   {order.note}
                 </div>
               )}
@@ -246,7 +249,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 <PawPrint className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                ไม่มีข้อมูลการชำระเงิน
+                {t.orders.noPaymentData}
               </CardContent>
             </Card>
           )}

@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-provider";
 
 export function DashboardDatePicker({ value }: { value: string }) {
+  const { t } = useI18n();
   const router = useRouter();
 
   function todayStr() {
@@ -28,7 +30,7 @@ export function DashboardDatePicker({ value }: { value: string }) {
       </div>
       {value !== todayStr() && (
         <Button variant="outline" size="sm" onClick={() => router.push("/")}>
-          วันนี้
+          {t.calendar.todayLabel}
         </Button>
       )}
     </div>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon } from "lucide-react";
 import { createUser, updateUser, deleteUser } from "@/app/actions/settings";
 import type { Role } from "@/generated/prisma/enums";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,7 @@ export function UserManager({
   users: User[];
   currentUserId: string;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -102,7 +104,7 @@ export function UserManager({
   }
 
   function remove(id: string) {
-    if (!confirm("ลบผู้ใช้งานนี้?")) return;
+    if (!confirm(t.settings.users.confirmDelete)) return;
     startTransition(async () => {
       const res = await deleteUser(id);
       if (!res.ok) {
@@ -118,7 +120,7 @@ export function UserManager({
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={openNew}>
-          <Plus /> เพิ่มผู้ใช้งาน
+          <Plus /> {t.settings.users.addUser}
         </Button>
       </div>
 
@@ -140,12 +142,12 @@ export function UserManager({
                       {u.name}
                       {!u.active && (
                         <Badge variant="secondary" className="text-[10px]">
-                          ปิดใช้งาน
+                          {t.settings.users.inactiveBadge}
                         </Badge>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      @{u.username} · {u.role === "ADMIN" ? "แอดมิน" : "พนักงาน"}
+                      @{u.username} · {u.role === "ADMIN" ? t.settings.users.roleAdmin : t.settings.users.roleStaff}
                     </div>
                   </div>
                 </div>
@@ -173,11 +175,11 @@ export function UserManager({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "แก้ไขผู้ใช้งาน" : "เพิ่มผู้ใช้งาน"}</DialogTitle>
+            <DialogTitle>{editing ? t.settings.users.editUser : t.settings.users.addUser}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>ชื่อผู้ใช้ (username) *</Label>
+              <Label>{t.settings.users.usernameFullLabel}</Label>
               <Input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -185,11 +187,11 @@ export function UserManager({
               />
             </div>
             <div className="space-y-2">
-              <Label>ชื่อ-นามสกุล *</Label>
+              <Label>{t.settings.users.nameFullLabel}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>อีเมล</Label>
+              <Label>{t.settings.users.emailLabel}</Label>
               <Input
                 type="email"
                 value={form.email}
@@ -197,24 +199,24 @@ export function UserManager({
               />
             </div>
             <div className="space-y-2">
-              <Label>สิทธิ์การใช้งาน</Label>
+              <Label>{t.settings.users.roleLabel}</Label>
               <Select
                 value={form.role}
                 onValueChange={(v) => setForm({ ...form, role: v as Role })}
-                items={{ ADMIN: "แอดมิน", USER: "พนักงาน" }}
+                items={{ ADMIN: t.settings.users.roleAdmin, USER: t.settings.users.roleStaff }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">แอดมิน</SelectItem>
-                  <SelectItem value="USER">พนักงาน</SelectItem>
+                  <SelectItem value="ADMIN">{t.settings.users.roleAdmin}</SelectItem>
+                  <SelectItem value="USER">{t.settings.users.roleStaff}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>
-                {editing ? "รหัสผ่านใหม่ (เว้นว่างถ้าไม่เปลี่ยน)" : "รหัสผ่าน *"}
+                {editing ? t.settings.users.passwordEditLabel : t.settings.users.passwordFullLabel}
               </Label>
               <Input
                 type="password"
@@ -230,14 +232,14 @@ export function UserManager({
                   onChange={(e) => setForm({ ...form, active: e.target.checked })}
                   className="h-4 w-4 accent-primary"
                 />
-                เปิดใช้งานบัญชีนี้
+                {t.settings.users.activeAccountCheckbox}
               </label>
             )}
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
               {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-              บันทึก
+              {t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
