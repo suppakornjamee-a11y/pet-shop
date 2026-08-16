@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Save, ImagePlus, X } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, ImagePlus, X, Syringe, Bug } from "lucide-react";
 import { createCustomerWithPets, updateCustomerWithPets } from "@/app/actions/customers";
 import { fileToDataUrl } from "@/lib/file";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,9 @@ type PetForm = {
   photoUrls: string[];
   vaccinePhotoUrls: string[];
   cctvConsent: boolean;
+  vaccineComplete: boolean;
+  lastFleaTickDate: string;
+  fleaTickMedicine: string;
 };
 
 const emptyPet: PetForm = {
@@ -59,6 +62,9 @@ const emptyPet: PetForm = {
   photoUrls: [],
   vaccinePhotoUrls: [],
   cctvConsent: false,
+  vaccineComplete: false,
+  lastFleaTickDate: "",
+  fleaTickMedicine: "",
 };
 
 function MultiPhotoUpload({
@@ -290,7 +296,6 @@ export function RegisterForm({
               <Input
                 value={pet.name}
                 onChange={(e) => updatePet(i, { name: e.target.value })}
-                placeholder={t.register.petNamePlaceholder}
                 required
               />
             </div>
@@ -338,7 +343,6 @@ export function RegisterForm({
               <Input
                 value={pet.breed}
                 onChange={(e) => updatePet(i, { breed: e.target.value })}
-                placeholder={t.register.breedPlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -346,7 +350,6 @@ export function RegisterForm({
               <Input
                 value={pet.color}
                 onChange={(e) => updatePet(i, { color: e.target.value })}
-                placeholder={t.register.colorPlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -356,7 +359,6 @@ export function RegisterForm({
                 step="0.1"
                 value={pet.weightKg}
                 onChange={(e) => updatePet(i, { weightKg: e.target.value })}
-                placeholder={t.register.weightPlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -372,8 +374,33 @@ export function RegisterForm({
               <Input
                 value={pet.foodNote}
                 onChange={(e) => updatePet(i, { foodNote: e.target.value })}
-                placeholder={t.register.foodNotePlaceholder}
               />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={pet.vaccineComplete}
+                onChange={(e) => updatePet(i, { vaccineComplete: e.target.checked })}
+                className="h-4 w-4 accent-primary"
+              />
+              <Syringe className="h-4 w-4 text-muted-foreground" /> {t.orders.form.vaccineCompleteCheckbox}
+            </label>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1 text-xs">
+                <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickLabel}
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={pet.lastFleaTickDate}
+                  onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
+                />
+                <Input
+                  value={pet.fleaTickMedicine}
+                  onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
+                  placeholder={t.orders.form.fleaMedicinePlaceholder}
+                />
+              </div>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label className="text-destructive">{t.register.aggressiveNotesLabel}</Label>

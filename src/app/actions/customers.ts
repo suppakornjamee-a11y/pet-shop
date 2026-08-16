@@ -20,6 +20,9 @@ const petSchema = z.object({
   photoUrls: z.array(z.string()).default([]),
   vaccinePhotoUrls: z.array(z.string()).default([]),
   cctvConsent: z.coerce.boolean().default(false),
+  vaccineComplete: z.coerce.boolean().default(false),
+  lastFleaTickDate: z.string().optional(),
+  fleaTickMedicine: z.string().optional(),
 });
 
 function petCreateData(p: z.infer<typeof petSchema>) {
@@ -38,6 +41,9 @@ function petCreateData(p: z.infer<typeof petSchema>) {
     photoUrls: p.photoUrls,
     vaccinePhotoUrls: p.vaccinePhotoUrls,
     cctvConsent: p.cctvConsent,
+    vaccineComplete: p.vaccineComplete,
+    lastFleaTickAt: p.lastFleaTickDate ? new Date(p.lastFleaTickDate) : null,
+    fleaTickMedicine: p.fleaTickMedicine || null,
   };
 }
 

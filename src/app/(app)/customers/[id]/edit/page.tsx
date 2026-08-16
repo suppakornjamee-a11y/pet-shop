@@ -49,6 +49,9 @@ export default async function EditCustomerPage(props: PageProps<"/customers/[id]
           photoUrls: p.photoUrls,
           vaccinePhotoUrls: p.vaccinePhotoUrls,
           cctvConsent: p.cctvConsent,
+          vaccineComplete: p.vaccineComplete ?? false,
+          lastFleaTickDate: p.lastFleaTickAt ? toThaiDateStr(p.lastFleaTickAt) : "",
+          fleaTickMedicine: p.fleaTickMedicine ?? "",
         }))}
       />
     </div>

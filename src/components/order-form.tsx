@@ -15,8 +15,6 @@ import {
   Plus,
   X,
   ClipboardCheck,
-  Syringe,
-  Bug,
 } from "lucide-react";
 import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
@@ -360,12 +358,6 @@ export function OrderForm({
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  {t.orders.form.noCustomerFound}{" "}
-                  <a href="/register" className="text-primary underline">
-                    {t.orders.form.registerNew}
-                  </a>
-                </p>
               </div>
             )}
 
@@ -396,52 +388,11 @@ export function OrderForm({
           </CardContent>
         </Card>
 
-        {/* 2. บริการ */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.orders.form.step2Title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {Object.entries(groupedServices).map(([cat, list]) => {
-              const Icon = serviceIcon(cat);
-              return (
-                <div key={cat}>
-                  <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                    <Icon className="h-4 w-4" />
-                    {t.labels.serviceCategory[cat as keyof typeof t.labels.serviceCategory]}
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {list.map((s) => {
-                      const active = serviceIds.has(s.id);
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => toggleService(s.id)}
-                          className={cn(
-                            "flex items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors",
-                            active
-                              ? "border-primary bg-primary/10"
-                              : "hover:bg-accent"
-                          )}
-                        >
-                          <span className={cn(active && "font-medium")}>{s.name}</span>
-                          <span className="text-muted-foreground">{formatBaht(s.price)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* 3. ห้องพัก / คอก / พื้นที่ */}
+        {/* 2. ห้องพัก / คอก / พื้นที่ */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BedDouble className="h-4 w-4" /> {t.orders.form.step3Title}
+              <BedDouble className="h-4 w-4" /> {t.orders.form.step2Title}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -492,9 +443,10 @@ export function OrderForm({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label className="text-xs">{t.orders.form.checkInLabel}</Label>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
                       <Input
                         type="date"
+                        className="min-w-0"
                         value={checkInDate}
                         onChange={(e) => onCheckInDateChange(e.target.value)}
                       />
@@ -502,15 +454,16 @@ export function OrderForm({
                         type="time"
                         value={checkInTime}
                         onChange={(e) => setCheckInTime(e.target.value)}
-                        className="w-28"
+                        className="w-24"
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">{t.orders.form.checkOutLabel}</Label>
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
                       <Input
                         type="date"
+                        className="min-w-0"
                         value={checkOutDate}
                         min={checkInDate}
                         disabled={isPerVisit}
@@ -520,7 +473,7 @@ export function OrderForm({
                         type="time"
                         value={checkOutTime}
                         onChange={(e) => setCheckOutTime(e.target.value)}
-                        className="w-28"
+                        className="w-24"
                       />
                     </div>
                   </div>
@@ -558,37 +511,49 @@ export function OrderForm({
                     {t.orders.form.deposit50}
                   </Button>
                 </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={vaccineComplete}
-                      onChange={(e) => setVaccineComplete(e.target.checked)}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <Syringe className="h-4 w-4 text-muted-foreground" /> {t.orders.form.vaccineCompleteCheckbox}
-                  </label>
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-1 text-xs">
-                      <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickLabel}
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="date"
-                        value={lastFleaTickDate}
-                        onChange={(e) => setLastFleaTickDate(e.target.value)}
-                      />
-                      <Input
-                        value={fleaTickMedicine}
-                        onChange={(e) => setFleaTickMedicine(e.target.value)}
-                        placeholder={t.orders.form.fleaMedicinePlaceholder}
-                      />
-                    </div>
-                  </div>
-                </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* 3. บริการ */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t.orders.form.step3Title}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(groupedServices).map(([cat, list]) => {
+              const Icon = serviceIcon(cat);
+              return (
+                <div key={cat}>
+                  <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Icon className="h-4 w-4" />
+                    {t.labels.serviceCategory[cat as keyof typeof t.labels.serviceCategory]}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {list.map((s) => {
+                      const active = serviceIds.has(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleService(s.id)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors",
+                            active
+                              ? "border-primary bg-primary/10"
+                              : "hover:bg-accent"
+                          )}
+                        >
+                          <span className={cn(active && "font-medium")}>{s.name}</span>
+                          <span className="text-muted-foreground">{formatBaht(s.price)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
