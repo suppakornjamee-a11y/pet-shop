@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(taskkill //PID 7636 //F)",
+      "Bash(command -v chromium-cli)",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(where chromium-cli *)",
+      "Bash(npx --no-install playwright install chromium --dry-run)",
+      "Bash(npm install *)",
+      "Bash(node \"C:\\\\Users\\\\SUPPAK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-SuppakornJame-petcare-app\\\\eb67f36f-a387-45ad-8643-0e28b0d92fcf\\\\scratchpad\\\\smoke-test.mjs\")",
+      "Bash(cp \"C:\\\\Users\\\\SUPPAK~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-SuppakornJame-petcare-app\\\\eb67f36f-a387-45ad-8643-0e28b0d92fcf\\\\scratchpad\\\\smoke-test.mjs\" \"/c/Users/SuppakornJame/petcare-app/scratch-smoke-test.mjs\")",
+      "Bash(node scratch-smoke-test.mjs)",
+      "Bash(ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\" 2>/dev/null && echo \"chrome found\" || echo \"no system chrome\")",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(npx next *)",
+      "Bash(node scratch-icon-check.mjs)",
+      "Bash(node scratch-auth-check.mjs)",
+      "Bash(rm -f scratch-auth-check.mjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 5 https://fonts.googleapis.com/css2?family=Prompt)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 5 https://www.google.com)",
+      "Bash(curl -s -o /dev/null -w \"google.com: %{http_code}\\\\n\" --max-time 5 https://www.google.com)",
+      "Bash(curl -s -o /dev/null -w \"github.com: %{http_code}\\\\n\" --max-time 5 https://github.com)",
+      "Bash(ping -n 1 -w 3000 github.com)"
+    ]
+  }
+}

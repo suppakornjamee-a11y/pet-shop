@@ -17,6 +17,7 @@ async function main() {
     customer: await prisma.customer.findMany(),
     pet: await prisma.pet.findMany(),
     service: await prisma.service.findMany(),
+    roomCategory: await prisma.roomCategory.findMany(),
     room: await prisma.room.findMany(),
     product: await prisma.product.findMany(),
     bankAccount: await prisma.bankAccount.findMany(),

@@ -44,3 +44,4 @@ next-env.d.ts
 
 # ข้อมูล export จาก DB (อาจมีข้อมูลส่วนตัว — ไม่ commit)
 /prisma/seed-data.json
+/prisma/master-data.json

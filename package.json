@@ -15,6 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:export": "tsx prisma/export-data.ts",
     "db:import": "tsx prisma/import-data.ts",
+    "db:export-master": "tsx prisma/export-master-data.ts",
+    "db:import-master": "tsx prisma/import-master-data.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset"
   },

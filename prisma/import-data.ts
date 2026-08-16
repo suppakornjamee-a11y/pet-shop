@@ -26,6 +26,7 @@ async function main() {
   log("customer", await prisma.customer.createMany({ data: data.customer ?? [], skipDuplicates: true }), (data.customer ?? []).length);
   log("pet", await prisma.pet.createMany({ data: data.pet ?? [], skipDuplicates: true }), (data.pet ?? []).length);
   log("service", await prisma.service.createMany({ data: data.service ?? [], skipDuplicates: true }), (data.service ?? []).length);
+  log("roomCategory", await prisma.roomCategory.createMany({ data: data.roomCategory ?? [], skipDuplicates: true }), (data.roomCategory ?? []).length);
   log("room", await prisma.room.createMany({ data: data.room ?? [], skipDuplicates: true }), (data.room ?? []).length);
   log("product", await prisma.product.createMany({ data: data.product ?? [], skipDuplicates: true }), (data.product ?? []).length);
   log("bankAccount", await prisma.bankAccount.createMany({ data: data.bankAccount ?? [], skipDuplicates: true }), (data.bankAccount ?? []).length);
