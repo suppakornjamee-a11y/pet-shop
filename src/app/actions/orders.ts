@@ -14,8 +14,25 @@ import {
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
+import { sendLinePush } from "@/lib/line";
+import { formatBaht } from "@/lib/format";
 import type { RoomModel, RoomCategoryModel } from "@/generated/prisma/models";
 import type { ActionResult } from "./customers";
+
+/** ส่งแจ้งเตือน LINE หาลูกค้า (เงียบๆ ไม่ throw ถ้าไม่ได้ผูกบัญชีหรือส่งไม่สำเร็จ) */
+async function notifyCustomerLine(orderId: string, text: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { customer: { select: { lineUserId: true } } },
+  });
+  const lineUserId = order?.customer.lineUserId;
+  if (!lineUserId) return;
+  try {
+    await sendLinePush(lineUserId, text);
+  } catch {
+    // ไม่ให้ error การแจ้งเตือนไปกระทบ flow หลัก (ยืนยันชำระเงิน/อัปเดตสถานะ)
+  }
+}
 
 const PAYMENT_TTL_MS = 15 * 60 * 1000; // 15 นาที
 
@@ -495,9 +512,11 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       0
     );
     const alreadyFullyPaid = (["PAID", "IN_PROGRESS", "COMPLETED"] as string[]).includes(order.status);
+    let justFullyPaid = false;
 
     if (!alreadyFullyPaid && verifiedSum >= order.total) {
       await tx.order.update({ where: { id: order.id }, data: { status: "PAID", updatedById: user.id } });
+      justFullyPaid = true;
 
       // ตัดสต็อกสินค้า (เฉพาะตอนชำระครบยอดแล้วเท่านั้น)
       for (const it of order.items) {
@@ -521,13 +540,20 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       await tx.order.update({ where: { id: order.id }, data: { status: "DEPOSIT_PAID", updatedById: user.id } });
     }
 
-    return { ok: true as const };
+    return { ok: true as const, justFullyPaid, orderCode: order.code, orderTotal: order.total };
   });
 
   revalidatePath(`/orders/${orderId}`);
   if (!result.ok) return result;
   revalidatePath("/orders");
   revalidatePath("/boarding");
+
+  if (result.justFullyPaid) {
+    void notifyCustomerLine(
+      orderId,
+      `ชำระเงินสำเร็จแล้ว ✅\nออเดอร์ ${result.orderCode}\nยอด ${formatBaht(result.orderTotal)}\nขอบคุณที่ใช้บริการค่ะ 🐾`
+    );
+  }
   return { ok: true, message: "ยืนยันการชำระเงินเรียบร้อย" };
 }
 
@@ -555,12 +581,20 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   const parsed = statusSchema.safeParse(status);
   if (!parsed.success) return { ok: false, error: "สถานะไม่ถูกต้อง" };
 
-  await prisma.order.update({
+  const order = await prisma.order.update({
     where: { id: orderId },
     data: { status: parsed.data, updatedById: user.id },
   });
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   revalidatePath("/boarding");
+
+  if (parsed.data === "COMPLETED") {
+    void notifyCustomerLine(
+      orderId,
+      `บริการเสร็จเรียบร้อยแล้วค่ะ 🎉\nออเดอร์ ${order.code}\nสามารถมารับได้เลยค่ะ 🐾`
+    );
+  }
+
   return { ok: true, message: "อัปเดตสถานะเรียบร้อย" };
 }

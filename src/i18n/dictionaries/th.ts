@@ -367,6 +367,11 @@ const th = {
       allergiesLabel: "อาการแพ้ / ยาที่แพ้",
       noteLabel: "หมายเหตุ",
     },
+    lineConnected: "เชื่อมต่อ LINE แล้ว",
+    lineConnectButton: "เชื่อมต่อ LINE OA",
+    lineConnectDialogTitle: "เชื่อมต่อ LINE OA",
+    lineConnectDialogDesc: "ให้ลูกค้าสแกน QR นี้ด้วยแอป LINE แล้วกดส่งข้อความที่เด้งขึ้นมา (ครั้งเดียวจบ) ระบบจะผูกบัญชีให้อัตโนมัติ เพื่อรับแจ้งเตือนตอนชำระเงินสำเร็จและงานเสร็จพร้อมรับ",
+    lineConnectUnavailable: "ยังไม่ได้ตั้งค่า LINE OA ในระบบ — ติดต่อผู้ดูแลระบบ",
   },
   register: {
     pageTitle: "ลงทะเบียนสัตว์เลี้ยง",

@@ -357,6 +357,11 @@ const en: Dictionary = {
       allergiesLabel: "Allergies / Medication Allergies",
       noteLabel: "Note",
     },
+    lineConnected: "LINE Connected",
+    lineConnectButton: "Connect LINE OA",
+    lineConnectDialogTitle: "Connect LINE OA",
+    lineConnectDialogDesc: "Have the customer scan this QR with the LINE app and tap send on the message that pops up (one-time only). The account links automatically to receive notifications when payment is confirmed and when the order is ready for pickup.",
+    lineConnectUnavailable: "LINE OA isn't configured yet — contact your administrator",
   },
   register: {
     pageTitle: "Register Pet",

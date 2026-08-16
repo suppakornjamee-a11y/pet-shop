@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PetFormDialog } from "@/components/pet-form-dialog";
+import { LineConnectButton } from "@/components/line-connect-button";
+import { buildLineLinkUrl } from "@/lib/line";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
@@ -101,6 +103,8 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
               </div>
             )}
           </div>
+
+          <LineConnectButton linked={!!customer.lineUserId} linkUrl={buildLineLinkUrl(customer.id)} />
 
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-muted-foreground">
