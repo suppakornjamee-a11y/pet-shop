@@ -131,12 +131,18 @@ export function OrderForm({
     new Set(initial?.serviceIds ?? [])
   );
   const [roomId, setRoomId] = useState<string>(initial?.roomId ?? "");
+  const initialRoom = rooms.find((r) => r.id === initial?.roomId);
   const [checkInDate, setCheckInDate] = useState(initial?.checkInDate || todayStr());
   const [checkInTime, setCheckInTime] = useState(initial?.checkInTime || "13:00");
   const [checkOutDate, setCheckOutDate] = useState(
-    initial?.checkOutDate || addDaysThai(initial?.checkInDate || todayStr(), 1)
+    initial?.checkOutDate ||
+      (initialRoom?.billingUnit === "PER_VISIT"
+        ? initial?.checkInDate || todayStr()
+        : addDaysThai(initial?.checkInDate || todayStr(), 1))
   );
-  const [checkOutTime, setCheckOutTime] = useState(initial?.checkOutTime || "11:00");
+  const [checkOutTime, setCheckOutTime] = useState(
+    initial?.checkOutTime || (initialRoom?.billingUnit === "PER_VISIT" ? "18:00" : "11:00")
+  );
   const [nanny, setNanny] = useState(initial?.nanny ?? false);
   const [depositAmount, setDepositAmount] = useState(String(initial?.depositAmount ?? 0));
   const [vaccineComplete, setVaccineComplete] = useState(initial?.vaccineComplete ?? false);

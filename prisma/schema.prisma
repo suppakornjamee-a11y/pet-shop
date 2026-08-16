@@ -121,15 +121,16 @@ model User {
 // ---------- Customers & Pets ----------
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String
-  email     String?
-  address   String?
-  lineId    String?
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  phone      String
+  email      String?
+  address    String?
+  lineId     String?
+  lineUserId String?  @unique // LINE userId ที่ผูกผ่าน webhook (แยกจาก lineId ที่เป็นข้อความอิสระ)
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   pets   Pet[]
   orders Order[]
@@ -139,30 +140,30 @@ model Customer {
 }
 
 model Pet {
-  id         String    @id @default(cuid())
-  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId String
-  name       String
-  species    Species
-  breed      String?
-  gender     Gender    @default(UNKNOWN)
-  birthDate  DateTime?
-  weightKg   Float?
-  color      String?
-  allergies  String? // อาการแพ้ / ยาที่แพ้
-  note       String?
-  photoUrl   String?
-  photoUrls        String[] @default([]) // รูปสัตว์เลี้ยง (หลายรูป)
+  id               String    @id @default(cuid())
+  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId       String
+  name             String
+  species          Species
+  breed            String?
+  gender           Gender    @default(UNKNOWN)
+  birthDate        DateTime?
+  weightKg         Float?
+  color            String?
+  allergies        String? // อาการแพ้ / ยาที่แพ้
+  note             String?
+  photoUrl         String?
+  photoUrls        String[]  @default([]) // รูปสัตว์เลี้ยง (หลายรูป)
   aggressiveNotes  String? // หมายเหตุพฤติกรรมก้าวร้าว/ดุ
   foodNote         String? // อาหารที่กิน / ห้ามกิน
   vaccinePhotoUrl  String? // รูปสมุดวัคซีน/ใบรับรองวัคซีน (เดิม — เก็บไว้เพื่อ backward compat)
-  vaccinePhotoUrls String[] @default([]) // รูปสมุดวัคซีน/ใบรับรองวัคซีน (หลายรูป)
+  vaccinePhotoUrls String[]  @default([]) // รูปสมุดวัคซีน/ใบรับรองวัคซีน (หลายรูป)
   cctvConsent      Boolean   @default(false) // ยินยอมให้บันทึกภาพกล้องวงจรปิดขณะฝากเลี้ยง
   vaccineComplete  Boolean? // วัคซีนครบล่าสุดที่ทราบ (เอาไว้ prefill ตอนจองครั้งถัดไป)
   lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด
   fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด เช่น Nexgard Spectra
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   orders Order[]
 
@@ -221,22 +222,22 @@ model Room {
 }
 
 model Product {
-  id        String        @id @default(cuid())
-  name      String
-  sku       String?       @unique
-  target    ProductTarget @default(PET)
-  category  String? // เช่น ขนม, อาหารเปียก, อาหารเม็ด
-  price     Int
-  cost      Int?
-  stockQty  Int           @default(0)
-  unit      String        @default("ชิ้น")
-  active    Boolean       @default(true)
-  createdBy   User?       @relation("ProductCreatedBy", fields: [createdById], references: [id])
+  id          String        @id @default(cuid())
+  name        String
+  sku         String?       @unique
+  target      ProductTarget @default(PET)
+  category    String? // เช่น ขนม, อาหารเปียก, อาหารเม็ด
+  price       Int
+  cost        Int?
+  stockQty    Int           @default(0)
+  unit        String        @default("ชิ้น")
+  active      Boolean       @default(true)
+  createdBy   User?         @relation("ProductCreatedBy", fields: [createdById], references: [id])
   createdById String?
-  updatedBy   User?       @relation("ProductUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy   User?         @relation("ProductUpdatedBy", fields: [updatedById], references: [id])
   updatedById String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   movements StockMovement[]
 
@@ -275,34 +276,34 @@ model BankAccount {
 // ---------- Orders / Payments ----------
 
 model Order {
-  id          String      @id @default(cuid())
-  code        String      @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
-  customer    Customer    @relation(fields: [customerId], references: [id])
-  customerId  String
-  pet         Pet?        @relation(fields: [petId], references: [id])
-  petId       String?
-  room        Room?       @relation(fields: [roomId], references: [id])
-  roomId      String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
-  status        OrderStatus @default(PENDING_PAYMENT)
-  appointmentAt DateTime? // วัน-เวลาคิวที่จอง (slot) — ใช้กับคิวอาบน้ำ/ตัดขนแบบ walk-in
-  checkInAt     DateTime? // เช็คอิน (ใช้กับการจองห้อง/คอก/พื้นที่)
-  checkOutAt    DateTime? // เช็คเอาท์
-  nights        Int         @default(0)
-  nanny         Boolean     @default(false) // มีพี่เลี้ยงดูแลพิเศษหรือไม่
-  depositAmount Int         @default(0) // มัดจำ (0 = ไม่มีมัดจำ จ่ายเต็มยอด)
-  vaccineComplete  Boolean   @default(false) // วัคซีนครบ (ณ ตอนจองนี้)
+  id               String      @id @default(cuid())
+  code             String      @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
+  customer         Customer    @relation(fields: [customerId], references: [id])
+  customerId       String
+  pet              Pet?        @relation(fields: [petId], references: [id])
+  petId            String?
+  room             Room?       @relation(fields: [roomId], references: [id])
+  roomId           String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
+  status           OrderStatus @default(PENDING_PAYMENT)
+  appointmentAt    DateTime? // วัน-เวลาคิวที่จอง (slot) — ใช้กับคิวอาบน้ำ/ตัดขนแบบ walk-in
+  checkInAt        DateTime? // เช็คอิน (ใช้กับการจองห้อง/คอก/พื้นที่)
+  checkOutAt       DateTime? // เช็คเอาท์
+  nights           Int         @default(0)
+  nanny            Boolean     @default(false) // มีพี่เลี้ยงดูแลพิเศษหรือไม่
+  depositAmount    Int         @default(0) // มัดจำ (0 = ไม่มีมัดจำ จ่ายเต็มยอด)
+  vaccineComplete  Boolean     @default(false) // วัคซีนครบ (ณ ตอนจองนี้)
   lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด (ณ ตอนจองนี้)
   fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด
-  subtotal    Int         @default(0)
-  discount    Int         @default(0)
-  total       Int         @default(0)
-  note        String?
-  createdBy   User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  createdById String?
-  updatedBy   User?       @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
-  updatedById String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  subtotal         Int         @default(0)
+  discount         Int         @default(0)
+  total            Int         @default(0)
+  note             String?
+  createdBy        User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdById      String?
+  updatedBy        User?       @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
+  updatedById      String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   items    OrderItem[]
   payments Payment[]
@@ -335,21 +336,21 @@ model Payment {
   order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId       String
   purpose       PaymentPurpose @default(BALANCE) // มัดจำ หรือ ยอดคงเหลือ/ยอดเต็ม
-  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id])
   bankAccountId String?
-  method        PaymentMethod @default(PROMPTPAY)
+  method        PaymentMethod  @default(PROMPTPAY)
   amount        Int
-  status        PaymentStatus @default(PENDING)
+  status        PaymentStatus  @default(PENDING)
   qrPayload     String? // PromptPay payload สำหรับสร้าง QR
   expiresAt     DateTime? // QR หมดอายุ (15 นาที)
   slipUrl       String? // สลิปที่ลูกค้าอัปโหลด
   submittedAt   DateTime?
-  verifiedBy    User?         @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+  verifiedBy    User?          @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
   verifiedById  String?
   verifiedAt    DateTime?
   rejectReason  String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([orderId])
 }

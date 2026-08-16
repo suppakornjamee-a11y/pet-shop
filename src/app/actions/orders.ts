@@ -115,8 +115,8 @@ async function buildOrderPlan(
       : Promise.resolve([]),
   ]);
 
-  const hasQueueService = services.some((s) => s.category === "BATH" || s.category === "GROOMING");
-  const needsAppointment = hasQueueService || !room;
+  // ถ้ามีห้อง ใช้เวลาเช็คอิน/เช็คเอาท์เป็นตัวอ้างอิงแทนคิวส่วนกลาง — แม้จะมีบริการอาบน้ำ/ตัดขนติดมาด้วยก็ไม่ต้องเลือกคิวซ้ำ
+  const needsAppointment = !room;
 
   let appointmentAt: Date | null = null;
   if (needsAppointment) {

@@ -3,8 +3,8 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { todayThaiStr, dateRangeThai, addDaysThai, thaiDayRange, isValidDateStr } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
-import { buildRoomGrid, type GridBooking } from "@/lib/room-grid";
-import { orderStatusColor } from "@/lib/labels";
+import { buildRoomGrid, countSpeciesByDate, type GridBooking } from "@/lib/room-grid";
+import { orderStatusColor, speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
           customerName: o.customer.name,
           petName: o.pet?.name ?? null,
           petBreed: o.pet?.breed ?? null,
+          petSpecies: o.pet?.species ?? null,
           checkInAt: o.checkInAt!,
           checkOutAt: o.checkOutAt!,
           nanny: o.nanny,
@@ -81,6 +82,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
   }));
 
   const sections = buildRoomGrid(gridRooms, bookings, dateRange);
+  const speciesCounts = countSpeciesByDate(bookings, dateRange);
 
   const dayLabel = (dateStr: string) => {
     const d = new Date(`${dateStr}T00:00:00Z`);
@@ -134,6 +136,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
               </th>
               {dateRange.map((d) => {
                 const { day, weekday, isToday } = dayLabel(d);
+                const counts = speciesCounts[d];
                 return (
                   <th
                     key={d}
@@ -144,6 +147,13 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
                   >
                     <div>{weekday}</div>
                     <div className={cn("text-sm", isToday && "font-bold")}>{day}</div>
+                    {(counts.dog > 0 || counts.cat > 0) && (
+                      <div className="mt-0.5 text-[9px] leading-none font-normal text-muted-foreground/80">
+                        {counts.dog > 0 && `${speciesEmoji.DOG}${counts.dog}`}
+                        {counts.dog > 0 && counts.cat > 0 && " "}
+                        {counts.cat > 0 && `${speciesEmoji.CAT}${counts.cat}`}
+                      </div>
+                    )}
                   </th>
                 );
               })}

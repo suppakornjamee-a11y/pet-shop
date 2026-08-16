@@ -1,4 +1,4 @@
-import type { OrderStatus, BillingUnit } from "@/generated/prisma/enums";
+import type { OrderStatus, BillingUnit, Species } from "@/generated/prisma/enums";
 import { thaiDayRange } from "@/lib/slots";
 
 export type GridBooking = {
@@ -7,6 +7,7 @@ export type GridBooking = {
   customerName: string;
   petName: string | null;
   petBreed: string | null;
+  petSpecies: Species | null;
   checkInAt: Date;
   checkOutAt: Date;
   nanny: boolean;
@@ -109,4 +110,25 @@ export function buildRoomGrid(
   }
 
   return [...sections.values()];
+}
+
+/** นับจำนวนสุนัข/แมวที่เข้าพักอยู่ในแต่ละวัน (ใช้แสดงตัวเลขเล็กๆ ใต้หัวคอลัมน์วันที่) */
+export function countSpeciesByDate(
+  bookings: GridBooking[],
+  dateRange: string[]
+): Record<string, { dog: number; cat: number }> {
+  const dayRanges = dateRange.map((d) => ({ dateStr: d, ...thaiDayRange(d) }));
+  const counts: Record<string, { dog: number; cat: number }> = {};
+  for (const day of dayRanges) {
+    let dog = 0;
+    let cat = 0;
+    for (const b of bookings) {
+      if (b.checkInAt < day.end && b.checkOutAt > day.start) {
+        if (b.petSpecies === "DOG") dog += 1;
+        else if (b.petSpecies === "CAT") cat += 1;
+      }
+    }
+    counts[day.dateStr] = { dog, cat };
+  }
+  return counts;
 }
