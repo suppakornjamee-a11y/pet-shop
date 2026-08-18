@@ -330,6 +330,8 @@ const en: Dictionary = {
       deposit50: "50% Deposit",
       vaccineCompleteCheckbox: "Vaccines Complete",
       lastFleaTickLabel: "Last Flea/Tick Treatment",
+      lastFleaTickDateLabel: "Last Flea/Tick Treatment Date",
+      fleaTickMedicineNameLabel: "Name of Flea/Tick Medicine Used",
       fleaMedicinePlaceholder: "Medicine name e.g. Nexgard Spectra",
       step4Title: "4. Products / Treats (Add-on)",
       remainingStock: (qty: number, unit: string) => `${qty} ${unit} left`,

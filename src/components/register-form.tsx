@@ -449,21 +449,22 @@ export function RegisterForm({
                 onChange={(e) => updatePet(i, { rabiesVaccineDate: e.target.value })}
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="flex items-center gap-1 text-xs">
-                <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickLabel}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickDateLabel}
               </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
-                  value={pet.lastFleaTickDate}
-                  onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
-                />
-                <Input
-                  value={pet.fleaTickMedicine}
-                  onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
-                />
-              </div>
+              <Input
+                type="date"
+                value={pet.lastFleaTickDate}
+                onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t.orders.form.fleaTickMedicineNameLabel}</Label>
+              <Input
+                value={pet.fleaTickMedicine}
+                onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t.register.foodNoteLabel}</Label>

@@ -341,6 +341,8 @@ const th = {
       deposit50: "มัดจำ 50%",
       vaccineCompleteCheckbox: "วัคซีนครบ",
       lastFleaTickLabel: "ยาเห็บหมัดล่าสุด",
+      lastFleaTickDateLabel: "วันที่กำจัดเห็บหมัดครั้งล่าสุด",
+      fleaTickMedicineNameLabel: "ชื่อของยากำจัดเห็บหมัดที่ใช้",
       fleaMedicinePlaceholder: "ชื่อยา เช่น Nexgard Spectra",
       step4Title: "4. สินค้า / ขนม (เพิ่มเติม)",
       remainingStock: (qty: number, unit: string) => `เหลือ ${qty} ${unit}`,
