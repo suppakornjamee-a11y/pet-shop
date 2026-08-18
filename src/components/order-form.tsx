@@ -228,6 +228,19 @@ export function OrderForm({
     return sum;
   }, [services, serviceIds, selectedRoom, nights, products, productQty]);
 
+  const allPayNowSelected =
+    chargeableItems.length > 0 && chargeableItems.every((it) => payNowKeys.has(it.key));
+
+  function togglePayAll() {
+    if (allPayNowSelected) {
+      setPayNowKeys(new Set());
+      setDepositAmount("0");
+    } else {
+      setPayNowKeys(new Set(chargeableItems.map((it) => it.key)));
+      setDepositAmount(String(total));
+    }
+  }
+
   function doSearch() {
     setSearching(true);
     startTransition(async () => {
@@ -750,7 +763,16 @@ export function OrderForm({
           <CardContent className="space-y-3">
             <div className="space-y-1.5 text-sm">
               {depositApplicable && chargeableItems.length > 0 && (
-                <p className="pb-1 text-xs text-muted-foreground">{t.orders.form.payNowHint}</p>
+                <div className="flex items-center justify-between gap-2 pb-1">
+                  <p className="text-xs text-muted-foreground">{t.orders.form.payNowHint}</p>
+                  <button
+                    type="button"
+                    onClick={togglePayAll}
+                    className="shrink-0 text-xs font-medium text-primary hover:underline"
+                  >
+                    {allPayNowSelected ? t.orders.form.unpayAllNow : t.orders.form.payAllNow}
+                  </button>
+                </div>
               )}
               {chargeableItems.map((it) => (
                 <div key={it.key} className="flex items-center justify-between gap-2">
