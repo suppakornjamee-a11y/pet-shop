@@ -763,8 +763,7 @@ export function OrderForm({
           <CardContent className="space-y-3">
             <div className="space-y-1.5 text-sm">
               {depositApplicable && chargeableItems.length > 0 && (
-                <div className="flex items-center justify-between gap-2 pb-1">
-                  <p className="text-xs text-muted-foreground">{t.orders.form.payNowHint}</p>
+                <div className="flex items-center justify-end pb-1">
                   <button
                     type="button"
                     onClick={togglePayAll}
