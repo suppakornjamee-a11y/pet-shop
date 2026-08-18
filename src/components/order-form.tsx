@@ -272,6 +272,7 @@ export function OrderForm({
 
   // อาบน้ำ/ตัดขน เลือกได้แบบเดียว (เหมือนตัวเลือกประเภทหลัก) ส่วนหมวดอื่น (รายการเพิ่มเติม/ทรีทเม้นต์/สปา/ฯลฯ) เลือกได้หลายรายการ
   function exclusiveKey(s: Service) {
+    if (s.defaultOn) return null; // รายการที่รวมอยู่ในอาบน้ำแล้ว ถอน/ติ๊กอิสระต่อกัน ไม่เอ็กซ์คลูซีฟ
     if (s.category === "BATH" && !s.group) return "BATH";
     if (s.category === "GROOMING") return "GROOMING";
     return null;
