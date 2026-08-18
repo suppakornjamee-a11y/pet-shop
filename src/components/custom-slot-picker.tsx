@@ -11,9 +11,11 @@ import { useI18n } from "@/components/i18n-provider";
 export function CustomSlotPicker({
   date,
   customerId,
+  queueType = "BATH",
 }: {
   date: string;
   customerId?: string;
+  queueType?: "BATH" | "OTHER";
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -27,7 +29,8 @@ export function CustomSlotPicker({
       return;
     }
     const cq = customerId ? `&customerId=${customerId}` : "";
-    router.push(`/orders/new?date=${date}&time=${time}${cq}`);
+    const qq = queueType === "OTHER" ? "&queueType=OTHER" : "";
+    router.push(`/orders/new?date=${date}&time=${time}${cq}${qq}`);
   }
 
   return (

@@ -278,7 +278,6 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder={t.settings.rooms.unitNamePlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -360,7 +359,6 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
                   <Input
                     value={form.cctvModel}
                     onChange={(e) => setForm({ ...form, cctvModel: e.target.value })}
-                    placeholder={t.settings.rooms.cctvModelPlaceholder}
                   />
                 </div>
                 <div className="space-y-2">
@@ -368,7 +366,6 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
                   <Input
                     value={form.cctvSerial}
                     onChange={(e) => setForm({ ...form, cctvSerial: e.target.value })}
-                    placeholder={t.settings.rooms.cctvSerialPlaceholder}
                   />
                 </div>
               </>
@@ -378,7 +375,6 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
               <Input
                 value={form.equipment}
                 onChange={(e) => setForm({ ...form, equipment: e.target.value })}
-                placeholder={t.settings.rooms.tagsPlaceholder}
               />
             </div>
           </div>

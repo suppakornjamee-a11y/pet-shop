@@ -148,7 +148,6 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder={t.settings.rooms.categoryNamePlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -180,7 +179,6 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
               <Input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder={t.settings.rooms.descriptionPlaceholder}
               />
             </div>
           </div>

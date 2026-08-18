@@ -56,21 +56,28 @@ const createOrderSchema = z.object({
     .default([]),
   appointmentDate: z.string().optional(),
   appointmentTime: z.string().optional(),
+  queueType: z.enum(["BATH", "OTHER"]).default("BATH"),
 });
 
 type OrderFormData = z.infer<typeof createOrderSchema>;
 
-/** เช็คว่า slot คิวส่วนกลาง (อาบน้ำ/ตัดขน) นี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่) */
+/**
+ * เช็คว่า slot คิวส่วนกลางนี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่)
+ * แยกพูลคิวตาม queueType (BATH = จองอาบน้ำ, OTHER = จองบริการอื่นๆ) ไม่แย่งเวลากัน
+ * ออเดอร์เก่าก่อนมีฟีเจอร์นี้ (queueType เป็น null) ถือเป็นพูล BATH
+ */
 export async function isSlotAvailable(
   dateStr: string,
   timeStr: string,
-  excludeOrderId?: string
+  excludeOrderId?: string,
+  queueType: "BATH" | "OTHER" = "BATH"
 ): Promise<boolean> {
   if (!isValidDateStr(dateStr) || !isValidTimeStr(timeStr)) return false;
   const at = buildSlotDate(dateStr, timeStr);
   const orders = await prisma.order.findMany({
     where: {
       appointmentAt: at,
+      ...(queueType === "BATH" ? { OR: [{ queueType: "BATH" }, { queueType: null }] } : { queueType: "OTHER" }),
       ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
     },
     select: {
@@ -150,7 +157,7 @@ async function buildOrderPlan(
     if (appointmentAt.getTime() < Date.now()) {
       return { ok: false, error: "ไม่สามารถจองคิวย้อนหลังได้ กรุณาเลือกเวลาในอนาคต" };
     }
-    if (!(await isSlotAvailable(appointmentDate, appointmentTime, excludeOrderId))) {
+    if (!(await isSlotAvailable(appointmentDate, appointmentTime, excludeOrderId, data.queueType))) {
       return { ok: false, error: "ช่วงเวลานี้มีคิวแล้ว กรุณาเลือกช่วงเวลาอื่น" };
     }
   }
@@ -265,6 +272,7 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
           roomId: plan.room?.id ?? null,
           nights: plan.nights,
           appointmentAt: plan.appointmentAt,
+          queueType: plan.appointmentAt ? data.queueType : null,
           checkInAt: plan.checkInAt,
           checkOutAt: plan.checkOutAt,
           nanny: data.nanny,
@@ -303,7 +311,8 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
 
   await createInitialPayments(order.id, total, data.depositAmount);
 
-  revalidatePath("/orders");
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
   revalidatePath("/boarding");
   return { ok: true, id: order.id, message: "สร้างออเดอร์เรียบร้อย" };
 }
@@ -337,6 +346,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
         roomId: plan.room?.id ?? null,
         nights: plan.nights,
         appointmentAt: plan.appointmentAt,
+        queueType: plan.appointmentAt ? data.queueType : null,
         checkInAt: plan.checkInAt,
         checkOutAt: plan.checkOutAt,
         nanny: data.nanny,
@@ -367,7 +377,8 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   await createInitialPayments(orderId, total, data.depositAmount);
 
   revalidatePath(`/orders/${orderId}`);
-  revalidatePath("/orders");
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
   revalidatePath("/boarding");
   return { ok: true, id: orderId, message: "แก้ไขออเดอร์เรียบร้อย สร้าง QR ใหม่แล้ว (15 นาที)" };
 }
@@ -421,8 +432,12 @@ export async function createBalancePayment(orderId: string): Promise<ActionResul
     include: { payments: true },
   });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  if (order.status !== "DEPOSIT_PAID") {
-    return { ok: false, error: "ออเดอร์นี้ยังไม่ได้มัดจำ หรือชำระครบแล้ว" };
+  // เก็บส่วนที่เหลือได้ตราบใดที่ยังไม่ยกเลิกและยังไม่เคยมัดจำ/ชำระอะไรเลย (แม้งานจะเสร็จ/เช็คเอาท์ไปแล้วก็ตาม)
+  if (order.status === "PENDING_PAYMENT") {
+    return { ok: false, error: "ออเดอร์นี้ยังไม่ได้ชำระมัดจำ" };
+  }
+  if (order.status === "CANCELLED") {
+    return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
   }
   const hasOpenPayment = order.payments.some((p) => p.status !== "VERIFIED" && p.status !== "REJECTED");
   if (hasOpenPayment) {
@@ -451,8 +466,9 @@ export async function regeneratePayment(paymentId: string): Promise<ActionResult
   if (payment.status === "VERIFIED") {
     return { ok: false, error: "รายการนี้ยืนยันแล้ว ไม่ต้องสร้าง QR ใหม่" };
   }
-  if (!["PENDING_PAYMENT", "DEPOSIT_PAID"].includes(payment.order.status)) {
-    return { ok: false, error: "ออเดอร์นี้ไม่สามารถสร้าง QR ใหม่ได้แล้ว" };
+  // สร้าง QR ใหม่ได้ตราบใดที่ออเดอร์ไม่ได้ถูกยกเลิก (แม้งานจะเสร็จ/เช็คเอาท์ไปแล้ว ก็ยังเก็บยอดคงเหลือย้อนหลังได้)
+  if (payment.order.status === "CANCELLED") {
+    return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
   }
   const account = await defaultPromptPayAccount();
   const qrPayload =
@@ -507,18 +523,26 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
     });
 
     const order = payment.order;
-    const verifiedSum = order.payments.reduce(
-      (sum, p) => sum + (p.id === paymentId || p.status === "VERIFIED" ? p.amount : 0),
-      0
-    );
-    const alreadyFullyPaid = (["PAID", "IN_PROGRESS", "COMPLETED"] as string[]).includes(order.status);
-    let justFullyPaid = false;
+    // ยอดที่ยืนยันแล้ว "ก่อน" รายการนี้ (order.payments เป็นข้อมูลก่อน update ด้านบน)
+    const previouslyVerifiedSum = order.payments
+      .filter((p) => p.status === "VERIFIED")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const verifiedSum = previouslyVerifiedSum + payment.amount;
+    const wasFullyPaidBefore = previouslyVerifiedSum >= order.total;
+    const nowFullyPaid = verifiedSum >= order.total;
+    // ชำระครบยอด "ครั้งแรก" ไหม — เช็คจากยอดเงินจริง ไม่ใช่สถานะงาน เพราะงานอาจเสร็จ/เช็คเอาท์ไปแล้วก่อนจะมาจ่ายส่วนที่เหลือย้อนหลังได้
+    const justFullyPaid = !wasFullyPaidBefore && nowFullyPaid;
+    // สถานะงานที่เดินหน้าไปไกลกว่า "ชำระแล้ว" แล้ว ไม่ควรถอยสถานะกลับ
+    const statusAlreadyAdvanced = (["PAID", "IN_PROGRESS", "COMPLETED"] as string[]).includes(order.status);
 
-    if (!alreadyFullyPaid && verifiedSum >= order.total) {
+    if (nowFullyPaid && !statusAlreadyAdvanced) {
       await tx.order.update({ where: { id: order.id }, data: { status: "PAID", updatedById: user.id } });
-      justFullyPaid = true;
+    } else if (!nowFullyPaid && !statusAlreadyAdvanced && payment.purpose === "DEPOSIT") {
+      await tx.order.update({ where: { id: order.id }, data: { status: "DEPOSIT_PAID", updatedById: user.id } });
+    }
 
-      // ตัดสต็อกสินค้า (เฉพาะตอนชำระครบยอดแล้วเท่านั้น)
+    if (justFullyPaid) {
+      // ตัดสต็อกสินค้า (เฉพาะตอนชำระครบยอดครั้งแรกเท่านั้น ไม่ว่าสถานะงานจะไปถึงไหนแล้วก็ตาม)
       for (const it of order.items) {
         if (it.itemType === "PRODUCT" && it.refId) {
           await tx.product.update({
@@ -536,8 +560,6 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
           });
         }
       }
-    } else if (!alreadyFullyPaid && payment.purpose === "DEPOSIT") {
-      await tx.order.update({ where: { id: order.id }, data: { status: "DEPOSIT_PAID", updatedById: user.id } });
     }
 
     return { ok: true as const, justFullyPaid, orderCode: order.code, orderTotal: order.total };
@@ -545,7 +567,8 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
 
   revalidatePath(`/orders/${orderId}`);
   if (!result.ok) return result;
-  revalidatePath("/orders");
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
   revalidatePath("/boarding");
 
   if (result.justFullyPaid) {
@@ -586,7 +609,8 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
     data: { status: parsed.data, updatedById: user.id },
   });
   revalidatePath(`/orders/${orderId}`);
-  revalidatePath("/orders");
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
   revalidatePath("/boarding");
 
   if (parsed.data === "COMPLETED") {

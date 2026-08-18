@@ -4,7 +4,17 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Label({ className, ...props }: React.ComponentProps<"label">) {
+function Label({ className, children, ...props }: React.ComponentProps<"label">) {
+  // ถ้าข้อความลงท้ายด้วย "*" (ฟิลด์บังคับ) ให้ไฮไลต์เครื่องหมาย * เป็นสีแดงอัตโนมัติ
+  const content =
+    typeof children === "string" && /\*\s*$/.test(children) ? (
+      <>
+        {children.replace(/\s*\*\s*$/, "")} <span className="text-red-600">*</span>
+      </>
+    ) : (
+      children
+    )
+
   return (
     <label
       data-slot="label"
@@ -13,7 +23,9 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
         className
       )}
       {...props}
-    />
+    >
+      {content}
+    </label>
   )
 }
 

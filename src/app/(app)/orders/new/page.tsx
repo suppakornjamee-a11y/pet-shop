@@ -17,23 +17,38 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
   const time = typeof searchParams.time === "string" ? searchParams.time : "";
   const roomId = typeof searchParams.roomId === "string" ? searchParams.roomId : "";
   const checkIn = typeof searchParams.checkIn === "string" ? searchParams.checkIn : "";
+  const queueType = searchParams.queueType === "OTHER" ? "OTHER" : "BATH";
+  const calendarPath = queueType === "OTHER" ? "/calendar-other" : "/calendar";
 
   const hasQueueEntry = isValidDateStr(date) && isValidTimeStr(time);
   const hasRoomEntry = roomId.length > 0;
 
-  // ต้องมาจาก /calendar (คิวอาบน้ำ/ตัดขน) หรือ /boarding (จองห้อง/พื้นที่) อย่างใดอย่างหนึ่งเสมอ
+  // ต้องมาจาก /calendar (จองอาบน้ำ), /calendar-other (จองบริการอื่นๆ) หรือ /boarding (จองห้อง/พื้นที่) อย่างใดอย่างหนึ่งเสมอ
   if (!hasQueueEntry && !hasRoomEntry) {
     redirect("/calendar");
   }
   if (hasQueueEntry) {
     // จองย้อนหลังไม่ได้
-    if (isPastSlot(date, time)) redirect(`/calendar?date=${date}`);
+    if (isPastSlot(date, time)) redirect(`${calendarPath}?date=${date}`);
     // ถ้าช่วงเวลาถูกจองไปแล้ว ให้กลับไปเลือกใหม่
-    if (!(await isSlotAvailable(date, time))) redirect(`/calendar?date=${date}`);
+    if (!(await isSlotAvailable(date, time, undefined, queueType))) {
+      redirect(`${calendarPath}?date=${date}`);
+    }
   }
 
   const [services, rooms, products, preselected] = await Promise.all([
-    prisma.service.findMany({ where: { active: true }, orderBy: { category: "asc" } }),
+    prisma.service.findMany({
+      where: {
+        active: true,
+        // มาจากปฏิทิน "จองอาบน้ำ" → เฉพาะอาบน้ำ/ตัดขน, "จองบริการอื่นๆ" → เฉพาะหมวดอื่นๆ (เทรนนิ่ง/ฟิตเนส)
+        ...(hasQueueEntry
+          ? queueType === "OTHER"
+            ? { category: "OTHER" as const }
+            : { category: { in: ["BATH", "GROOMING"] } }
+          : {}),
+      },
+      orderBy: { category: "asc" },
+    }),
     prisma.room.findMany({
       where: { active: true },
       include: { category: true },
@@ -104,6 +119,7 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
         }
         appointmentDate={hasQueueEntry ? date : undefined}
         appointmentTime={hasQueueEntry ? time : undefined}
+        queueType={queueType}
         initial={
           hasRoomEntry
             ? { roomId, checkInDate: isValidDateStr(checkIn) ? checkIn : undefined }

@@ -61,11 +61,13 @@ export function PaymentPanel({
   orderStatus,
   orderTotal,
   payments,
+  isQueueBooking = false,
 }: {
   orderId: string;
   orderStatus: OrderStatus;
   orderTotal: number;
   payments: PaymentRow[];
+  isQueueBooking?: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -114,6 +116,7 @@ export function PaymentPanel({
             orderStatus={orderStatus}
             payment={activePayment}
             showPurposeLabel={showPurposeLabel}
+            isQueueBooking={isQueueBooking}
           />
         ) : fullyPaid ? (
           <div className="flex flex-col items-center gap-2 rounded-lg bg-emerald-50 p-6 text-center dark:bg-emerald-950/40">
@@ -161,10 +164,12 @@ function ActivePaymentPanel({
   orderStatus,
   payment,
   showPurposeLabel,
+  isQueueBooking,
 }: {
   orderStatus: OrderStatus;
   payment: PaymentRow;
   showPurposeLabel: boolean;
+  isQueueBooking: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -229,6 +234,14 @@ function ActivePaymentPanel({
         </div>
         <div className="text-3xl font-bold text-primary">{formatBaht(payment.amount)}</div>
       </div>
+
+      {isQueueBooking && payment.purpose === "DEPOSIT" && (
+        <div className="rounded-lg border-2 border-red-600 bg-red-50 p-3 text-center dark:bg-red-950/40">
+          <p className="text-base leading-snug font-extrabold text-red-600 dark:text-red-400">
+            {t.orders.payment.depositQueueWarning}
+          </p>
+        </div>
+      )}
 
       {/* QR แบบ Thai QR Payment / PromptPay */}
       <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
@@ -329,8 +342,8 @@ function ActivePaymentPanel({
         </div>
       )}
 
-      {/* Admin actions */}
-      {["PENDING_PAYMENT", "DEPOSIT_PAID"].includes(orderStatus) && (
+      {/* Admin actions — แสดงได้ตราบใดที่มี payment ค้างอยู่และออเดอร์ยังไม่ถูกยกเลิก (แม้งานจะเสร็จ/เช็คเอาท์ไปแล้วก็ยืนยันยอดคงเหลือย้อนหลังได้) */}
+      {orderStatus !== "CANCELLED" && (
         <div className="space-y-2 border-t pt-3">
           <div className="text-xs font-medium text-muted-foreground">
             {t.orders.payment.adminVerification}

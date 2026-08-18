@@ -164,6 +164,46 @@ export async function deleteRoom(id: string): Promise<ActionResult> {
   return { ok: true, message: "ลบห้องพักเรียบร้อย" };
 }
 
+/* ---------------- Services ---------------- */
+
+const serviceSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "กรุณากรอกชื่อบริการ"),
+  category: z.enum(["BATH", "GROOMING", "BOARDING", "OTHER"]),
+  group: z.enum(["ADDON", "TREATMENT", "SPA"]).optional(),
+  speciesScope: z.enum(["DOG", "CAT"]).optional(),
+  defaultOn: z.coerce.boolean().default(false),
+  sortOrder: z.coerce.number().int().default(0),
+  description: z.string().optional(),
+  price: z.coerce.number().int().min(0),
+  active: z.coerce.boolean().default(true),
+});
+
+export async function upsertService(input: unknown): Promise<ActionResult> {
+  await requireUser();
+  const parsed = serviceSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { id, ...rest } = parsed.data;
+  const data = { ...rest, group: rest.group ?? null, speciesScope: rest.speciesScope ?? null };
+
+  if (id) {
+    await prisma.service.update({ where: { id }, data });
+  } else {
+    await prisma.service.create({ data });
+  }
+  revalidatePath("/settings/services");
+  revalidatePath("/orders/new");
+  return { ok: true, message: "บันทึกบริการเรียบร้อย" };
+}
+
+export async function deleteService(id: string): Promise<ActionResult> {
+  await requireUser();
+  await prisma.service.update({ where: { id }, data: { active: false } });
+  revalidatePath("/settings/services");
+  revalidatePath("/orders/new");
+  return { ok: true, message: "ปิดใช้งานบริการเรียบร้อย" };
+}
+
 /* ---------------- Bank Accounts (ADMIN only) ---------------- */
 
 const bankSchema = z.object({

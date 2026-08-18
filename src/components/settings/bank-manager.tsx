@@ -187,7 +187,6 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <Input
                 value={form.bankName}
                 onChange={(e) => setForm({ ...form, bankName: e.target.value })}
-                placeholder={t.settings.bankAccounts.bankNamePlaceholder}
               />
             </div>
             <div className="space-y-2">
@@ -209,7 +208,6 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <Input
                 value={form.promptpayId}
                 onChange={(e) => setForm({ ...form, promptpayId: e.target.value })}
-                placeholder={t.settings.bankAccounts.promptpayIdPlaceholder}
               />
             </div>
             <label className="flex items-center gap-2 text-sm sm:col-span-2">

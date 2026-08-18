@@ -43,6 +43,11 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   const locale = await getLocale();
   const t = getDictionary(locale);
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
+  const backHref = order.roomId
+    ? "/boarding"
+    : order.queueType === "OTHER"
+      ? "/orders/other"
+      : "/orders/bath";
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -51,7 +56,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         description={t.orders.detailCreatedAt(formatDateTime(order.createdAt))}
         action={
           <>
-            <Button render={<Link href="/orders" />} nativeButton={false} variant="outline">
+            <Button render={<Link href={backHref} />} nativeButton={false} variant="outline">
               <ArrowLeft /> {t.common.back}
             </Button>
             {order.status === "PENDING_PAYMENT" && (
@@ -227,6 +232,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               orderId={order.id}
               orderStatus={order.status}
               orderTotal={order.total}
+              isQueueBooking={Boolean(order.appointmentAt) && order.queueType !== "OTHER"}
               payments={order.payments.map((p) => ({
                 id: p.id,
                 purpose: p.purpose,

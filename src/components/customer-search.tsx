@@ -35,7 +35,6 @@ export function CustomerSearch({ initial }: { initial: Customer[] }) {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={t.customers.searchPlaceholder}
           className="pl-9"
         />
       </div>

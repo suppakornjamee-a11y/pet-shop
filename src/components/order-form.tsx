@@ -39,7 +39,15 @@ import {
 } from "@/components/ui/select";
 import { useI18n } from "@/components/i18n-provider";
 
-type Service = { id: string; name: string; category: string; price: number };
+type Service = {
+  id: string;
+  name: string;
+  category: string;
+  group: string | null;
+  speciesScope: "DOG" | "CAT" | null;
+  defaultOn: boolean;
+  price: number;
+};
 type Room = {
   id: string;
   categoryId: string;
@@ -92,6 +100,7 @@ type OrderInitial = {
 };
 
 const todayStr = () => toThaiDateStr(new Date());
+const GROUP_ORDER = ["BATH", "GROOMING", "ADDON", "TREATMENT", "SPA", "OTHER", "BOARDING"];
 
 export function OrderForm({
   services,
@@ -103,6 +112,7 @@ export function OrderForm({
   initial,
   appointmentDate,
   appointmentTime,
+  queueType = "BATH",
 }: {
   services: Service[];
   rooms: Room[];
@@ -113,11 +123,14 @@ export function OrderForm({
   initial?: OrderInitial;
   appointmentDate?: string;
   appointmentTime?: string;
+  queueType?: "BATH" | "OTHER";
 }) {
   const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isEdit = mode === "edit";
+  const isQueueBooking = Boolean(appointmentDate && appointmentTime);
+  const isBathQueueBooking = isQueueBooking && queueType === "BATH";
 
   const [customer, setCustomer] = useState<CustomerWithPets | null>(preselected);
   const [query, setQuery] = useState("");
@@ -144,7 +157,9 @@ export function OrderForm({
     initial?.checkOutTime || (initialRoom?.billingUnit === "PER_VISIT" ? "18:00" : "11:00")
   );
   const [nanny, setNanny] = useState(initial?.nanny ?? false);
-  const [depositAmount, setDepositAmount] = useState(String(initial?.depositAmount ?? 0));
+  const [depositAmount, setDepositAmount] = useState(
+    String(initial?.depositAmount ?? (isBathQueueBooking ? 300 : 0))
+  );
   const [vaccineComplete, setVaccineComplete] = useState(initial?.vaccineComplete ?? false);
   const [lastFleaTickDate, setLastFleaTickDate] = useState(initial?.lastFleaTickDate ?? "");
   const [fleaTickMedicine, setFleaTickMedicine] = useState(initial?.fleaTickMedicine ?? "");
@@ -152,11 +167,48 @@ export function OrderForm({
     initial?.productQty ?? {}
   );
   const [note, setNote] = useState(initial?.note ?? "");
+  const [payNowKeys, setPayNowKeys] = useState<Set<string>>(new Set());
 
   const selectedRoom = rooms.find((r) => r.id === roomId) ?? null;
   const isPerVisit = selectedRoom?.billingUnit === "PER_VISIT";
   const nights =
     selectedRoom && !isPerVisit ? Math.max(1, daysBetween(checkInDate, checkOutDate)) : 0;
+  const depositApplicable = isBathQueueBooking || Boolean(selectedRoom);
+
+  const chargeableItems = useMemo(() => {
+    const items: { key: string; label: string; amount: number }[] = [];
+    for (const id of serviceIds) {
+      const s = services.find((x) => x.id === id);
+      if (s) items.push({ key: `svc:${id}`, label: s.name, amount: s.price });
+    }
+    if (selectedRoom) {
+      const qty = nights > 0 ? nights : 1;
+      items.push({
+        key: "room",
+        label: `${selectedRoom.categoryName} ${selectedRoom.name}`,
+        amount: selectedRoom.pricePerNight * qty,
+      });
+    }
+    for (const [id, qty] of Object.entries(productQty)) {
+      if (qty === 0) continue;
+      const p = products.find((x) => x.id === id);
+      if (p) items.push({ key: `prod:${id}`, label: `${p.name} × ${qty}`, amount: p.price * qty });
+    }
+    return items;
+  }, [serviceIds, services, selectedRoom, nights, productQty, products]);
+
+  function togglePayNow(key: string) {
+    setPayNowKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      const sum = chargeableItems
+        .filter((it) => next.has(it.key))
+        .reduce((s, it) => s + it.amount, 0);
+      setDepositAmount(String(sum));
+      return next;
+    });
+  }
 
   const roomsByCategory = useMemo(() => {
     const map = new Map<string, { categoryName: string; rooms: Room[] }>();
@@ -190,6 +242,18 @@ export function OrderForm({
     setVaccineComplete(pet.vaccineComplete ?? false);
     setLastFleaTickDate(pet.lastFleaTickAt ? toThaiDateStr(new Date(pet.lastFleaTickAt)) : "");
     setFleaTickMedicine(pet.fleaTickMedicine ?? "");
+    // จองอาบน้ำ: รายการที่รวมอยู่แล้ว (ไถเท้า/ไถท้อง/ไถก้น/บีบต่อม/เช็ดหู) ติ๊กให้อัตโนมัติตามชนิดสัตว์ — ถอนออกเองได้ภายหลัง
+    if (isBathQueueBooking) {
+      setServiceIds((prev) => {
+        const next = new Set(prev);
+        for (const s of services) {
+          if (!s.defaultOn) continue;
+          if (!s.speciesScope || s.speciesScope === pet.species) next.add(s.id);
+          else next.delete(s.id);
+        }
+        return next;
+      });
+    }
   }
 
   function pickCustomer(c: CustomerWithPets) {
@@ -207,20 +271,12 @@ export function OrderForm({
   }
 
   function toggleService(id: string) {
-    const svc = services.find((s) => s.id === id);
     setServiceIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
       } else {
-        // เลือกได้หมวดละ 1 อัน — ยกเลิกรายการอื่นในหมวดเดียวกันก่อน
-        if (svc) {
-          for (const other of services) {
-            if (other.category === svc.category && next.has(other.id)) {
-              next.delete(other.id);
-            }
-          }
-        }
+        // เลือกได้หลายรายการต่อหมวด (เช่น อาบน้ำ + รายการเพิ่มเติมหลายอย่าง + ทรีทเม้นต์)
         next.add(id);
       }
       return next;
@@ -272,7 +328,7 @@ export function OrderForm({
       checkOutDate: roomId ? checkOutDate : undefined,
       checkOutTime: roomId ? checkOutTime : undefined,
       nanny: roomId ? nanny : false,
-      depositAmount: roomId ? Number(depositAmount || 0) : 0,
+      depositAmount: roomId || isBathQueueBooking ? Number(depositAmount || 0) : 0,
       vaccineComplete: roomId ? vaccineComplete : false,
       lastFleaTickDate: roomId ? lastFleaTickDate : undefined,
       fleaTickMedicine: roomId ? fleaTickMedicine : undefined,
@@ -281,6 +337,7 @@ export function OrderForm({
       note,
       appointmentDate,
       appointmentTime,
+      queueType,
     };
 
     startTransition(async () => {
@@ -295,14 +352,40 @@ export function OrderForm({
     });
   }
 
+  const selectedPetSpecies = customer?.pets.find((p) => p.id === petId)?.species;
+
+  const speciesFilteredServices = useMemo(
+    () =>
+      services.filter(
+        (s) => !s.speciesScope || !selectedPetSpecies || s.speciesScope === selectedPetSpecies
+      ),
+    [services, selectedPetSpecies]
+  );
+
+  const defaultOnServices = useMemo(
+    () => speciesFilteredServices.filter((s) => s.defaultOn),
+    [speciesFilteredServices]
+  );
+
   const groupedServices = useMemo(() => {
     const map: Record<string, Service[]> = {};
-    for (const s of services) (map[s.category] ??= []).push(s);
-    return map;
-  }, [services]);
+    for (const s of speciesFilteredServices) {
+      if (s.defaultOn) continue;
+      const key = s.category === "BATH" && s.group ? s.group : s.category;
+      (map[key] ??= []).push(s);
+    }
+    return Object.fromEntries(
+      GROUP_ORDER.filter((k) => map[k]?.length).map((k) => [k, map[k]])
+    );
+  }, [speciesFilteredServices]);
 
-  const serviceIcon = (cat: string) =>
-    cat === "GROOMING" ? Scissors : cat === "BATH" ? Bath : ClipboardCheck;
+  const serviceIcon = (key: string) =>
+    key === "GROOMING" ? Scissors : key === "BATH" ? Bath : ClipboardCheck;
+
+  const groupLabel = (key: string) =>
+    key in t.labels.serviceGroup
+      ? t.labels.serviceGroup[key as keyof typeof t.labels.serviceGroup]
+      : t.labels.serviceCategory[key as keyof typeof t.labels.serviceCategory];
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -337,7 +420,6 @@ export function OrderForm({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), doSearch())}
-                    placeholder={t.orders.form.searchPlaceholder}
                   />
                   <Button type="button" variant="secondary" onClick={doSearch} disabled={searching}>
                     {searching ? <Loader2 className="animate-spin" /> : <Search />}
@@ -528,13 +610,13 @@ export function OrderForm({
             <CardTitle className="text-base">{t.orders.form.step3Title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(groupedServices).map(([cat, list]) => {
-              const Icon = serviceIcon(cat);
+            {Object.entries(groupedServices).map(([key, list]) => {
+              const Icon = serviceIcon(key);
               return (
-                <div key={cat}>
+                <div key={key}>
                   <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     <Icon className="h-4 w-4" />
-                    {t.labels.serviceCategory[cat as keyof typeof t.labels.serviceCategory]}
+                    {groupLabel(key)}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {list.map((s) => {
@@ -560,6 +642,33 @@ export function OrderForm({
                 </div>
               );
             })}
+
+            {defaultOnServices.length > 0 && (
+              <div>
+                <div className="mb-2 text-sm font-medium text-muted-foreground">
+                  {t.orders.form.defaultServicesTitle}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {defaultOnServices.map((s) => {
+                    const active = serviceIds.has(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleService(s.id)}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors",
+                          active ? "border-primary bg-primary/10" : "hover:bg-accent"
+                        )}
+                      >
+                        <span className={cn(active && "font-medium")}>{s.name}</span>
+                        <span className="text-muted-foreground">{formatBaht(s.price)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -626,37 +735,25 @@ export function OrderForm({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5 text-sm">
-              {[...serviceIds].map((id) => {
-                const s = services.find((x) => x.id === id);
-                if (!s) return null;
-                return (
-                  <div key={id} className="flex justify-between">
-                    <span className="text-muted-foreground">{s.name}</span>
-                    <span>{formatBaht(s.price)}</span>
-                  </div>
-                );
-              })}
-              {selectedRoom && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {selectedRoom.categoryName} {selectedRoom.name}
-                    {nights > 0 ? ` × ${t.orders.form.nightsCount(nights)}` : ` × 1 ${t.orders.form.perVisitUnit}`}
-                  </span>
-                  <span>{formatBaht(selectedRoom.pricePerNight * (nights > 0 ? nights : 1))}</span>
-                </div>
+              {depositApplicable && chargeableItems.length > 0 && (
+                <p className="pb-1 text-xs text-muted-foreground">{t.orders.form.payNowHint}</p>
               )}
-              {Object.entries(productQty).map(([id, qty]) => {
-                const p = products.find((x) => x.id === id);
-                if (!p || qty === 0) return null;
-                return (
-                  <div key={id} className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {p.name} × {qty}
-                    </span>
-                    <span>{formatBaht(p.price * qty)}</span>
-                  </div>
-                );
-              })}
+              {chargeableItems.map((it) => (
+                <div key={it.key} className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                    {depositApplicable && (
+                      <input
+                        type="checkbox"
+                        checked={payNowKeys.has(it.key)}
+                        onChange={() => togglePayNow(it.key)}
+                        className="h-3.5 w-3.5 shrink-0 accent-primary"
+                      />
+                    )}
+                    <span className="truncate">{it.label}</span>
+                  </span>
+                  <span className="shrink-0">{formatBaht(it.amount)}</span>
+                </div>
+              ))}
               {total === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
                   {t.orders.form.noItemsSelected}
@@ -664,12 +761,26 @@ export function OrderForm({
               )}
             </div>
 
+            {isBathQueueBooking && !selectedRoom && (
+              <div className="space-y-1.5 border-t pt-3">
+                <Label className="text-xs">{t.orders.form.depositLabel}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                />
+                <p className="font-bold text-red-600 dark:text-red-400">
+                  {t.orders.payment.depositQueueWarning}
+                </p>
+              </div>
+            )}
+
             <div className="border-t pt-3">
               <Label className="text-xs">{t.orders.form.noteLabel}</Label>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder={t.orders.form.notePlaceholder}
                 rows={2}
                 className="mt-1"
               />
@@ -679,7 +790,7 @@ export function OrderForm({
               <span>{t.orders.form.grandTotal}</span>
               <span className="text-primary">{formatBaht(total)}</span>
             </div>
-            {roomId && Number(depositAmount || 0) > 0 && (
+            {(selectedRoom || isBathQueueBooking) && Number(depositAmount || 0) > 0 && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{t.orders.form.depositNowRemaining}</span>
                 <span>

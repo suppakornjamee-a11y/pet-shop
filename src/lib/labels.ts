@@ -5,6 +5,14 @@ export const speciesEmoji: Record<Species, string> = {
   CAT: "🐱",
 };
 
+const FLEA_TICK_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 วัน
+
+/** เห็บ/หมัดควรตรวจเช็คซ้ำหรือยัง — ไม่เคยบันทึก หรือเกิน 30 วันนับจากล่าสุด */
+export function isFleaTickCheckStale(lastFleaTickAt: Date | null): boolean {
+  if (!lastFleaTickAt) return true;
+  return Date.now() - lastFleaTickAt.getTime() > FLEA_TICK_STALE_MS;
+}
+
 // Tailwind classes for status badges
 export const orderStatusColor: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",

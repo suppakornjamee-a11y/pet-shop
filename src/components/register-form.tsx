@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Save, ImagePlus, X, Syringe, Bug } from "lucide-react";
 import { createCustomerWithPets, updateCustomerWithPets } from "@/app/actions/customers";
 import { fileToDataUrl } from "@/lib/file";
+import { ageFromBirthDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,41 +31,51 @@ type PetForm = {
   id?: string;
   name: string;
   species: "DOG" | "CAT";
-  gender: "MALE" | "FEMALE" | "UNKNOWN";
   breed: string;
-  color: string;
-  weightKg: string;
+  gender: "MALE" | "FEMALE" | "UNKNOWN";
   birthDate: string;
-  allergies: string;
-  note: string;
+  weightKg: string;
+  color: string;
+  personality: string;
   aggressiveNotes: string;
+  allergies: string;
+  vaccine5in1Date: string;
+  rabiesVaccineDate: string;
+  lastFleaTickDate: string;
+  fleaTickMedicine: string;
   foodNote: string;
+  medicationNote: string;
+  neutered: boolean;
+  note: string;
   photoUrls: string[];
   vaccinePhotoUrls: string[];
   cctvConsent: boolean;
   vaccineComplete: boolean;
-  lastFleaTickDate: string;
-  fleaTickMedicine: string;
 };
 
 const emptyPet: PetForm = {
   name: "",
   species: "DOG",
-  gender: "UNKNOWN",
   breed: "",
-  color: "",
-  weightKg: "",
+  gender: "UNKNOWN",
   birthDate: "",
-  allergies: "",
-  note: "",
+  weightKg: "",
+  color: "",
+  personality: "",
   aggressiveNotes: "",
+  allergies: "",
+  vaccine5in1Date: "",
+  rabiesVaccineDate: "",
+  lastFleaTickDate: "",
+  fleaTickMedicine: "",
   foodNote: "",
+  medicationNote: "",
+  neutered: false,
+  note: "",
   photoUrls: [],
   vaccinePhotoUrls: [],
   cctvConsent: false,
   vaccineComplete: false,
-  lastFleaTickDate: "",
-  fleaTickMedicine: "",
 };
 
 function MultiPhotoUpload({
@@ -142,21 +153,44 @@ function MultiPhotoUpload({
 
 type CustomerForm = {
   name: string;
+  nickname: string;
   phone: string;
   email: string;
-  address: string;
   lineId: string;
+  address: string;
+  petInstagram: string;
+  preferredLanguage: "TH" | "EN";
   note: string;
 };
 
 const emptyCustomer: CustomerForm = {
   name: "",
+  nickname: "",
   phone: "",
   email: "",
-  address: "",
   lineId: "",
+  address: "",
+  petInstagram: "",
+  preferredLanguage: "TH",
   note: "",
 };
+
+function AgeDisplay({ birthDate }: { birthDate: string }) {
+  const { t } = useI18n();
+  if (!birthDate) {
+    return <p className="text-xs text-muted-foreground">{t.register.ageUnknown}</p>;
+  }
+  const parsed = new Date(`${birthDate}T00:00:00`);
+  if (isNaN(parsed.getTime())) return null;
+  const { years, months } = ageFromBirthDate(parsed);
+  return (
+    <p className="text-xs font-medium text-primary">
+      {t.register.ageLabel}
+      {years > 0 ? `${t.register.ageYears(years)} ` : ""}
+      {t.register.ageMonths(months)}
+    </p>
+  );
+}
 
 export function RegisterForm({
   mode = "create",
@@ -205,7 +239,7 @@ export function RegisterForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* ข้อมูลเจ้าของ */}
+      {/* Section 1: ข้อมูลเจ้าของ */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t.register.ownerInfoTitle}</CardTitle>
@@ -216,8 +250,14 @@ export function RegisterForm({
             <Input
               value={customer.name}
               onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-              placeholder={t.register.ownerNamePlaceholder}
               required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t.register.nicknameLabel}</Label>
+            <Input
+              value={customer.nickname}
+              onChange={(e) => setCustomer({ ...customer, nickname: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -225,17 +265,7 @@ export function RegisterForm({
             <Input
               value={customer.phone}
               onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-              placeholder={t.register.phonePlaceholder}
               required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t.register.emailLabel}</Label>
-            <Input
-              type="email"
-              value={customer.email}
-              onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
-              placeholder={t.register.emailPlaceholder}
             />
           </div>
           <div className="space-y-2">
@@ -243,7 +273,6 @@ export function RegisterForm({
             <Input
               value={customer.lineId}
               onChange={(e) => setCustomer({ ...customer, lineId: e.target.value })}
-              placeholder={t.register.lineIdPlaceholder}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -251,14 +280,20 @@ export function RegisterForm({
             <Textarea
               value={customer.address}
               onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-              placeholder={t.register.addressPlaceholder}
               rows={2}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t.register.petInstagramLabel}</Label>
+            <Input
+              value={customer.petInstagram}
+              onChange={(e) => setCustomer({ ...customer, petInstagram: e.target.value })}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* สัตว์เลี้ยง */}
+      {/* Section 2: ข้อมูลสัตว์เลี้ยงรายตัว */}
       {pets.map((pet, i) => (
         <Card key={i}>
           <CardHeader>
@@ -316,6 +351,13 @@ export function RegisterForm({
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>{t.register.breedLabel}</Label>
+              <Input
+                value={pet.breed}
+                onChange={(e) => updatePet(i, { breed: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>{t.register.genderLabel}</Label>
               <Select
                 value={pet.gender}
@@ -339,18 +381,13 @@ export function RegisterForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{t.register.breedLabel}</Label>
+              <Label>{t.register.birthDateLabel}</Label>
               <Input
-                value={pet.breed}
-                onChange={(e) => updatePet(i, { breed: e.target.value })}
+                type="date"
+                value={pet.birthDate}
+                onChange={(e) => updatePet(i, { birthDate: e.target.value })}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>{t.register.colorLabel}</Label>
-              <Input
-                value={pet.color}
-                onChange={(e) => updatePet(i, { color: e.target.value })}
-              />
+              <AgeDisplay birthDate={pet.birthDate} />
             </div>
             <div className="space-y-2">
               <Label>{t.register.weightLabel}</Label>
@@ -362,30 +399,57 @@ export function RegisterForm({
               />
             </div>
             <div className="space-y-2">
-              <Label>{t.register.birthDateLabel}</Label>
+              <Label>{t.register.colorLabel}</Label>
               <Input
-                type="date"
-                value={pet.birthDate}
-                onChange={(e) => updatePet(i, { birthDate: e.target.value })}
+                value={pet.color}
+                onChange={(e) => updatePet(i, { color: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t.register.personalityLabel}</Label>
+              <Textarea
+                value={pet.personality}
+                onChange={(e) => updatePet(i, { personality: e.target.value })}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-destructive">{t.register.aggressiveNotesLabel}</Label>
+              <Textarea
+                value={pet.aggressiveNotes}
+                onChange={(e) => updatePet(i, { aggressiveNotes: e.target.value })}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t.register.allergiesLabel}</Label>
+              <Textarea
+                value={pet.allergies}
+                onChange={(e) => updatePet(i, { allergies: e.target.value })}
+                rows={2}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t.register.foodNoteLabel}</Label>
+              <Label className="flex items-center gap-1">
+                <Syringe className="h-3.5 w-3.5" /> {t.register.vaccine5in1Label}
+              </Label>
               <Input
-                value={pet.foodNote}
-                onChange={(e) => updatePet(i, { foodNote: e.target.value })}
+                type="date"
+                value={pet.vaccine5in1Date}
+                onChange={(e) => updatePet(i, { vaccine5in1Date: e.target.value })}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={pet.vaccineComplete}
-                onChange={(e) => updatePet(i, { vaccineComplete: e.target.checked })}
-                className="h-4 w-4 accent-primary"
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Syringe className="h-3.5 w-3.5" /> {t.register.rabiesVaccineLabel}
+              </Label>
+              <Input
+                type="date"
+                value={pet.rabiesVaccineDate}
+                onChange={(e) => updatePet(i, { rabiesVaccineDate: e.target.value })}
               />
-              <Syringe className="h-4 w-4 text-muted-foreground" /> {t.orders.form.vaccineCompleteCheckbox}
-            </label>
-            <div className="space-y-1.5">
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
               <Label className="flex items-center gap-1 text-xs">
                 <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickLabel}
               </Label>
@@ -398,34 +462,46 @@ export function RegisterForm({
                 <Input
                   value={pet.fleaTickMedicine}
                   onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
-                  placeholder={t.orders.form.fleaMedicinePlaceholder}
                 />
               </div>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label className="text-destructive">{t.register.aggressiveNotesLabel}</Label>
+            <div className="space-y-2">
+              <Label>{t.register.foodNoteLabel}</Label>
               <Textarea
-                value={pet.aggressiveNotes}
-                onChange={(e) => updatePet(i, { aggressiveNotes: e.target.value })}
-                placeholder={t.register.aggressiveNotesPlaceholder}
+                value={pet.foodNote}
+                onChange={(e) => updatePet(i, { foodNote: e.target.value })}
                 rows={2}
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t.register.allergiesLabel}</Label>
+            <div className="space-y-2">
+              <Label>{t.register.medicationNoteLabel}</Label>
               <Textarea
-                value={pet.allergies}
-                onChange={(e) => updatePet(i, { allergies: e.target.value })}
-                placeholder={t.register.allergiesPlaceholder}
+                value={pet.medicationNote}
+                onChange={(e) => updatePet(i, { medicationNote: e.target.value })}
                 rows={2}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>{t.register.neuteredLabel}</Label>
+              <Select
+                value={pet.neutered ? "yes" : "no"}
+                onValueChange={(v) => updatePet(i, { neutered: v === "yes" })}
+                items={{ yes: t.register.neuteredYes, no: t.register.neuteredNo }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">{t.register.neuteredYes}</SelectItem>
+                  <SelectItem value="no">{t.register.neuteredNo}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>{t.register.noteLabel}</Label>
               <Textarea
                 value={pet.note}
                 onChange={(e) => updatePet(i, { note: e.target.value })}
-                placeholder={t.register.notePlaceholder}
                 rows={2}
               />
             </div>
@@ -442,7 +518,7 @@ export function RegisterForm({
         </Card>
       ))}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+      <div className="flex justify-start">
         <Button
           type="button"
           variant="outline"
@@ -450,6 +526,34 @@ export function RegisterForm({
         >
           <Plus /> {t.register.addAnotherPet}
         </Button>
+      </div>
+
+      {/* Section ล่างสุด: ภาษาที่เลือก */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t.register.languageSectionTitle}</CardTitle>
+        </CardHeader>
+        <CardContent className="max-w-xs space-y-2">
+          <Label>{t.register.preferredLanguageLabel}</Label>
+          <Select
+            value={customer.preferredLanguage}
+            onValueChange={(v) =>
+              setCustomer({ ...customer, preferredLanguage: (v as "TH" | "EN") ?? "TH" })
+            }
+            items={{ TH: t.language.th, EN: t.language.en }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TH">{t.language.th}</SelectItem>
+              <SelectItem value="EN">{t.language.en}</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="animate-spin" /> : <Save />}
           {t.register.saveData}

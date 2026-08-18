@@ -261,7 +261,6 @@ export function StockManager({ products }: { products: Product[] }) {
               <Input
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                placeholder={t.settings.stock.categoryPlaceholder}
               />
             </div>
             <div className="space-y-2">

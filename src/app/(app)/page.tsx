@@ -3,12 +3,15 @@ import {
   ClipboardPlus,
   PawPrint,
   Wallet,
-  ReceiptText,
-  Clock,
-  TrendingUp,
+  // ReceiptText,
+  // Clock,
+  // TrendingUp,
+  LogIn,
+  LogOut,
+  Bath,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatBaht, formatDateTime } from "@/lib/format";
 import { orderStatusColor } from "@/lib/labels";
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -48,57 +51,103 @@ export default async function DashboardPage(props: PageProps<"/">) {
   const selectedDateStr = toDateStr(startOfDay);
   const isToday = selectedDateStr === toDateStr(new Date());
 
-  const [dayOrders, paidDay, pendingPayments, customerCount, dayOrderList] =
-    await Promise.all([
-      prisma.order.count({ where: { createdAt: { gte: startOfDay, lt: endOfDay } } }),
-      prisma.order.aggregate({
-        _sum: { total: true },
-        where: {
-          createdAt: { gte: startOfDay, lt: endOfDay },
-          status: { in: ["PAID", "IN_PROGRESS", "COMPLETED"] },
-        },
-      }),
-      prisma.order.count({ where: { status: "PENDING_PAYMENT" } }),
-      prisma.customer.count(),
-      prisma.order.findMany({
-        where: { createdAt: { gte: startOfDay, lt: endOfDay } },
-        take: 10,
-        orderBy: { createdAt: "desc" },
-        include: { customer: true, pet: true },
-      }),
-    ]);
+  const [
+    // dayOrders,
+    // paidDay,
+    // pendingPayments,
+    // customerCount,
+    dayOrderList,
+    checkInsToday,
+    checkOutsToday,
+    groomingQueueToday,
+  ] = await Promise.all([
+    // prisma.order.count({ where: { createdAt: { gte: startOfDay, lt: endOfDay } } }),
+    // prisma.order.aggregate({
+    //   _sum: { total: true },
+    //   where: {
+    //     createdAt: { gte: startOfDay, lt: endOfDay },
+    //     status: { in: ["PAID", "IN_PROGRESS", "COMPLETED"] },
+    //   },
+    // }),
+    // prisma.order.count({ where: { status: "PENDING_PAYMENT" } }),
+    // prisma.customer.count(),
+    prisma.order.findMany({
+      where: { createdAt: { gte: startOfDay, lt: endOfDay } },
+      take: 10,
+      orderBy: { createdAt: "desc" },
+      include: {
+        customer: true,
+        pet: true,
+        payments: { where: { status: "VERIFIED" }, select: { amount: true } },
+      },
+    }),
+    prisma.order.count({
+      where: { checkInAt: { gte: startOfDay, lt: endOfDay }, status: { not: "CANCELLED" } },
+    }),
+    prisma.order.count({
+      where: { checkOutAt: { gte: startOfDay, lt: endOfDay }, status: { not: "CANCELLED" } },
+    }),
+    prisma.order.count({
+      where: {
+        appointmentAt: { gte: startOfDay, lt: endOfDay },
+        queueType: { not: "OTHER" },
+        status: { not: "CANCELLED" },
+      },
+    }),
+  ]);
 
-  const revenueDay = paidDay._sum.total ?? 0;
+  // const revenueDay = paidDay._sum.total ?? 0;
   const dateLabel = formatDate(startOfDay);
 
   const stats = [
+    // {
+    //   label: isToday ? t.dashboard.statOrdersToday : t.dashboard.statOrders,
+    //   value: dayOrders.toString(),
+    //   icon: ReceiptText,
+    //   color: "text-sky-600 bg-sky-100 dark:bg-sky-950 dark:text-sky-400",
+    //   tint: "from-sky-50 dark:from-sky-950/30",
+    // },
+    // {
+    //   label: isToday ? t.dashboard.statRevenueToday : t.dashboard.statRevenue,
+    //   value: formatBaht(revenueDay),
+    //   icon: TrendingUp,
+    //   color: "text-emerald-600 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400",
+    //   tint: "from-emerald-50 dark:from-emerald-950/30",
+    // },
+    // {
+    //   label: t.dashboard.statPendingPayment,
+    //   value: pendingPayments.toString(),
+    //   icon: Clock,
+    //   color: "text-amber-600 bg-amber-100 dark:bg-amber-950 dark:text-amber-400",
+    //   tint: "from-amber-50 dark:from-amber-950/30",
+    // },
+    // {
+    //   label: t.dashboard.statTotalCustomers,
+    //   value: customerCount.toString(),
+    //   icon: PawPrint,
+    //   color: "text-violet-600 bg-violet-100 dark:bg-violet-950 dark:text-violet-400",
+    //   tint: "from-violet-50 dark:from-violet-950/30",
+    // },
     {
-      label: isToday ? t.dashboard.statOrdersToday : t.dashboard.statOrders,
-      value: dayOrders.toString(),
-      icon: ReceiptText,
-      color: "text-sky-600 bg-sky-100 dark:bg-sky-950 dark:text-sky-400",
-      tint: "from-sky-50 dark:from-sky-950/30",
+      label: t.dashboard.statCheckInsToday,
+      value: checkInsToday.toString(),
+      icon: LogIn,
+      color: "text-teal-600 bg-teal-100 dark:bg-teal-950 dark:text-teal-400",
+      tint: "from-teal-50 dark:from-teal-950/30",
     },
     {
-      label: isToday ? t.dashboard.statRevenueToday : t.dashboard.statRevenue,
-      value: formatBaht(revenueDay),
-      icon: TrendingUp,
-      color: "text-emerald-600 bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400",
-      tint: "from-emerald-50 dark:from-emerald-950/30",
+      label: t.dashboard.statCheckOutsToday,
+      value: checkOutsToday.toString(),
+      icon: LogOut,
+      color: "text-orange-600 bg-orange-100 dark:bg-orange-950 dark:text-orange-400",
+      tint: "from-orange-50 dark:from-orange-950/30",
     },
     {
-      label: t.dashboard.statPendingPayment,
-      value: pendingPayments.toString(),
-      icon: Clock,
-      color: "text-amber-600 bg-amber-100 dark:bg-amber-950 dark:text-amber-400",
-      tint: "from-amber-50 dark:from-amber-950/30",
-    },
-    {
-      label: t.dashboard.statTotalCustomers,
-      value: customerCount.toString(),
-      icon: PawPrint,
-      color: "text-violet-600 bg-violet-100 dark:bg-violet-950 dark:text-violet-400",
-      tint: "from-violet-50 dark:from-violet-950/30",
+      label: t.dashboard.statGroomingQueueToday,
+      value: groomingQueueToday.toString(),
+      icon: Bath,
+      color: "text-pink-600 bg-pink-100 dark:bg-pink-950 dark:text-pink-400",
+      tint: "from-pink-50 dark:from-pink-950/30",
     },
   ];
 
@@ -123,15 +172,15 @@ export default async function DashboardPage(props: PageProps<"/">) {
         <DashboardDatePicker value={selectedDateStr} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label}>
+            <Card key={s.label} className="w-full">
               <CardContent className="flex items-center gap-3.5 py-2">
                 <div
                   className={cn(
-                    "flex h-11 w-11 items-center justify-center rounded-lg",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
                     s.color
                   )}
                 >
@@ -169,7 +218,10 @@ export default async function DashboardPage(props: PageProps<"/">) {
             </div>
           ) : (
             <div className="divide-y">
-              {dayOrderList.map((o) => (
+              {dayOrderList.map((o) => {
+                const paidSum = o.payments.reduce((sum, p) => sum + p.amount, 0);
+                const isUnderpaid = o.status === "COMPLETED" && paidSum < o.total;
+                return (
                 <Link
                   key={o.id}
                   href={`/orders/${o.id}`}
@@ -181,6 +233,14 @@ export default async function DashboardPage(props: PageProps<"/">) {
                       <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[o.status])}>
                         {t.labels.orderStatus[o.status]}
                       </Badge>
+                      {isUnderpaid && (
+                        <Badge
+                          variant="outline"
+                          className="border-red-300 bg-red-50 text-[10px] font-semibold text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400"
+                        >
+                          {t.dashboard.underpaidBadge}
+                        </Badge>
+                      )}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {o.customer.name}
@@ -189,7 +249,8 @@ export default async function DashboardPage(props: PageProps<"/">) {
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

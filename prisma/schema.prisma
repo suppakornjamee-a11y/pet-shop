@@ -32,7 +32,14 @@ enum ServiceCategory {
   BATH // อาบน้ำ
   GROOMING // ตัดขน
   BOARDING // ฝากเลี้ยง
-  OTHER
+  OTHER // บริการอื่นๆ (เทรนนิ่ง/ฟิตเนส/เล่นน้ำพุ)
+}
+
+// หมวดย่อยภายในหมวด "อาบน้ำ" — ใช้แยกกลุ่มรายการเพิ่มเติม/ทรีทเม้นต์/สปา ออกจากบริการอาบน้ำ/ตัดขนหลัก
+enum ServiceGroup {
+  ADDON // รายการเพิ่มเติม
+  TREATMENT // ทรีทเม้นต์
+  SPA // สปา
 }
 
 enum RoomSize {
@@ -54,6 +61,12 @@ enum OrderStatus {
 enum BillingUnit {
   PER_NIGHT // คิดราคาต่อคืน (ห้องพัก/คอกค้างคืน)
   PER_VISIT // คิดราคาต่อครั้ง (Daycare / Pawsome ไป-กลับวันเดียว)
+}
+
+// แยกคิวส่วนกลาง (appointmentAt) ออกเป็น 2 พูล ไม่ให้แย่งช่วงเวลากัน
+enum QueueType {
+  BATH // จองอาบน้ำ
+  OTHER // จองบริการอื่นๆ (เทรนนิ่ง/ฟิตเนส)
 }
 
 enum PaymentPurpose {
@@ -97,6 +110,11 @@ enum AccountType {
   BANK
 }
 
+enum Locale {
+  TH
+  EN
+}
+
 // ---------- Staff / Auth ----------
 
 model User {
@@ -121,16 +139,19 @@ model User {
 // ---------- Customers & Pets ----------
 
 model Customer {
-  id         String   @id @default(cuid())
-  name       String
-  phone      String
-  email      String?
-  address    String?
-  lineId     String?
-  lineUserId String?  @unique // LINE userId ที่ผูกผ่าน webhook (แยกจาก lineId ที่เป็นข้อความอิสระ)
-  note       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String // ชื่อจริง นามสกุลจริงเจ้าของ
+  nickname          String? // ชื่อเล่นเจ้าของ
+  phone             String
+  email             String?
+  address           String?
+  lineId            String?
+  lineUserId        String?  @unique // LINE userId ที่ผูกผ่าน webhook (แยกจาก lineId ที่เป็นข้อความอิสระ)
+  petInstagram      String? // Instagram ของสัตว์เลี้ยง
+  preferredLanguage Locale   @default(TH) // ภาษาที่ลูกค้าใช้สื่อสารด้วย
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   pets   Pet[]
   orders Order[]
@@ -150,18 +171,23 @@ model Pet {
   birthDate        DateTime?
   weightKg         Float?
   color            String?
-  allergies        String? // อาการแพ้ / ยาที่แพ้
+  allergies        String? // อาการแพ้หรือปัญหาสุขภาพ
   note             String?
   photoUrl         String?
   photoUrls        String[]  @default([]) // รูปสัตว์เลี้ยง (หลายรูป)
-  aggressiveNotes  String? // หมายเหตุพฤติกรรมก้าวร้าว/ดุ
-  foodNote         String? // อาหารที่กิน / ห้ามกิน
+  personality      String? // นิสัย
+  aggressiveNotes  String? // ข้อควรระวังด้านความก้าวร้าว
+  foodNote         String? // รายละเอียดการให้อาหาร
+  medicationNote   String? // รายละเอียดการให้ยา
+  neutered         Boolean   @default(false) // ทำหมันแล้ว
   vaccinePhotoUrl  String? // รูปสมุดวัคซีน/ใบรับรองวัคซีน (เดิม — เก็บไว้เพื่อ backward compat)
   vaccinePhotoUrls String[]  @default([]) // รูปสมุดวัคซีน/ใบรับรองวัคซีน (หลายรูป)
   cctvConsent      Boolean   @default(false) // ยินยอมให้บันทึกภาพกล้องวงจรปิดขณะฝากเลี้ยง
   vaccineComplete  Boolean? // วัคซีนครบล่าสุดที่ทราบ (เอาไว้ prefill ตอนจองครั้งถัดไป)
-  lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด
-  fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด เช่น Nexgard Spectra
+  vaccine5in1At    DateTime? // วันที่ฉีดวัคซีนรวม 5/6 โรคล่าสุด
+  rabiesVaccineAt  DateTime? // วันที่ฉีดวัคซีนพิษสุนัขบ้าล่าสุด
+  lastFleaTickAt   DateTime? // วันที่กำจัดเห็บหมัดครั้งล่าสุด
+  fleaTickMedicine String? // ชื่อของยากำจัดเห็บหมัดที่ใช้
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -173,14 +199,20 @@ model Pet {
 // ---------- Master data ----------
 
 model Service {
-  id          String          @id @default(cuid())
-  name        String
-  category    ServiceCategory
-  description String?
-  price       Int // หน่วยเป็นบาท
-  active      Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String          @id @default(cuid())
+  name         String
+  category     ServiceCategory
+  group        ServiceGroup? // ใช้เฉพาะหมวด BATH — null = รายการอาบน้ำ/ตัดขนหลัก
+  speciesScope Species? // null = หมา & แมวทั้งคู่, ระบุ = เฉพาะชนิดนั้น
+  defaultOn    Boolean         @default(false) // ติ๊กให้อัตโนมัติ (เช่น ไถเท้า/ไถท้อง/ไถก้น/บีบต่อม/เช็ดหู) ถอนออกได้
+  sortOrder    Int             @default(0)
+  description  String?
+  price        Int // หน่วยเป็นบาท
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([category])
 }
 
 model RoomCategory {
@@ -286,6 +318,7 @@ model Order {
   roomId           String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
   status           OrderStatus @default(PENDING_PAYMENT)
   appointmentAt    DateTime? // วัน-เวลาคิวที่จอง (slot) — ใช้กับคิวอาบน้ำ/ตัดขนแบบ walk-in
+  queueType        QueueType? // พูลคิว (BATH/OTHER) เมื่อมี appointmentAt — null = จองก่อนเพิ่มฟีเจอร์นี้ ถือเป็น BATH
   checkInAt        DateTime? // เช็คอิน (ใช้กับการจองห้อง/คอก/พื้นที่)
   checkOutAt       DateTime? // เช็คเอาท์
   nights           Int         @default(0)

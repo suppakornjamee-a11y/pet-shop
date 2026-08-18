@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
-import { speciesEmoji, orderStatusColor } from "@/lib/labels";
+import { speciesEmoji, orderStatusColor, isFleaTickCheckStale } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,9 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
   const lastVisit = completedOrders[0]?.createdAt;
   const t = getDictionary(await getLocale());
 
+  // เตือนตรวจเห็บ/หมัดก่อนจอง
+  const petsNeedingFleaCheck = customer.pets.filter((pet) => isFleaTickCheckStale(pet.lastFleaTickAt));
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
@@ -73,6 +76,17 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
           </>
         }
       />
+
+      {petsNeedingFleaCheck.length > 0 && (
+        <div className="rounded-lg border-2 border-amber-500 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <div className="font-bold text-amber-700 dark:text-amber-400">
+            {t.customers.fleaTickReminderTitle}
+          </div>
+          <div className="mt-0.5 text-amber-700/90 dark:text-amber-400/90">
+            {t.customers.fleaTickReminderPets(petsNeedingFleaCheck.map((p) => p.name).join(", "))}
+          </div>
+        </div>
+      )}
 
       {/* ===== Section 1: ข้อมูลเจ้าของ + สัตว์เลี้ยง ===== */}
       <Card>
@@ -153,6 +167,18 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                     {t.customers.allergyWarning(pet.allergies)}
                   </div>
                 )}
+                <div
+                  className={cn(
+                    "mt-2 rounded-md px-2 py-1 text-xs font-medium",
+                    isFleaTickCheckStale(pet.lastFleaTickAt)
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                  )}
+                >
+                  {pet.lastFleaTickAt
+                    ? t.customers.fleaTickLastChecked(formatDate(pet.lastFleaTickAt))
+                    : t.customers.fleaTickNeverChecked}
+                </div>
                 <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground/70">
                   <History className="h-2.5 w-2.5" /> {t.customers.editedLabel(formatDateTime(pet.updatedAt))}
                 </div>

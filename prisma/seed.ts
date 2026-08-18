@@ -38,17 +38,116 @@ async function main() {
   });
 
   // ----- Services -----
-  const services = [
-    { name: "อาบน้ำทั่วไป", category: "BATH" as const, price: 250 },
-    { name: "อาบน้ำพิเศษ", category: "BATH" as const, price: 350 },
-    { name: "อาบน้ำแบบพรีเมี่ยม", category: "BATH" as const, price: 500 },
-    { name: "ตัดขน (สไตล์พื้นฐาน)", category: "GROOMING" as const, price: 500 },
-    { name: "ตัดขน (สไตล์พิเศษ)", category: "GROOMING" as const, price: 800 },
-    { name: "ตัดเล็บ + ทำความสะอาดหู", category: "OTHER" as const, price: 150 },
+  // แคตตาล็อกเดิม (ราคาตัวอย่าง) ถูกแทนที่ด้วยรายการใหม่ด้านล่าง — ปิดใช้งานไว้ ไม่ลบ (กันออเดอร์เก่าที่อ้างอิงอยู่พัง)
+  await prisma.service.updateMany({
+    where: {
+      name: {
+        in: [
+          "อาบน้ำทั่วไป",
+          "อาบน้ำพิเศษ",
+          "อาบน้ำแบบพรีเมี่ยม",
+          "ตัดขน (สไตล์พื้นฐาน)",
+          "ตัดขน (สไตล์พิเศษ)",
+          "ตัดเล็บ + ทำความสะอาดหู",
+        ],
+      },
+    },
+    data: { active: false },
+  });
+
+  type ServiceSeed = {
+    name: string;
+    category: "BATH" | "GROOMING" | "BOARDING" | "OTHER";
+    group?: "ADDON" | "TREATMENT" | "SPA";
+    speciesScope?: "DOG" | "CAT";
+    defaultOn?: boolean;
+    price?: number;
+  };
+  // ราคาประมาณการตามราคาตลาดทั่วไป — ปรับได้จริงที่หน้า "ตั้งค่า > บริการ"
+  // รายการที่ defaultOn (รวมอยู่ในอาบน้ำแล้ว) ตั้งราคา 0 ไว้เสมอ เพราะรวมอยู่ในค่าอาบน้ำแล้ว ไม่ได้คิดแยก
+  const serviceDefs: ServiceSeed[] = [
+    // อาบน้ำ (เลือกได้ตามชนิดสัตว์)
+    { name: "อาบน้ำขนสั้น", category: "BATH", price: 300 },
+    { name: "อาบน้ำขนยาว", category: "BATH", price: 400 },
+    { name: "อาบน้ำขนพิเศษ", category: "BATH", speciesScope: "DOG", price: 500 },
+    // รวมอยู่ในอาบน้ำโดยอัตโนมัติ — ถอนออกได้ถ้าลูกค้าไม่รับบริการ
+    { name: "ไถเท้า", category: "BATH", defaultOn: true },
+    { name: "ไถท้อง", category: "BATH", defaultOn: true },
+    { name: "ไถก้น", category: "BATH", defaultOn: true },
+    { name: "บีบต่อม", category: "BATH", defaultOn: true },
+    { name: "เช็ดหู", category: "BATH", defaultOn: true },
+    // ตัดขน
+    { name: "ตัดขนสั้น", category: "GROOMING", speciesScope: "DOG", price: 400 },
+    { name: "ตัดขนยาว", category: "GROOMING", price: 500 },
+    { name: "ตัดขนพิเศษ", category: "GROOMING", speciesScope: "DOG", price: 700 },
+    { name: "ตัดขนกรรไกร", category: "GROOMING", speciesScope: "CAT", price: 600 },
+    // รายการเพิ่มเติม
+    { name: "สางขนพันกัน", category: "BATH", group: "ADDON", price: 150 },
+    { name: "ค่าพลัดขน", category: "BATH", group: "ADDON", price: 200 },
+    { name: "ทรีทเม้นท์ขนขาว", category: "BATH", group: "ADDON", price: 250 },
+    { name: "ทรีทเม้นต์บำรุงขน", category: "BATH", group: "ADDON", price: 250 },
+    {
+      name: "ทรีทเม้นต์กำจัดคราบมัน",
+      category: "BATH",
+      group: "ADDON",
+      speciesScope: "CAT",
+      price: 250,
+    },
+    { name: "แปรงฟัน", category: "BATH", group: "ADDON", price: 100 },
+    { name: "ตัดเล็บ", category: "BATH", group: "ADDON", price: 100 },
+    { name: "Paws & Nose Moisture Treatment", category: "BATH", group: "ADDON", price: 200 },
+    { name: "ทาแป้งลดคราบน้ำตา", category: "BATH", group: "ADDON", price: 100 },
+    // ทรีทเม้นต์
+    { name: "ขนขาว", category: "BATH", group: "TREATMENT", price: 300 },
+    { name: "บำรุงขน", category: "BATH", group: "TREATMENT", price: 300 },
+    { name: "เพิ่มวอลลุ่มขนพิเศษ", category: "BATH", group: "TREATMENT", price: 350 },
+    { name: "บำรุงจมูกและอุ้งเท้า", category: "BATH", group: "TREATMENT", price: 250 },
+    { name: "ลดคราบน้ำตา", category: "BATH", group: "TREATMENT", price: 200 },
+    {
+      name: "พรีเมียมทรีทเม้นต์ขนนุ่ม",
+      category: "BATH",
+      group: "TREATMENT",
+      speciesScope: "DOG",
+      price: 450,
+    },
+    {
+      name: "ขจัดคราบไขมัน",
+      category: "BATH",
+      group: "TREATMENT",
+      speciesScope: "CAT",
+      price: 300,
+    },
+    {
+      name: "พรีเมียมทรีทเม้นต์บำรุงและขจัดคราบไขมัน",
+      category: "BATH",
+      group: "TREATMENT",
+      speciesScope: "CAT",
+      price: 450,
+    },
+    // สปา
+    { name: "เกลือกุหลาบ", category: "BATH", group: "SPA", price: 200 },
+    { name: "เกลือคาโมมายล์", category: "BATH", group: "SPA", price: 200 },
+    { name: "เกลือมะพร้าว", category: "BATH", group: "SPA", price: 200 },
+    { name: "เกลือเปปเปอร์มินท์", category: "BATH", group: "SPA", price: 200 },
+    { name: "เกลือมาร์ชแมลโลว์", category: "BATH", group: "SPA", price: 200 },
+    { name: "เกลือลาเวนเดอร์", category: "BATH", group: "SPA", price: 200 },
+    { name: "Mineral Bath Blue Marine", category: "BATH", group: "SPA", price: 350 },
+    { name: "Mineral Bath Hot Spring", category: "BATH", group: "SPA", price: 350 },
+    { name: "Mineral Bath Rose Salt", category: "BATH", group: "SPA", price: 350 },
+    { name: "Bubble Spa", category: "BATH", group: "SPA", price: 300 },
+    { name: "สปาโคลน", category: "BATH", group: "SPA", price: 350 },
+    // บริการอื่นๆ
+    { name: "เทรนนิ่ง", category: "OTHER", price: 500 },
+    { name: "ฟิตเนส", category: "OTHER", price: 300 },
+    { name: "เล่นน้ำพุ", category: "OTHER", price: 150 },
   ];
-  for (const s of services) {
+  for (const [i, s] of serviceDefs.entries()) {
+    const { price, ...rest } = s;
     const exists = await prisma.service.findFirst({ where: { name: s.name } });
-    if (!exists) await prisma.service.create({ data: s });
+    if (!exists) await prisma.service.create({ data: { ...rest, price: price ?? 0, sortOrder: i } });
+    else if (exists.price === 0 && (price ?? 0) > 0) {
+      await prisma.service.update({ where: { id: exists.id }, data: { price } });
+    }
   }
 
   // ----- Room categories + rooms -----
