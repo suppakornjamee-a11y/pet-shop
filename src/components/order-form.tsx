@@ -270,13 +270,26 @@ export function OrderForm({
     prefillFromPet(customer?.pets.find((p) => p.id === id));
   }
 
+  // อาบน้ำ/ตัดขน เลือกได้แบบเดียว (เหมือนตัวเลือกประเภทหลัก) ส่วนหมวดอื่น (รายการเพิ่มเติม/ทรีทเม้นต์/สปา/ฯลฯ) เลือกได้หลายรายการ
+  function exclusiveKey(s: Service) {
+    if (s.category === "BATH" && !s.group) return "BATH";
+    if (s.category === "GROOMING") return "GROOMING";
+    return null;
+  }
+
   function toggleService(id: string) {
+    const svc = services.find((x) => x.id === id);
     setServiceIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
       } else {
-        // เลือกได้หลายรายการต่อหมวด (เช่น อาบน้ำ + รายการเพิ่มเติมหลายอย่าง + ทรีทเม้นต์)
+        const key = svc ? exclusiveKey(svc) : null;
+        if (key) {
+          for (const other of services) {
+            if (other.id !== id && exclusiveKey(other) === key) next.delete(other.id);
+          }
+        }
         next.add(id);
       }
       return next;
