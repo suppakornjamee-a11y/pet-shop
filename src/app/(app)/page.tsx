@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
 import { cn } from "@/lib/utils";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 function parseDate(input?: string) {
   if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
@@ -39,6 +40,7 @@ function toDateStr(d: Date) {
 }
 
 export default async function DashboardPage(props: PageProps<"/">) {
+  await requireStaffUser();
   const t = getDictionary(await getLocale());
   const searchParams = await props.searchParams;
   const dateParam = typeof searchParams.date === "string" ? searchParams.date : undefined;

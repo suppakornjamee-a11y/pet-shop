@@ -17,10 +17,11 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
 
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { customer: true, pet: true, room: true, items: true },
+    include: { customer: true, pet: true, room: true, items: true, extraCharges: true },
   });
   if (!order) notFound();
 
+  const extraChargesTotal = order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
   const shopName = await getSetting("shop_name", "PetCare");
   const shopAddress = await getSetting("shop_address", "");
   const t = getDictionary(await getLocale());
@@ -80,14 +81,32 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
                 <td className="px-2 py-2 text-right">{formatBaht(it.subtotal)}</td>
               </tr>
             ))}
+            {order.extraCharges.map((c) => (
+              <tr key={c.id} className="border-b text-red-600">
+                <td className="px-2 py-2">{c.description}</td>
+                <td className="px-2 py-2 text-center">1</td>
+                <td className="px-2 py-2 text-right">{formatBaht(c.amount)}</td>
+                <td className="px-2 py-2 text-right">{formatBaht(c.amount)}</td>
+              </tr>
+            ))}
           </tbody>
           <tfoot>
+            {order.holidaySurcharge > 0 && (
+              <tr>
+                <td colSpan={3} className="px-2 py-2 text-right font-semibold text-red-600">
+                  {t.print.holidaySurchargeLabel(order.holidayLabel ?? "")}
+                </td>
+                <td className="px-2 py-2 text-right font-bold text-red-600">
+                  +{formatBaht(order.holidaySurcharge)}
+                </td>
+              </tr>
+            )}
             <tr>
               <td colSpan={3} className="px-2 py-3 text-right font-semibold">
                 {t.print.grandTotal}
               </td>
               <td className="px-2 py-3 text-right text-lg font-bold">
-                {formatBaht(order.total)}
+                {formatBaht(order.total + extraChargesTotal)}
               </td>
             </tr>
           </tfoot>

@@ -30,3 +30,10 @@ export async function requireAdmin() {
   if (user.role !== "ADMIN") redirect("/");
   return user;
 }
+
+/** หน้าจัดการทั่วไป (ลงทะเบียน/ลูกค้า/ร้านค้า/ตั้งค่า/สร้างออเดอร์ ฯลฯ) — ช่างอาบน้ำ (GROOMER) เข้าไม่ได้ เห็นแค่ปฏิทิน/ออเดอร์ */
+export async function requireStaffUser() {
+  const user = await requireUser();
+  if (user.role === "GROOMER") redirect("/calendar");
+  return user;
+}

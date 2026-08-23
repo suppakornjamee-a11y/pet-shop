@@ -2,10 +2,11 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import type { Role } from "@/generated/prisma/enums";
+import type { Role, GroomerLevel } from "@/generated/prisma/enums";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  // ออกจากระบบอัตโนมัติถ้าไม่มี action ภายใน 1 ชั่วโมง — updateAge: 0 ทำให้ session ต่ออายุทุกครั้งที่มี request (sliding window)
+  session: { strategy: "jwt", maxAge: 60 * 60, updateAge: 0 },
   trustHost: true,
   pages: { signIn: "/login" },
   providers: [
@@ -32,6 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           role: user.role,
           username: user.username,
+          groomerLevel: user.groomerLevel,
         };
       },
     }),
@@ -42,6 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.uid = user.id;
         token.role = (user as { role: Role }).role;
         token.username = (user as { username: string }).username;
+        token.groomerLevel = (user as { groomerLevel: GroomerLevel | null }).groomerLevel;
       }
       return token;
     },
@@ -50,6 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.uid as string;
         session.user.role = token.role as Role;
         session.user.username = token.username as string;
+        session.user.groomerLevel = token.groomerLevel as GroomerLevel | null;
       }
       return session;
     },

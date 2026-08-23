@@ -49,7 +49,6 @@ type PetForm = {
   note: string;
   photoUrls: string[];
   vaccinePhotoUrls: string[];
-  cctvConsent: boolean;
   vaccineComplete: boolean;
 };
 
@@ -74,7 +73,6 @@ const emptyPet: PetForm = {
   note: "",
   photoUrls: [],
   vaccinePhotoUrls: [],
-  cctvConsent: false,
   vaccineComplete: false,
 };
 
@@ -82,10 +80,12 @@ function MultiPhotoUpload({
   label,
   values,
   onChange,
+  readOnly,
 }: {
   label: string;
   values: string[];
   onChange: (dataUrls: string[]) => void;
+  readOnly?: boolean;
 }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -119,33 +119,40 @@ function MultiPhotoUpload({
               alt={`${label} ${idx + 1}`}
               className="h-28 w-28 rounded-lg border object-cover"
             />
-            <button
-              type="button"
-              onClick={() => removeAt(idx)}
-              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-destructive"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => removeAt(idx)}
+                className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-destructive"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         ))}
-        <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors hover:bg-accent/50">
-          {loading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <>
-              <ImagePlus className="h-5 w-5" />
-              {t.register.uploadPhoto}
-            </>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            disabled={loading}
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-        </label>
+        {!readOnly && (
+          <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors hover:bg-accent/50">
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <ImagePlus className="h-5 w-5" />
+                {t.register.uploadPhoto}
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              disabled={loading}
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </label>
+        )}
+        {readOnly && values.length === 0 && (
+          <p className="text-xs text-muted-foreground">{t.register.noPhotos}</p>
+        )}
       </div>
     </div>
   );
@@ -197,15 +204,19 @@ export function RegisterForm({
   customerId,
   initialCustomer,
   initialPets,
+  footer,
 }: {
-  mode?: "create" | "edit";
+  mode?: "create" | "edit" | "view";
   customerId?: string;
   initialCustomer?: CustomerForm;
   initialPets?: PetForm[];
+  /** เนื้อหาเสริมต่อท้าย (เช่น สรุปยอดใช้จ่าย/ประวัติการใช้บริการ) — ใช้กับหน้าประวัติลูกค้าเท่านั้น */
+  footer?: React.ReactNode;
 }) {
   const { t } = useI18n();
   const router = useRouter();
   const isEdit = mode === "edit";
+  const readOnly = mode === "view";
   const [isPending, startTransition] = useTransition();
 
   const [customer, setCustomer] = useState<CustomerForm>(initialCustomer ?? emptyCustomer);
@@ -219,6 +230,16 @@ export function RegisterForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const missingPhotos = pets.some((p) => p.photoUrls.length === 0);
+    if (missingPhotos) {
+      toast.error(t.register.petPhotoRequired);
+      return;
+    }
+    const missingVaccinePhotos = pets.some((p) => p.vaccinePhotoUrls.length === 0);
+    if (missingVaccinePhotos) {
+      toast.error(t.register.vaccinePhotoRequired);
+      return;
+    }
     startTransition(async () => {
       const petsPayload = pets.map((p) => ({
         ...p,
@@ -251,6 +272,7 @@ export function RegisterForm({
               value={customer.name}
               onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
               required
+              disabled={readOnly}
             />
           </div>
           <div className="space-y-2">
@@ -258,6 +280,7 @@ export function RegisterForm({
             <Input
               value={customer.nickname}
               onChange={(e) => setCustomer({ ...customer, nickname: e.target.value })}
+              disabled={readOnly}
             />
           </div>
           <div className="space-y-2">
@@ -266,6 +289,7 @@ export function RegisterForm({
               value={customer.phone}
               onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
               required
+              disabled={readOnly}
             />
           </div>
           <div className="space-y-2">
@@ -273,6 +297,7 @@ export function RegisterForm({
             <Input
               value={customer.lineId}
               onChange={(e) => setCustomer({ ...customer, lineId: e.target.value })}
+              disabled={readOnly}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -281,6 +306,7 @@ export function RegisterForm({
               value={customer.address}
               onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
               rows={2}
+              disabled={readOnly}
             />
           </div>
           <div className="space-y-2">
@@ -288,6 +314,7 @@ export function RegisterForm({
             <Input
               value={customer.petInstagram}
               onChange={(e) => setCustomer({ ...customer, petInstagram: e.target.value })}
+              disabled={readOnly}
             />
           </div>
         </CardContent>
@@ -300,7 +327,7 @@ export function RegisterForm({
             <CardTitle className="text-base">
               {pet.species === "CAT" ? "🐱" : "🐶"} {t.register.petNumberTitle(i + 1)}
             </CardTitle>
-            {pets.length > 1 && !pet.id && (
+            {!readOnly && pets.length > 1 && !pet.id && (
               <CardAction>
                 <Button
                   type="button"
@@ -319,11 +346,13 @@ export function RegisterForm({
                 label={t.register.petPhotoLabel}
                 values={pet.photoUrls}
                 onChange={(v) => updatePet(i, { photoUrls: v })}
+                readOnly={readOnly}
               />
               <MultiPhotoUpload
                 label={t.register.vaccinePhotoLabel}
                 values={pet.vaccinePhotoUrls}
                 onChange={(v) => updatePet(i, { vaccinePhotoUrls: v })}
+                readOnly={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -332,6 +361,7 @@ export function RegisterForm({
                 value={pet.name}
                 onChange={(e) => updatePet(i, { name: e.target.value })}
                 required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -340,6 +370,7 @@ export function RegisterForm({
                 value={pet.species}
                 onValueChange={(v) => updatePet(i, { species: v as "DOG" | "CAT" })}
                 items={{ DOG: t.customers.petDialog.dog, CAT: t.customers.petDialog.cat }}
+                disabled={readOnly}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -355,6 +386,8 @@ export function RegisterForm({
               <Input
                 value={pet.breed}
                 onChange={(e) => updatePet(i, { breed: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -369,6 +402,7 @@ export function RegisterForm({
                   FEMALE: t.customers.petDialog.female,
                   UNKNOWN: t.customers.petDialog.unknown,
                 }}
+                disabled={readOnly}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -386,6 +420,8 @@ export function RegisterForm({
                 type="date"
                 value={pet.birthDate}
                 onChange={(e) => updatePet(i, { birthDate: e.target.value })}
+                required
+                disabled={readOnly}
               />
               <AgeDisplay birthDate={pet.birthDate} />
             </div>
@@ -396,6 +432,8 @@ export function RegisterForm({
                 step="0.1"
                 value={pet.weightKg}
                 onChange={(e) => updatePet(i, { weightKg: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -403,6 +441,8 @@ export function RegisterForm({
               <Input
                 value={pet.color}
                 onChange={(e) => updatePet(i, { color: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -411,6 +451,8 @@ export function RegisterForm({
                 value={pet.personality}
                 onChange={(e) => updatePet(i, { personality: e.target.value })}
                 rows={2}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -419,6 +461,8 @@ export function RegisterForm({
                 value={pet.aggressiveNotes}
                 onChange={(e) => updatePet(i, { aggressiveNotes: e.target.value })}
                 rows={2}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -427,6 +471,8 @@ export function RegisterForm({
                 value={pet.allergies}
                 onChange={(e) => updatePet(i, { allergies: e.target.value })}
                 rows={2}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -437,6 +483,8 @@ export function RegisterForm({
                 type="date"
                 value={pet.vaccine5in1Date}
                 onChange={(e) => updatePet(i, { vaccine5in1Date: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -447,6 +495,8 @@ export function RegisterForm({
                 type="date"
                 value={pet.rabiesVaccineDate}
                 onChange={(e) => updatePet(i, { rabiesVaccineDate: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -457,6 +507,8 @@ export function RegisterForm({
                 type="date"
                 value={pet.lastFleaTickDate}
                 onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -464,6 +516,8 @@ export function RegisterForm({
               <Input
                 value={pet.fleaTickMedicine}
                 onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -472,6 +526,8 @@ export function RegisterForm({
                 value={pet.foodNote}
                 onChange={(e) => updatePet(i, { foodNote: e.target.value })}
                 rows={2}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -480,6 +536,8 @@ export function RegisterForm({
                 value={pet.medicationNote}
                 onChange={(e) => updatePet(i, { medicationNote: e.target.value })}
                 rows={2}
+                required
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -488,6 +546,7 @@ export function RegisterForm({
                 value={pet.neutered ? "yes" : "no"}
                 onValueChange={(v) => updatePet(i, { neutered: v === "yes" })}
                 items={{ yes: t.register.neuteredYes, no: t.register.neuteredNo }}
+                disabled={readOnly}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -504,62 +563,62 @@ export function RegisterForm({
                 value={pet.note}
                 onChange={(e) => updatePet(i, { note: e.target.value })}
                 rows={2}
+                disabled={readOnly}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={pet.cctvConsent}
-                onChange={(e) => updatePet(i, { cctvConsent: e.target.checked })}
-                className="h-4 w-4 accent-primary"
-              />
-              {t.register.cctvConsent}
-            </label>
           </CardContent>
         </Card>
       ))}
 
-      <div className="flex justify-start">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setPets((prev) => [...prev, { ...emptyPet }])}
-        >
-          <Plus /> {t.register.addAnotherPet}
-        </Button>
-      </div>
-
-      {/* Section ล่างสุด: ภาษาที่เลือก */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t.register.languageSectionTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="max-w-xs space-y-2">
-          <Label>{t.register.preferredLanguageLabel}</Label>
-          <Select
-            value={customer.preferredLanguage}
-            onValueChange={(v) =>
-              setCustomer({ ...customer, preferredLanguage: (v as "TH" | "EN") ?? "TH" })
-            }
-            items={{ TH: t.language.th, EN: t.language.en }}
+      {!readOnly && (
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPets((prev) => [...prev, { ...emptyPet }])}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TH">{t.language.th}</SelectItem>
-              <SelectItem value="EN">{t.language.en}</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+            <Plus /> {t.register.addAnotherPet}
+          </Button>
+        </div>
+      )}
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? <Loader2 className="animate-spin" /> : <Save />}
-          {t.register.saveData}
-        </Button>
-      </div>
+      {/* Section ล่างสุด: ภาษาที่เลือก — ไม่แสดงในโหมดดูอย่างเดียว (หน้าประวัติลูกค้า) */}
+      {!readOnly && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t.register.languageSectionTitle}</CardTitle>
+          </CardHeader>
+          <CardContent className="max-w-xs space-y-2">
+            <Label>{t.register.preferredLanguageLabel}</Label>
+            <Select
+              value={customer.preferredLanguage}
+              onValueChange={(v) =>
+                setCustomer({ ...customer, preferredLanguage: (v as "TH" | "EN") ?? "TH" })
+              }
+              items={{ TH: t.language.th, EN: t.language.en }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TH">{t.language.th}</SelectItem>
+                <SelectItem value="EN">{t.language.en}</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
+      {footer}
+
+      {!readOnly && (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isPending}>
+            {isPending ? <Loader2 className="animate-spin" /> : <Save />}
+            {t.register.saveData}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

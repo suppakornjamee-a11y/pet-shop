@@ -18,6 +18,13 @@ export function formatDate(date: Date | string): string {
   }).format(d);
 }
 
+export function formatDateLong(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "long",
+  }).format(d);
+}
+
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("th-TH", {

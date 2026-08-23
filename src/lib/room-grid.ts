@@ -1,4 +1,4 @@
-import type { OrderStatus, BillingUnit, Species } from "@/generated/prisma/enums";
+import type { OrderStatus, BillingUnit, Species, NannyType } from "@/generated/prisma/enums";
 import { thaiDayRange } from "@/lib/slots";
 
 export type GridBooking = {
@@ -10,7 +10,7 @@ export type GridBooking = {
   petSpecies: Species | null;
   checkInAt: Date;
   checkOutAt: Date;
-  nanny: boolean;
+  nannyType: NannyType;
   depositAmount: number;
   vaccineComplete: boolean;
   lastFleaTickAt: Date | null;

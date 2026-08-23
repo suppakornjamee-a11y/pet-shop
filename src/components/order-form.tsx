@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Loader2,
-  Search,
+  // Search, -- ปุ่มค้นหาคอมเม้นปิดไว้ก่อน เปลี่ยนเป็น autocomplete แทน
   UserCheck,
   Bath,
   Scissors,
@@ -15,6 +15,7 @@ import {
   Plus,
   X,
   ClipboardCheck,
+  Video,
 } from "lucide-react";
 import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
@@ -90,7 +91,8 @@ type OrderInitial = {
   checkInTime?: string;
   checkOutDate?: string;
   checkOutTime?: string;
-  nanny?: boolean;
+  nannyType?: "NONE" | "REGULAR" | "VIP";
+  cctvRequested?: boolean;
   depositAmount?: number;
   vaccineComplete?: boolean;
   lastFleaTickDate?: string;
@@ -101,6 +103,10 @@ type OrderInitial = {
 
 const todayStr = () => toThaiDateStr(new Date());
 const GROUP_ORDER = ["BATH", "GROOMING", "ADDON", "TREATMENT", "SPA", "OTHER", "BOARDING"];
+const BATH_DEPOSIT_AMOUNT = 300; // มัดจำจองอาบน้ำ บังคับ 300 ต่อออเดอร์เสมอ (เซิร์ฟเวอร์เป็นคนตัดสินจริง — ค่านี้ใช้แค่แสดงผล)
+const NANNY_REGULAR_RATE = 300; // พี่เลี้ยงดูแลพิเศษ ต่อคืนต่อตัว
+const NANNY_VIP_RATE = 400; // พี่เลี้ยงดูแลพิเศษ VIP ต่อตัวต่อการเข้าพัก
+const CCTV_ROOM_RATE = 100; // ห้องกล้องวงจรปิด
 
 export function OrderForm({
   services,
@@ -135,7 +141,6 @@ export function OrderForm({
   const [customer, setCustomer] = useState<CustomerWithPets | null>(preselected);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CustomerWithPets[]>([]);
-  const [searching, setSearching] = useState(false);
 
   const [petId, setPetId] = useState<string>(
     initial?.petId ?? preselected?.pets[0]?.id ?? ""
@@ -156,10 +161,10 @@ export function OrderForm({
   const [checkOutTime, setCheckOutTime] = useState(
     initial?.checkOutTime || (initialRoom?.billingUnit === "PER_VISIT" ? "18:00" : "11:00")
   );
-  const [nanny, setNanny] = useState(initial?.nanny ?? false);
-  const [depositAmount, setDepositAmount] = useState(
-    String(initial?.depositAmount ?? (isBathQueueBooking ? 300 : 0))
+  const [nannyType, setNannyType] = useState<"NONE" | "REGULAR" | "VIP">(
+    initial?.nannyType ?? "NONE"
   );
+  const [cctvRequested, setCctvRequested] = useState(initial?.cctvRequested ?? false);
   const [vaccineComplete, setVaccineComplete] = useState(initial?.vaccineComplete ?? false);
   const [lastFleaTickDate, setLastFleaTickDate] = useState(initial?.lastFleaTickDate ?? "");
   const [fleaTickMedicine, setFleaTickMedicine] = useState(initial?.fleaTickMedicine ?? "");
@@ -167,48 +172,11 @@ export function OrderForm({
     initial?.productQty ?? {}
   );
   const [note, setNote] = useState(initial?.note ?? "");
-  const [payNowKeys, setPayNowKeys] = useState<Set<string>>(new Set());
 
   const selectedRoom = rooms.find((r) => r.id === roomId) ?? null;
   const isPerVisit = selectedRoom?.billingUnit === "PER_VISIT";
   const nights =
     selectedRoom && !isPerVisit ? Math.max(1, daysBetween(checkInDate, checkOutDate)) : 0;
-  const depositApplicable = isBathQueueBooking || Boolean(selectedRoom);
-
-  const chargeableItems = useMemo(() => {
-    const items: { key: string; label: string; amount: number }[] = [];
-    for (const id of serviceIds) {
-      const s = services.find((x) => x.id === id);
-      if (s) items.push({ key: `svc:${id}`, label: s.name, amount: s.price });
-    }
-    if (selectedRoom) {
-      const qty = nights > 0 ? nights : 1;
-      items.push({
-        key: "room",
-        label: `${selectedRoom.categoryName} ${selectedRoom.name}`,
-        amount: selectedRoom.pricePerNight * qty,
-      });
-    }
-    for (const [id, qty] of Object.entries(productQty)) {
-      if (qty === 0) continue;
-      const p = products.find((x) => x.id === id);
-      if (p) items.push({ key: `prod:${id}`, label: `${p.name} × ${qty}`, amount: p.price * qty });
-    }
-    return items;
-  }, [serviceIds, services, selectedRoom, nights, productQty, products]);
-
-  function togglePayNow(key: string) {
-    setPayNowKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      const sum = chargeableItems
-        .filter((it) => next.has(it.key))
-        .reduce((s, it) => s + it.amount, 0);
-      setDepositAmount(String(sum));
-      return next;
-    });
-  }
 
   const roomsByCategory = useMemo(() => {
     const map = new Map<string, { categoryName: string; rooms: Room[] }>();
@@ -220,35 +188,39 @@ export function OrderForm({
     return [...map.values()];
   }, [rooms]);
 
+  const nannyFee = !selectedRoom
+    ? 0
+    : nannyType === "REGULAR"
+      ? NANNY_REGULAR_RATE * (nights > 0 ? nights : 1)
+      : nannyType === "VIP"
+        ? NANNY_VIP_RATE
+        : 0;
+  const cctvFee = selectedRoom && cctvRequested ? CCTV_ROOM_RATE : 0;
+
   const total = useMemo(() => {
     let sum = 0;
     for (const s of services) if (serviceIds.has(s.id)) sum += s.price;
     if (selectedRoom) sum += selectedRoom.pricePerNight * (nights > 0 ? nights : 1);
     for (const p of products) sum += (productQty[p.id] ?? 0) * p.price;
-    return sum;
-  }, [services, serviceIds, selectedRoom, nights, products, productQty]);
+    return sum + nannyFee + cctvFee;
+  }, [services, serviceIds, selectedRoom, nights, products, productQty, nannyFee, cctvFee]);
 
-  const allPayNowSelected =
-    chargeableItems.length > 0 && chargeableItems.every((it) => payNowKeys.has(it.key));
+  // นโยบายมัดจำ: ห้องพัก/บริการอื่นๆ ไม่มีมัดจำ (จ่ายเต็มจำนวนเสมอ) — จองอาบน้ำบังคับมัดจำ 300 ต่อออเดอร์เสมอ
+  const depositAmount = isBathQueueBooking && !selectedRoom ? Math.min(BATH_DEPOSIT_AMOUNT, total) : 0;
 
-  function togglePayAll() {
-    if (allPayNowSelected) {
-      setPayNowKeys(new Set());
-      setDepositAmount("0");
-    } else {
-      setPayNowKeys(new Set(chargeableItems.map((it) => it.key)));
-      setDepositAmount(String(total));
-    }
-  }
+  // ค้นหาลูกค้าแบบ autocomplete — เด้งรายการให้เลือกทีละตัวอักษร (debounce กันยิงถี่เกินไป)
+  useEffect(() => {
+    if (customer || !query.trim()) return;
+    const timeoutId = setTimeout(() => {
+      startTransition(async () => {
+        const res = await searchCustomers(query);
+        setResults(res as CustomerWithPets[]);
+      });
+    }, 250);
+    return () => clearTimeout(timeoutId);
+  }, [query, customer]);
 
-  function doSearch() {
-    setSearching(true);
-    startTransition(async () => {
-      const res = await searchCustomers(query);
-      setResults(res as CustomerWithPets[]);
-      setSearching(false);
-    });
-  }
+  const showResults = !customer && query.trim().length > 0 && results.length > 0;
 
   function prefillFromPet(pet?: Pet) {
     if (!pet) return;
@@ -354,8 +326,9 @@ export function OrderForm({
       checkInTime: roomId ? checkInTime : undefined,
       checkOutDate: roomId ? checkOutDate : undefined,
       checkOutTime: roomId ? checkOutTime : undefined,
-      nanny: roomId ? nanny : false,
-      depositAmount: roomId || isBathQueueBooking ? Number(depositAmount || 0) : 0,
+      nannyType: roomId ? nannyType : "NONE",
+      cctvRequested: roomId ? cctvRequested : false,
+      depositAmount,
       vaccineComplete: roomId ? vaccineComplete : false,
       lastFleaTickDate: roomId ? lastFleaTickDate : undefined,
       fleaTickMedicine: roomId ? fleaTickMedicine : undefined,
@@ -418,11 +391,11 @@ export function OrderForm({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         {/* 1. ลูกค้า */}
-        <Card>
+        <Card className="overflow-visible">
           <CardHeader>
             <CardTitle className="text-base">{t.orders.form.step1Title}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-visible">
             {customer ? (
               <div className="flex items-center justify-between rounded-lg border bg-accent/40 p-3">
                 <div>
@@ -441,20 +414,20 @@ export function OrderForm({
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="relative space-y-3">
+                <Label>{t.orders.form.searchPlaceholder}</Label>
                 <div className="flex gap-2">
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), doSearch())}
-                  />
+                  <Input value={query} onChange={(e) => setQuery(e.target.value)} />
+                  {/* ปุ่มค้นหาคอมเม้นปิดไว้ก่อน — เปลี่ยนเป็น autocomplete เด้งผลอัตโนมัติแทน
                   <Button type="button" variant="secondary" onClick={doSearch} disabled={searching}>
                     {searching ? <Loader2 className="animate-spin" /> : <Search />}
                     {t.common.search}
                   </Button>
+                  */}
+                  {isPending && <Loader2 className="mt-2.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
                 </div>
-                {results.length > 0 && (
-                  <div className="divide-y rounded-lg border">
+                {showResults && (
+                  <div className="absolute top-full z-20 mt-1 w-full divide-y rounded-lg border bg-popover shadow-md">
                     {results.map((c) => (
                       <button
                         key={c.id}
@@ -503,7 +476,8 @@ export function OrderForm({
           </CardContent>
         </Card>
 
-        {/* 2. ห้องพัก / คอก / พื้นที่ */}
+        {/* 2. ห้องพัก / คอก / พื้นที่ — จองอาบน้ำไม่มีห้องพัก */}
+        {!isBathQueueBooking && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -597,44 +571,61 @@ export function OrderForm({
                   <p className="text-xs text-muted-foreground">{t.orders.form.nightsCount(nights)}</p>
                 )}
 
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{t.orders.form.nannyCheckbox}</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["NONE", "REGULAR", "VIP"] as const).map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setNannyType(opt)}
+                        className={cn(
+                          "rounded-lg border p-2.5 text-center text-xs transition-colors",
+                          nannyType === opt ? "border-primary bg-primary/10 font-medium" : "hover:bg-accent"
+                        )}
+                      >
+                        <div>
+                          {opt === "NONE"
+                            ? t.orders.form.nannyNone
+                            : opt === "REGULAR"
+                              ? t.orders.form.nannyRegular
+                              : t.orders.form.nannyVip}
+                        </div>
+                        {opt !== "NONE" && (
+                          <div className="text-muted-foreground">
+                            {formatBaht(opt === "REGULAR" ? NANNY_REGULAR_RATE : NANNY_VIP_RATE)}
+                            {opt === "REGULAR" ? t.orders.form.perNightUnitSuffix : ""}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={nanny}
-                    onChange={(e) => setNanny(e.target.checked)}
+                    checked={cctvRequested}
+                    onChange={(e) => setCctvRequested(e.target.checked)}
                     className="h-4 w-4 accent-primary"
                   />
-                  {t.orders.form.nannyCheckbox}
+                  <Video className="h-4 w-4 text-muted-foreground" />
+                  {t.orders.form.cctvCheckbox} ({formatBaht(CCTV_ROOM_RATE)})
                 </label>
-
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">{t.orders.form.depositLabel}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="self-end"
-                    onClick={() => setDepositAmount(String(Math.round(total / 2 / 10) * 10))}
-                  >
-                    {t.orders.form.deposit50}
-                  </Button>
-                </div>
               </>
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* 3. บริการ */}
+        {/* 3. บริการ (จองอาบน้ำไม่มีขั้นห้องพัก จึงเลื่อนเป็นข้อ 2) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t.orders.form.step3Title}</CardTitle>
+            <CardTitle className="text-base">
+              {isBathQueueBooking
+                ? t.orders.form.step3Title.replace(/^3\./, "2.")
+                : t.orders.form.step3Title}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {Object.entries(groupedServices).map(([key, list]) => {
@@ -699,59 +690,61 @@ export function OrderForm({
           </CardContent>
         </Card>
 
-        {/* 4. สินค้า */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShoppingBag className="h-4 w-4" /> {t.orders.form.step4Title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {products.map((p) => {
-                const qty = productQty[p.id] ?? 0;
-                return (
-                  <div
-                    key={p.id}
-                    className={cn(
-                      "flex items-center justify-between rounded-lg border p-3 text-sm",
-                      qty > 0 && "border-primary bg-primary/5"
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatBaht(p.price)} · {t.orders.form.remainingStock(p.stockQty, p.unit)}
+        {/* 4. สินค้า — คอมเม้นปิดไว้ก่อนสำหรับโหมดจองอาบน้ำ */}
+        {!isBathQueueBooking && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShoppingBag className="h-4 w-4" /> {t.orders.form.step4Title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {products.map((p) => {
+                  const qty = productQty[p.id] ?? 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border p-3 text-sm",
+                        qty > 0 && "border-primary bg-primary/5"
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{p.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatBaht(p.price)} · {t.orders.form.remainingStock(p.stockQty, p.unit)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => setQty(p.id, -1)}
+                          disabled={qty === 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-5 text-center">{qty}</span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() => setQty(p.id, 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() => setQty(p.id, -1)}
-                        disabled={qty === 0}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-5 text-center">{qty}</span>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() => setQty(p.id, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* สรุป */}
@@ -762,33 +755,51 @@ export function OrderForm({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5 text-sm">
-              {depositApplicable && chargeableItems.length > 0 && (
-                <div className="flex items-center justify-end pb-1">
-                  <button
-                    type="button"
-                    onClick={togglePayAll}
-                    className="shrink-0 text-xs font-medium text-primary hover:underline"
-                  >
-                    {allPayNowSelected ? t.orders.form.unpayAllNow : t.orders.form.payAllNow}
-                  </button>
+              {[...serviceIds].map((id) => {
+                const s = services.find((x) => x.id === id);
+                if (!s) return null;
+                return (
+                  <div key={id} className="flex justify-between">
+                    <span className="text-muted-foreground">{s.name}</span>
+                    <span>{formatBaht(s.price)}</span>
+                  </div>
+                );
+              })}
+              {selectedRoom && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {selectedRoom.categoryName} {selectedRoom.name}
+                    {nights > 0 ? ` × ${t.orders.form.nightsCount(nights)}` : ` × 1 ${t.orders.form.perVisitUnit}`}
+                  </span>
+                  <span>{formatBaht(selectedRoom.pricePerNight * (nights > 0 ? nights : 1))}</span>
                 </div>
               )}
-              {chargeableItems.map((it) => (
-                <div key={it.key} className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-                    {depositApplicable && (
-                      <input
-                        type="checkbox"
-                        checked={payNowKeys.has(it.key)}
-                        onChange={() => togglePayNow(it.key)}
-                        className="h-3.5 w-3.5 shrink-0 accent-primary"
-                      />
-                    )}
-                    <span className="truncate">{it.label}</span>
+              {nannyFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {nannyType === "VIP" ? t.orders.form.nannyVipFull : t.orders.form.nannyRegularFull}
                   </span>
-                  <span className="shrink-0">{formatBaht(it.amount)}</span>
+                  <span>{formatBaht(nannyFee)}</span>
                 </div>
-              ))}
+              )}
+              {cctvFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t.orders.form.cctvCheckbox}</span>
+                  <span>{formatBaht(cctvFee)}</span>
+                </div>
+              )}
+              {Object.entries(productQty).map(([id, qty]) => {
+                const p = products.find((x) => x.id === id);
+                if (!p || qty === 0) return null;
+                return (
+                  <div key={id} className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {p.name} × {qty}
+                    </span>
+                    <span>{formatBaht(p.price * qty)}</span>
+                  </div>
+                );
+              })}
               {total === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
                   {t.orders.form.noItemsSelected}
@@ -796,15 +807,12 @@ export function OrderForm({
               )}
             </div>
 
-            {isBathQueueBooking && !selectedRoom && (
+            {isBathQueueBooking && !selectedRoom && depositAmount > 0 && (
               <div className="space-y-1.5 border-t pt-3">
-                <Label className="text-xs">{t.orders.form.depositLabel}</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{t.orders.form.depositLabel}</span>
+                  <span className="font-semibold">{formatBaht(depositAmount)}</span>
+                </div>
                 <p className="font-bold text-red-600 dark:text-red-400">
                   {t.orders.payment.depositQueueWarning}
                 </p>
@@ -825,11 +833,11 @@ export function OrderForm({
               <span>{t.orders.form.grandTotal}</span>
               <span className="text-primary">{formatBaht(total)}</span>
             </div>
-            {(selectedRoom || isBathQueueBooking) && Number(depositAmount || 0) > 0 && (
+            {isBathQueueBooking && !selectedRoom && depositAmount > 0 && (
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{t.orders.form.depositNowRemaining}</span>
                 <span>
-                  {formatBaht(Number(depositAmount || 0))} / {formatBaht(total - Number(depositAmount || 0))}
+                  {formatBaht(depositAmount)} / {formatBaht(total - depositAmount)}
                 </span>
               </div>
             )}

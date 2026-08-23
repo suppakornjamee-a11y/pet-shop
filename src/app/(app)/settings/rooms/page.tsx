@@ -5,8 +5,10 @@ import { RoomCategoryManager } from "@/components/settings/room-category-manager
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function RoomsSettingsPage() {
+  await requireStaffUser();
   const [categories, rooms] = await Promise.all([
     prisma.roomCategory.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.room.findMany({

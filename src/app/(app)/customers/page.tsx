@@ -6,8 +6,10 @@ import { CustomerSearch } from "@/components/customer-search";
 import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function CustomersPage() {
+  await requireStaffUser();
   const initial = await searchCustomers("");
   const t = getDictionary(await getLocale());
 

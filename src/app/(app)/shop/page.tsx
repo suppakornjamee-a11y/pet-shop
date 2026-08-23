@@ -4,8 +4,10 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ProductImportExport } from "@/components/product-import-export";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 function ProductGrid({
   products,
@@ -44,6 +46,7 @@ function ProductGrid({
 }
 
 export default async function ShopPage() {
+  await requireStaffUser();
   const products = await prisma.product.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
@@ -54,7 +57,11 @@ export default async function ShopPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader title={t.shop.title} description={t.shop.description} />
+      <PageHeader
+        title={t.shop.title}
+        description={t.shop.description}
+        action={<ProductImportExport />}
+      />
 
       <Tabs defaultValue="shop">
         <TabsList>

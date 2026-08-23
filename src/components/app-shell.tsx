@@ -17,7 +17,8 @@ import {
   CalendarFlatIcon,
   CalendarDayFlatIcon,
   CalendarRangeFlatIcon,
-  DashboardFlatIcon,
+  DashboardImageIcon,
+  HolidayImageIcon,
   UserAvatarFlatIcon,
   BankPaymentFlatIcon,
   BedFlatIcon,
@@ -45,6 +46,7 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  hiddenForGroomer?: boolean;
 };
 
 type NavGroup = {
@@ -56,25 +58,26 @@ function getNavGroups(t: Dictionary): NavGroup[] {
   return [
     {
       items: [
-        { href: "/", label: t.nav.dashboard, icon: DashboardFlatIcon },
-        { href: "/register", label: t.nav.register, icon: ClipboardFlatIcon },
+        { href: "/", label: t.nav.dashboard, icon: DashboardImageIcon, hiddenForGroomer: true },
+        { href: "/register", label: t.nav.register, icon: ClipboardFlatIcon, hiddenForGroomer: true },
         { href: "/calendar", label: t.nav.queueCalendar, icon: CalendarDayFlatIcon },
         { href: "/orders/bath", label: t.nav.ordersBath, icon: DocumentFlatIcon },
         { href: "/calendar-other", label: t.nav.otherServiceCalendar, icon: CalendarFlatIcon },
         { href: "/orders/other", label: t.nav.ordersOther, icon: DocumentFlatIcon },
-        { href: "/boarding", label: t.nav.boardingCalendar, icon: CalendarRangeFlatIcon },
-        { href: "/customers", label: t.nav.customers, icon: CustomerRecordFlatIcon },
-        { href: "/shop", label: t.nav.shopCafe, icon: StockFlatIcon },
+        { href: "/boarding", label: t.nav.boardingCalendar, icon: CalendarRangeFlatIcon, hiddenForGroomer: true },
+        { href: "/customers", label: t.nav.customers, icon: CustomerRecordFlatIcon, hiddenForGroomer: true },
+        { href: "/shop", label: t.nav.shopCafe, icon: StockFlatIcon, hiddenForGroomer: true },
       ],
     },
     {
       title: t.nav.settingsGroup,
       items: [
-        { href: "/settings/stock", label: t.nav.stock, icon: StockFlatIcon },
-        { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon },
-        { href: "/settings/services", label: t.nav.services, icon: ClipboardFlatIcon },
+        { href: "/settings/stock", label: t.nav.stock, icon: StockFlatIcon, hiddenForGroomer: true },
+        { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon, hiddenForGroomer: true },
+        { href: "/settings/services", label: t.nav.services, icon: ClipboardFlatIcon, hiddenForGroomer: true },
         { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankPaymentFlatIcon, adminOnly: true },
         { href: "/settings/users", label: t.nav.users, icon: UserAvatarFlatIcon, adminOnly: true },
+        { href: "/settings/holidays", label: t.nav.holidays, icon: HolidayImageIcon, adminOnly: true },
       ],
     },
   ];
@@ -109,7 +112,9 @@ function SidebarContent({
       <nav className="flex-1 space-y-7 overflow-y-auto px-3.5 py-5">
         {navGroups.map((group, gi) => {
           const items = group.items.filter(
-            (it) => !it.adminOnly || user.role === "ADMIN"
+            (it) =>
+              (!it.adminOnly || user.role === "ADMIN") &&
+              (!it.hiddenForGroomer || user.role !== "GROOMER")
           );
           if (items.length === 0) return null;
           return (
@@ -160,7 +165,7 @@ function SidebarContent({
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-[15px] font-medium">{user.name}</div>
             <Badge variant="secondary" className="mt-0.5 h-4 px-1.5 text-[10px]">
-              {user.role === "ADMIN" ? t.nav.admin : t.nav.staff}
+              {user.role === "ADMIN" ? t.nav.admin : user.role === "GROOMER" ? t.nav.groomer : t.nav.staff}
             </Badge>
           </div>
         </div>

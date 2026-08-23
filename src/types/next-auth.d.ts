@@ -1,4 +1,4 @@
-import type { Role } from "@/generated/prisma/enums";
+import type { Role, GroomerLevel } from "@/generated/prisma/enums";
 import type { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
@@ -7,12 +7,14 @@ declare module "next-auth" {
       id: string;
       role: Role;
       username: string;
+      groomerLevel: GroomerLevel | null;
     } & DefaultSession["user"];
   }
 
   interface User {
     role: Role;
     username: string;
+    groomerLevel: GroomerLevel | null;
   }
 }
 
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
     uid: string;
     role: Role;
     username: string;
+    groomerLevel: GroomerLevel | null;
   }
 }

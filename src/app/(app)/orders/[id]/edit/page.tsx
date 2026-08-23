@@ -5,8 +5,10 @@ import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit">) {
+  await requireStaffUser();
   const { id } = await props.params;
 
   const order = await prisma.order.findUnique({
@@ -87,7 +89,8 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
           checkInTime: order.checkInAt ? toThaiTimeStr(order.checkInAt) : undefined,
           checkOutDate: order.checkOutAt ? toThaiDateStr(order.checkOutAt) : undefined,
           checkOutTime: order.checkOutAt ? toThaiTimeStr(order.checkOutAt) : undefined,
-          nanny: order.nanny,
+          nannyType: order.nannyType,
+          cctvRequested: order.cctvRequested,
           depositAmount: order.depositAmount,
           vaccineComplete: order.vaccineComplete,
           lastFleaTickDate: order.lastFleaTickAt ? toThaiDateStr(order.lastFleaTickAt) : undefined,

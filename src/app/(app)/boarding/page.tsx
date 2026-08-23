@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 import type { Dictionary } from "@/i18n/dictionaries/th";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 const WINDOW_DAYS = 14;
 
 export default async function BoardingPage(props: PageProps<"/boarding">) {
+  await requireStaffUser();
   const sp = await props.searchParams;
   const locale = await getLocale();
   const t = getDictionary(locale);
@@ -63,7 +65,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
           petSpecies: o.pet?.species ?? null,
           checkInAt: o.checkInAt!,
           checkOutAt: o.checkOutAt!,
-          nanny: o.nanny,
+          nannyType: o.nannyType,
           depositAmount: o.depositAmount,
           vaccineComplete: o.vaccineComplete,
           lastFleaTickAt: o.lastFleaTickAt,
@@ -227,7 +229,8 @@ function SectionRows({
                   </div>
                   <div className="truncate opacity-80">
                     {t.labels.orderStatus[seg.booking.status]}
-                    {seg.booking.nanny && t.boarding.nannyTag}
+                    {seg.booking.nannyType === "REGULAR" && t.boarding.nannyTag}
+                    {seg.booking.nannyType === "VIP" && t.boarding.nannyVipTag}
                     {seg.booking.depositAmount > 0 && t.boarding.depositTag(seg.booking.depositAmount)}
                   </div>
                 </Link>

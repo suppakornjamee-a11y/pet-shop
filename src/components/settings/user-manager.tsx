@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon, Scissors } from "lucide-react";
 import { createUser, updateUser, deleteUser } from "@/app/actions/settings";
-import type { Role } from "@/generated/prisma/enums";
+import type { Role, GroomerLevel } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ type User = {
   email: string | null;
   role: Role;
   active: boolean;
+  groomerLevel: GroomerLevel | null;
 };
 
 export function UserManager({
@@ -55,11 +56,12 @@ export function UserManager({
     password: "",
     role: "USER" as Role,
     active: true,
+    groomerLevel: "JUNIOR" as GroomerLevel,
   });
 
   function openNew() {
     setEditing(null);
-    setForm({ username: "", name: "", email: "", password: "", role: "USER", active: true });
+    setForm({ username: "", name: "", email: "", password: "", role: "USER", active: true, groomerLevel: "JUNIOR" });
     setOpen(true);
   }
   function openEdit(u: User) {
@@ -71,6 +73,7 @@ export function UserManager({
       password: "",
       role: u.role,
       active: u.active,
+      groomerLevel: u.groomerLevel ?? "JUNIOR",
     });
     setOpen(true);
   }
@@ -85,6 +88,7 @@ export function UserManager({
             role: form.role,
             active: form.active,
             password: form.password || undefined,
+            groomerLevel: form.role === "GROOMER" ? form.groomerLevel : undefined,
           })
         : await createUser({
             username: form.username,
@@ -92,6 +96,7 @@ export function UserManager({
             email: form.email || undefined,
             password: form.password,
             role: form.role,
+            groomerLevel: form.role === "GROOMER" ? form.groomerLevel : undefined,
           });
       if (!res.ok) {
         toast.error(res.error);
@@ -133,6 +138,8 @@ export function UserManager({
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
                     {u.role === "ADMIN" ? (
                       <ShieldCheck className="h-5 w-5" />
+                    ) : u.role === "GROOMER" ? (
+                      <Scissors className="h-5 w-5" />
                     ) : (
                       <UserIcon className="h-5 w-5" />
                     )}
@@ -145,9 +152,21 @@ export function UserManager({
                           {t.settings.users.inactiveBadge}
                         </Badge>
                       )}
+                      {u.role === "GROOMER" && u.groomerLevel && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {u.groomerLevel === "SENIOR"
+                            ? t.settings.users.groomerLevelSenior
+                            : t.settings.users.groomerLevelJunior}
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      @{u.username} · {u.role === "ADMIN" ? t.settings.users.roleAdmin : t.settings.users.roleStaff}
+                      @{u.username} ·{" "}
+                      {u.role === "ADMIN"
+                        ? t.settings.users.roleAdmin
+                        : u.role === "GROOMER"
+                          ? t.settings.users.roleGroomer
+                          : t.settings.users.roleStaff}
                     </div>
                   </div>
                 </div>
@@ -203,7 +222,11 @@ export function UserManager({
               <Select
                 value={form.role}
                 onValueChange={(v) => setForm({ ...form, role: v as Role })}
-                items={{ ADMIN: t.settings.users.roleAdmin, USER: t.settings.users.roleStaff }}
+                items={{
+                  ADMIN: t.settings.users.roleAdmin,
+                  USER: t.settings.users.roleStaff,
+                  GROOMER: t.settings.users.roleGroomer,
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -211,9 +234,31 @@ export function UserManager({
                 <SelectContent>
                   <SelectItem value="ADMIN">{t.settings.users.roleAdmin}</SelectItem>
                   <SelectItem value="USER">{t.settings.users.roleStaff}</SelectItem>
+                  <SelectItem value="GROOMER">{t.settings.users.roleGroomer}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {form.role === "GROOMER" && (
+              <div className="space-y-2">
+                <Label>{t.settings.users.groomerLevelLabel}</Label>
+                <Select
+                  value={form.groomerLevel}
+                  onValueChange={(v) => setForm({ ...form, groomerLevel: v as GroomerLevel })}
+                  items={{
+                    JUNIOR: t.settings.users.groomerLevelJunior,
+                    SENIOR: t.settings.users.groomerLevelSenior,
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="JUNIOR">{t.settings.users.groomerLevelJunior}</SelectItem>
+                    <SelectItem value="SENIOR">{t.settings.users.groomerLevelSenior}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2 sm:col-span-2">
               <Label>
                 {editing ? t.settings.users.passwordEditLabel : t.settings.users.passwordFullLabel}

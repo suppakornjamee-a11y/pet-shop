@@ -8,8 +8,10 @@ import { OrderForm } from "@/components/order-form";
 import { Badge } from "@/components/ui/badge";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function NewOrderPage(props: PageProps<"/orders/new">) {
+  await requireStaffUser();
   const searchParams = await props.searchParams;
   const customerId =
     typeof searchParams.customerId === "string" ? searchParams.customerId : undefined;

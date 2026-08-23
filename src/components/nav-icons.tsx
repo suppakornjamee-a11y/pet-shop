@@ -122,6 +122,18 @@ export function DashboardFlatIcon({ className }: IconProps) {
   );
 }
 
+/** ไอคอนแดชบอร์ด — รูปภาพกราฟสถิติที่ผู้ใช้เตรียมมาให้ */
+export function DashboardImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/dashboard.png" alt="" className={className} />;
+}
+
+/** ไอคอนวันหยุด — รูปภาพปฏิทินริมชายหาดที่ผู้ใช้เตรียมมาให้ */
+export function HolidayImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/holiday.png" alt="" className={className} />;
+}
+
 /** ไอคอนผู้ใช้งาน — อวตารในวงกลม สไตล์ flat สีฟ้า */
 export function UserAvatarFlatIcon({ className }: IconProps) {
   return (

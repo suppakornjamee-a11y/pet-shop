@@ -26,8 +26,26 @@ const petSchema = z.object({
   note: z.string().optional(),
   photoUrls: z.array(z.string()).default([]),
   vaccinePhotoUrls: z.array(z.string()).default([]),
-  cctvConsent: z.coerce.boolean().default(false),
   vaccineComplete: z.coerce.boolean().default(false),
+});
+
+// ใช้เฉพาะหน้าลงทะเบียนสัตว์เลี้ยง (RegisterForm) — บังคับกรอกครบทุกฟิลด์ ยกเว้นหมายเหตุ
+const petRegisterSchema = petSchema.extend({
+  breed: z.string().min(1, "กรุณากรอกพันธุ์"),
+  birthDate: z.string().min(1, "กรุณาเลือกวันเกิดสัตว์เลี้ยง"),
+  weightKg: z.coerce.number().gt(0, "กรุณากรอกน้ำหนัก"),
+  color: z.string().min(1, "กรุณากรอกสี"),
+  personality: z.string().min(1, "กรุณากรอกนิสัย"),
+  aggressiveNotes: z.string().min(1, "กรุณากรอกข้อควรระวังด้านความก้าวร้าว"),
+  allergies: z.string().min(1, "กรุณากรอกอาการแพ้หรือปัญหาสุขภาพ"),
+  vaccine5in1Date: z.string().min(1, "กรุณาเลือกวันที่ฉีดวัคซีนรวม 5/6 โรคล่าสุด"),
+  rabiesVaccineDate: z.string().min(1, "กรุณาเลือกวันที่ฉีดวัคซีนพิษสุนัขบ้าล่าสุด"),
+  lastFleaTickDate: z.string().min(1, "กรุณาเลือกวันที่กำจัดเห็บหมัดครั้งล่าสุด"),
+  fleaTickMedicine: z.string().min(1, "กรุณากรอกชื่อของยากำจัดเห็บหมัดที่ใช้"),
+  foodNote: z.string().min(1, "กรุณากรอกรายละเอียดการให้อาหาร"),
+  medicationNote: z.string().min(1, "กรุณากรอกรายละเอียดการให้ยา"),
+  photoUrls: z.array(z.string()).min(1, "กรุณาแนบรูปสัตว์เลี้ยงอย่างน้อย 1 รูป"),
+  vaccinePhotoUrls: z.array(z.string()).min(1, "กรุณาแนบรูปสมุดวัคซีนอย่างน้อย 1 รูป"),
 });
 
 function petCreateData(p: z.infer<typeof petSchema>) {
@@ -48,7 +66,6 @@ function petCreateData(p: z.infer<typeof petSchema>) {
     neutered: p.neutered,
     photoUrls: p.photoUrls,
     vaccinePhotoUrls: p.vaccinePhotoUrls,
-    cctvConsent: p.cctvConsent,
     vaccineComplete: p.vaccineComplete,
     vaccine5in1At: p.vaccine5in1Date ? new Date(p.vaccine5in1Date) : null,
     rabiesVaccineAt: p.rabiesVaccineDate ? new Date(p.rabiesVaccineDate) : null,
@@ -84,7 +101,10 @@ export async function createCustomerWithPets(input: {
     return { ok: false, error: customer.error.issues[0].message };
   }
 
-  const petsParsed = z.array(petSchema).min(1, "ต้องมีสัตว์เลี้ยงอย่างน้อย 1 ตัว").safeParse(input.pets);
+  const petsParsed = z
+    .array(petRegisterSchema)
+    .min(1, "ต้องมีสัตว์เลี้ยงอย่างน้อย 1 ตัว")
+    .safeParse(input.pets);
   if (!petsParsed.success) {
     return { ok: false, error: petsParsed.error.issues[0].message };
   }
@@ -102,7 +122,7 @@ export async function createCustomerWithPets(input: {
   return { ok: true, id: created.id, message: "บันทึกข้อมูลลูกค้าเรียบร้อย" };
 }
 
-const petWithOptionalIdSchema = petSchema.extend({ id: z.string().optional() });
+const petWithOptionalIdSchema = petRegisterSchema.extend({ id: z.string().optional() });
 
 /** แก้ไขข้อมูลเจ้าของ + สัตว์เลี้ยงทั้งหมดพร้อมกัน (ใช้หน้าเดียวกับลงทะเบียน) */
 export async function updateCustomerWithPets(input: {

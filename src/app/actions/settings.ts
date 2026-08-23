@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import ExcelJS from "exceljs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireAdmin } from "@/lib/auth-helpers";
@@ -36,6 +37,114 @@ export async function upsertProduct(input: unknown): Promise<ActionResult> {
   }
   revalidatePath("/settings/stock");
   return { ok: true, message: "บันทึกสินค้าเรียบร้อย" };
+}
+
+/* ---------------- นำเข้า/ส่งออกสินค้า (Excel) — ร้านค้า & คาเฟ่ ---------------- */
+
+const PRODUCT_IMPORT_HEADERS = [
+  "ชื่อสินค้า",
+  "หมวด (ของสัตว์ / ของคน)",
+  "ประเภท",
+  "ราคาขาย",
+  "ต้นทุน",
+  "หน่วย",
+  "จำนวนคงเหลือ",
+];
+
+/** สร้างไฟล์ Excel เปล่าพร้อม header + แถวตัวอย่าง ให้ดาวน์โหลดไปกรอกแล้วนำเข้ากลับ */
+export async function exportProductTemplate(): Promise<
+  { ok: true; base64: string; filename: string } | { ok: false; error: string }
+> {
+  await requireUser();
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("สินค้า");
+  sheet.addRow(PRODUCT_IMPORT_HEADERS);
+  sheet.addRow(["ขนมสุนัข Jerky", "ของสัตว์", "ขนม", 50, 30, "ซอง", 100]);
+  sheet.getRow(1).font = { bold: true };
+  sheet.columns.forEach((col) => {
+    col.width = 22;
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    ok: true,
+    base64: Buffer.from(buffer).toString("base64"),
+    filename: "แบบฟอร์มนำเข้าสินค้า.xlsx",
+  };
+}
+
+const importRowSchema = z.object({
+  name: z.string().min(1),
+  target: z.enum(["PET", "HUMAN"]),
+  category: z.string().optional(),
+  price: z.coerce.number().int().min(0),
+  cost: z.coerce.number().int().min(0).optional(),
+  unit: z.string().min(1).default("ชิ้น"),
+  stockQty: z.coerce.number().int().min(0).default(0),
+});
+
+/** นำเข้าสินค้าจำนวนมากจากไฟล์ Excel (แถวไหนชื่อซ้ำของเดิม = อัปเดตราคา/สต็อกทับ) */
+export async function importProducts(formData: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { ok: false, error: "กรุณาเลือกไฟล์" };
+
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(arrayBuffer);
+  } catch {
+    return { ok: false, error: "อ่านไฟล์ไม่ได้ กรุณาใช้ไฟล์ .xlsx ตามแบบฟอร์ม" };
+  }
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return { ok: false, error: "ไม่พบข้อมูลในไฟล์" };
+
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 2; i <= sheet.rowCount; i++) {
+    const row = sheet.getRow(i);
+    const name = String(row.getCell(1).text ?? "").trim();
+    if (!name) continue;
+
+    const targetRaw = String(row.getCell(2).text ?? "").trim();
+    const parsed = importRowSchema.safeParse({
+      name,
+      target: targetRaw === "ของคน" ? "HUMAN" : "PET",
+      category: String(row.getCell(3).text ?? "").trim() || undefined,
+      price: row.getCell(4).value,
+      cost: row.getCell(5).value || undefined,
+      unit: String(row.getCell(6).text ?? "").trim() || "ชิ้น",
+      stockQty: row.getCell(7).value || 0,
+    });
+    if (!parsed.success) {
+      skipped++;
+      continue;
+    }
+
+    const existing = await prisma.product.findFirst({ where: { name: parsed.data.name } });
+    if (existing) {
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: { ...parsed.data, updatedById: user.id },
+      });
+    } else {
+      await prisma.product.create({
+        data: { ...parsed.data, createdById: user.id, updatedById: user.id },
+      });
+    }
+    imported++;
+  }
+
+  revalidatePath("/shop");
+  revalidatePath("/settings/stock");
+  return {
+    ok: true,
+    message:
+      skipped > 0
+        ? `นำเข้าสำเร็จ ${imported} รายการ (ข้าม ${skipped} แถวที่ข้อมูลไม่ถูกต้อง)`
+        : `นำเข้าสำเร็จ ${imported} รายการ`,
+  };
 }
 
 export async function adjustStock(input: {
@@ -177,6 +286,8 @@ const serviceSchema = z.object({
   description: z.string().optional(),
   price: z.coerce.number().int().min(0),
   active: z.coerce.boolean().default(true),
+  commissionPercent: z.coerce.number().min(0).max(100).optional(),
+  commissionFlat: z.coerce.number().int().min(0).optional(),
 });
 
 export async function upsertService(input: unknown): Promise<ActionResult> {
@@ -184,7 +295,13 @@ export async function upsertService(input: unknown): Promise<ActionResult> {
   const parsed = serviceSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const { id, ...rest } = parsed.data;
-  const data = { ...rest, group: rest.group ?? null, speciesScope: rest.speciesScope ?? null };
+  const data = {
+    ...rest,
+    group: rest.group ?? null,
+    speciesScope: rest.speciesScope ?? null,
+    commissionPercent: rest.commissionPercent ?? null,
+    commissionFlat: rest.commissionFlat ?? null,
+  };
 
   if (id) {
     await prisma.service.update({ where: { id }, data });
@@ -198,10 +315,10 @@ export async function upsertService(input: unknown): Promise<ActionResult> {
 
 export async function deleteService(id: string): Promise<ActionResult> {
   await requireUser();
-  await prisma.service.update({ where: { id }, data: { active: false } });
+  await prisma.service.delete({ where: { id } });
   revalidatePath("/settings/services");
   revalidatePath("/orders/new");
-  return { ok: true, message: "ปิดใช้งานบริการเรียบร้อย" };
+  return { ok: true, message: "ลบบริการเรียบร้อย" };
 }
 
 /* ---------------- Bank Accounts (ADMIN only) ---------------- */
@@ -256,18 +373,28 @@ const userCreateSchema = z.object({
   name: z.string().min(1, "กรุณากรอกชื่อ"),
   email: z.string().optional(),
   password: z.string().min(4, "รหัสผ่านอย่างน้อย 4 ตัวอักษร"),
-  role: z.enum(["ADMIN", "USER"]).default("USER"),
+  role: z.enum(["ADMIN", "USER", "GROOMER"]).default("USER"),
+  groomerLevel: z.enum(["JUNIOR", "SENIOR"]).optional(),
 });
 
 export async function createUser(input: unknown): Promise<ActionResult> {
   await requireAdmin();
   const parsed = userCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { password, ...rest } = parsed.data;
+  const { password, groomerLevel, role, ...rest } = parsed.data;
+  if (role === "GROOMER" && !groomerLevel) {
+    return { ok: false, error: "กรุณาเลือกระดับช่างอาบน้ำ (Junior/Senior)" };
+  }
 
   try {
     await prisma.user.create({
-      data: { ...rest, email: rest.email || null, passwordHash: await bcrypt.hash(password, 10) },
+      data: {
+        ...rest,
+        role,
+        groomerLevel: role === "GROOMER" ? groomerLevel : null,
+        email: rest.email || null,
+        passwordHash: await bcrypt.hash(password, 10),
+      },
     });
   } catch {
     return { ok: false, error: "ชื่อผู้ใช้หรืออีเมลนี้มีอยู่แล้ว" };
@@ -280,21 +407,27 @@ const userUpdateSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   email: z.string().optional(),
-  role: z.enum(["ADMIN", "USER"]),
+  role: z.enum(["ADMIN", "USER", "GROOMER"]),
   active: z.coerce.boolean(),
   password: z.string().optional(),
+  groomerLevel: z.enum(["JUNIOR", "SENIOR"]).optional(),
 });
 
 export async function updateUser(input: unknown): Promise<ActionResult> {
   await requireAdmin();
   const parsed = userUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { id, password, ...rest } = parsed.data;
+  const { id, password, groomerLevel, role, ...rest } = parsed.data;
+  if (role === "GROOMER" && !groomerLevel) {
+    return { ok: false, error: "กรุณาเลือกระดับช่างอาบน้ำ (Junior/Senior)" };
+  }
 
   await prisma.user.update({
     where: { id },
     data: {
       ...rest,
+      role,
+      groomerLevel: role === "GROOMER" ? groomerLevel : null,
       email: rest.email || null,
       ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}),
     },
@@ -309,4 +442,40 @@ export async function deleteUser(id: string): Promise<ActionResult> {
   await prisma.user.delete({ where: { id } });
   revalidatePath("/settings/users");
   return { ok: true, message: "ลบผู้ใช้งานเรียบร้อย" };
+}
+
+/* ---------------- วันหยุด / ค่าธรรมเนียมพิเศษ (ADMIN only) ---------------- */
+
+const holidaySchema = z.object({
+  id: z.string().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ไม่ถูกต้อง"),
+  title: z.string().min(1, "กรุณากรอกชื่อวันหยุด"),
+  extraCharge: z.coerce.number().int().min(0),
+});
+
+export async function upsertHoliday(input: unknown): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = holidaySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { id, date, ...rest } = parsed.data;
+  const dateValue = new Date(`${date}T00:00:00+07:00`);
+
+  try {
+    if (id) {
+      await prisma.holiday.update({ where: { id }, data: { ...rest, date: dateValue } });
+    } else {
+      await prisma.holiday.create({ data: { ...rest, date: dateValue } });
+    }
+  } catch {
+    return { ok: false, error: "มีวันหยุดของวันที่นี้อยู่แล้ว" };
+  }
+  revalidatePath("/settings/holidays");
+  return { ok: true, message: "บันทึกวันหยุดเรียบร้อย" };
+}
+
+export async function deleteHoliday(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  await prisma.holiday.delete({ where: { id } });
+  revalidatePath("/settings/holidays");
+  return { ok: true, message: "ลบวันหยุดเรียบร้อย" };
 }

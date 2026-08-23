@@ -25,6 +25,7 @@ export default async function UsersSettingsPage() {
           email: u.email,
           role: u.role,
           active: u.active,
+          groomerLevel: u.groomerLevel,
         }))}
       />
     </div>

@@ -11,13 +11,29 @@ import {
   daysBetween,
   isValidDateStr,
   isValidTimeStr,
+  thaiDayRange,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
 import { sendLinePush } from "@/lib/line";
 import { formatBaht } from "@/lib/format";
 import type { RoomModel, RoomCategoryModel } from "@/generated/prisma/models";
+import type { Role } from "@/generated/prisma/enums";
 import type { ActionResult } from "./customers";
+
+const EDIT_LOCK_MS = 2 * 24 * 60 * 60 * 1000; // 2 วัน
+
+/** ออเดอร์ที่สร้างมาเกิน 2 วันแล้ว แก้ไข/เพิ่มรายการไม่ได้อีก ยกเว้น ADMIN */
+function assertOrderEditable(
+  order: { createdAt: Date },
+  user: { role: Role }
+): { ok: true } | { ok: false; error: string } {
+  const isOld = Date.now() - order.createdAt.getTime() > EDIT_LOCK_MS;
+  if (isOld && user.role !== "ADMIN") {
+    return { ok: false, error: "ออเดอร์นี้สร้างมาเกิน 2 วันแล้ว แก้ไขได้เฉพาะแอดมินเท่านั้น" };
+  }
+  return { ok: true };
+}
 
 /** ส่งแจ้งเตือน LINE หาลูกค้า (เงียบๆ ไม่ throw ถ้าไม่ได้ผูกบัญชีหรือส่งไม่สำเร็จ) */
 async function notifyCustomerLine(orderId: string, text: string) {
@@ -35,6 +51,10 @@ async function notifyCustomerLine(orderId: string, text: string) {
 }
 
 const PAYMENT_TTL_MS = 15 * 60 * 1000; // 15 นาที
+const BATH_DEPOSIT_AMOUNT = 300; // มัดจำจองอาบน้ำ บังคับ 300 ต่อตัว (ต่อออเดอร์ เพราะจองทีละตัว)
+const NANNY_REGULAR_RATE = 300; // พี่เลี้ยงดูแลพิเศษ ต่อคืนต่อตัว
+const NANNY_VIP_RATE = 400; // พี่เลี้ยงดูแลพิเศษ VIP ต่อตัวต่อการเข้าพัก (ไม่คูณจำนวนคืน)
+const CCTV_ROOM_RATE = 100; // ห้องกล้องวงจรปิด
 
 const createOrderSchema = z.object({
   customerId: z.string().min(1, "กรุณาเลือกลูกค้า"),
@@ -44,7 +64,8 @@ const createOrderSchema = z.object({
   checkInTime: z.string().optional(),
   checkOutDate: z.string().optional(),
   checkOutTime: z.string().optional(),
-  nanny: z.coerce.boolean().default(false),
+  nannyType: z.enum(["NONE", "REGULAR", "VIP"]).default("NONE"),
+  cctvRequested: z.coerce.boolean().default(false),
   depositAmount: z.coerce.number().int().min(0).default(0),
   vaccineComplete: z.coerce.boolean().default(false),
   lastFleaTickDate: z.string().optional(),
@@ -116,9 +137,24 @@ async function buildOrderPlan(
       nights: number;
       items: OrderItemInput[];
       subtotal: number;
+      depositAmount: number;
+      holidaySurcharge: number;
+      holidayLabel: string | null;
       room: NonNullable<RoomWithCategory>;
     }
-  | { ok: true; room: null; appointmentAt: Date | null; checkInAt: null; checkOutAt: null; nights: 0; items: OrderItemInput[]; subtotal: number }
+  | {
+      ok: true;
+      room: null;
+      appointmentAt: Date | null;
+      checkInAt: null;
+      checkOutAt: null;
+      nights: 0;
+      items: OrderItemInput[];
+      subtotal: number;
+      depositAmount: number;
+      holidaySurcharge: number;
+      holidayLabel: string | null;
+    }
   | { ok: false; error: string }
 > {
   const hasSomething =
@@ -218,6 +254,35 @@ async function buildOrderPlan(
       quantity: qty,
       subtotal: room.pricePerNight * qty,
     });
+    if (data.nannyType === "REGULAR") {
+      items.push({
+        itemType: "SERVICE",
+        refId: "nanny-regular",
+        name: `พี่เลี้ยงดูแลพิเศษ (${qty} คืน)`,
+        unitPrice: NANNY_REGULAR_RATE,
+        quantity: qty,
+        subtotal: NANNY_REGULAR_RATE * qty,
+      });
+    } else if (data.nannyType === "VIP") {
+      items.push({
+        itemType: "SERVICE",
+        refId: "nanny-vip",
+        name: "พี่เลี้ยงดูแลพิเศษ VIP",
+        unitPrice: NANNY_VIP_RATE,
+        quantity: 1,
+        subtotal: NANNY_VIP_RATE,
+      });
+    }
+    if (data.cctvRequested) {
+      items.push({
+        itemType: "SERVICE",
+        refId: "cctv-room",
+        name: "ห้องกล้องวงจรปิด",
+        unitPrice: CCTV_ROOM_RATE,
+        quantity: 1,
+        subtotal: CCTV_ROOM_RATE,
+      });
+    }
   }
   for (const line of data.productLines) {
     const p = products.find((x) => x.id === line.productId);
@@ -233,14 +298,56 @@ async function buildOrderPlan(
   }
 
   const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
-  if (data.depositAmount > subtotal) {
-    return { ok: false, error: "มัดจำต้องไม่มากกว่ายอดรวมออเดอร์" };
+
+  // นโยบายมัดจำ: ห้องพัก/บริการอื่นๆ ไม่มีมัดจำ (จ่ายเต็มจำนวนเสมอ) — จองอาบน้ำบังคับมัดจำ 300 ต่อออเดอร์เสมอ
+  const depositAmount = room
+    ? 0
+    : data.queueType === "BATH"
+      ? Math.min(BATH_DEPOSIT_AMOUNT, subtotal)
+      : 0;
+
+  // ค่าธรรมเนียมวันหยุด — อิงวันที่ให้บริการจริง (เช็คอิน ถ้ามีห้อง, ไม่งั้นใช้วันนัดคิว)
+  const serviceDateStr = room ? data.checkInDate : data.appointmentDate;
+  let holidaySurcharge = 0;
+  let holidayLabel: string | null = null;
+  if (serviceDateStr && isValidDateStr(serviceDateStr)) {
+    const holiday = await prisma.holiday.findUnique({
+      where: { date: thaiDayRange(serviceDateStr).start },
+    });
+    if (holiday) {
+      holidaySurcharge = holiday.extraCharge;
+      holidayLabel = holiday.title;
+    }
   }
 
   if (room) {
-    return { ok: true, appointmentAt, checkInAt, checkOutAt, nights, items, subtotal, room };
+    return {
+      ok: true,
+      appointmentAt,
+      checkInAt,
+      checkOutAt,
+      nights,
+      items,
+      subtotal,
+      depositAmount,
+      holidaySurcharge,
+      holidayLabel,
+      room,
+    };
   }
-  return { ok: true, appointmentAt, checkInAt: null, checkOutAt: null, nights: 0, items, subtotal, room: null };
+  return {
+    ok: true,
+    appointmentAt,
+    checkInAt: null,
+    checkOutAt: null,
+    nights: 0,
+    items,
+    subtotal,
+    depositAmount,
+    holidaySurcharge,
+    holidayLabel,
+    room: null,
+  };
 }
 
 function parseFleaTickDate(dateStr: string | undefined): Date | null {
@@ -256,7 +363,7 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
   const plan = await buildOrderPlan(data);
   if (!plan.ok) return plan;
 
-  const total = plan.subtotal;
+  const total = plan.subtotal + plan.holidaySurcharge;
   const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
 
   // ลองสร้างพร้อม retry เผื่อรหัสชนกัน (P2002)
@@ -275,8 +382,11 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
           queueType: plan.appointmentAt ? data.queueType : null,
           checkInAt: plan.checkInAt,
           checkOutAt: plan.checkOutAt,
-          nanny: data.nanny,
-          depositAmount: data.depositAmount,
+          nannyType: data.nannyType,
+          cctvRequested: data.cctvRequested,
+          depositAmount: plan.depositAmount,
+          holidaySurcharge: plan.holidaySurcharge,
+          holidayLabel: plan.holidayLabel,
           vaccineComplete: data.vaccineComplete,
           lastFleaTickAt,
           fleaTickMedicine: data.fleaTickMedicine || null,
@@ -309,7 +419,7 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
     });
   }
 
-  await createInitialPayments(order.id, total, data.depositAmount);
+  await createInitialPayments(order.id, total, plan.depositAmount);
 
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
@@ -328,11 +438,13 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   if (existing.status !== "PENDING_PAYMENT") {
     return { ok: false, error: "แก้ไขได้เฉพาะออเดอร์ที่ยังรอชำระเงินเท่านั้น" };
   }
+  const editable = assertOrderEditable(existing, user);
+  if (!editable.ok) return editable;
 
   const plan = await buildOrderPlan(data, orderId);
   if (!plan.ok) return plan;
 
-  const total = plan.subtotal;
+  const total = plan.subtotal + plan.holidaySurcharge;
   const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
 
   await prisma.$transaction(async (tx) => {
@@ -349,8 +461,11 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
         queueType: plan.appointmentAt ? data.queueType : null,
         checkInAt: plan.checkInAt,
         checkOutAt: plan.checkOutAt,
-        nanny: data.nanny,
-        depositAmount: data.depositAmount,
+        nannyType: data.nannyType,
+        cctvRequested: data.cctvRequested,
+        depositAmount: plan.depositAmount,
+        holidaySurcharge: plan.holidaySurcharge,
+        holidayLabel: plan.holidayLabel,
         vaccineComplete: data.vaccineComplete,
         lastFleaTickAt,
         fleaTickMedicine: data.fleaTickMedicine || null,
@@ -374,7 +489,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
     });
   }
 
-  await createInitialPayments(orderId, total, data.depositAmount);
+  await createInitialPayments(orderId, total, plan.depositAmount);
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders/bath");
@@ -429,15 +544,18 @@ export async function createBalancePayment(orderId: string): Promise<ActionResul
   await requireUser();
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { payments: true },
+    include: { payments: true, extraCharges: true },
   });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  // เก็บส่วนที่เหลือได้ตราบใดที่ยังไม่ยกเลิกและยังไม่เคยมัดจำ/ชำระอะไรเลย (แม้งานจะเสร็จ/เช็คเอาท์ไปแล้วก็ตาม)
+  // เก็บยอดคงเหลือได้ก็ต่อเมื่อออเดอร์เสร็จสิ้น (เช็คเอ้าท์/ทำงานเสร็จ) แล้วเท่านั้น
   if (order.status === "PENDING_PAYMENT") {
     return { ok: false, error: "ออเดอร์นี้ยังไม่ได้ชำระมัดจำ" };
   }
   if (order.status === "CANCELLED") {
     return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
+  }
+  if (order.status !== "COMPLETED") {
+    return { ok: false, error: "ออเดอร์ต้องเสร็จสิ้นก่อน จึงจะเก็บยอดคงเหลือได้" };
   }
   const hasOpenPayment = order.payments.some((p) => p.status !== "VERIFIED" && p.status !== "REJECTED");
   if (hasOpenPayment) {
@@ -446,7 +564,9 @@ export async function createBalancePayment(orderId: string): Promise<ActionResul
   const verifiedSum = order.payments
     .filter((p) => p.status === "VERIFIED")
     .reduce((sum, p) => sum + p.amount, 0);
-  const remaining = order.total - verifiedSum;
+  // รวมค่าเสียหายเพิ่มเติมเข้ากับยอดคงเหลือที่ต้องเก็บตอนจ่ายส่วนที่เหลือ
+  const extraChargesSum = order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
+  const remaining = order.total + extraChargesSum - verifiedSum;
   if (remaining <= 0) {
     return { ok: false, error: "ไม่มียอดคงเหลือให้เก็บแล้ว" };
   }
@@ -621,4 +741,205 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   }
 
   return { ok: true, message: "อัปเดตสถานะเรียบร้อย" };
+}
+
+/**
+ * ถ้ามี QR ยอดคงเหลือที่ยัง PENDING อยู่ ให้คำนวณยอดใหม่จากยอดออเดอร์ + ค่าเสียหายเพิ่มเติมล่าสุด
+ * แล้วอัปเดต QR ให้ตรง — ป้องกันไม่ให้ QR ค้างยอดเก่าเมื่อมีการแก้ไขรายการ/ค่าเสียหายหลังสร้าง QR ไปแล้ว
+ */
+async function syncPendingBalancePayment(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true, extraCharges: true },
+  });
+  if (!order) return;
+  const pending = order.payments.find((p) => p.purpose === "BALANCE" && p.status === "PENDING");
+  if (!pending) return;
+
+  const verifiedSum = order.payments
+    .filter((p) => p.status === "VERIFIED")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const extraChargesSum = order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
+  const correctAmount = order.total + extraChargesSum - verifiedSum;
+
+  if (correctAmount === pending.amount) return;
+  if (correctAmount <= 0) {
+    // แก้ไขรายการจนไม่มียอดคงเหลือต้องเก็บแล้ว — ลบ QR ที่ยังไม่มีใครจ่ายทิ้งไปเลย (ไม่ใช้สถานะ REJECTED
+    // เพราะนั่นสงวนไว้สำหรับกรณีแอดมินปฏิเสธสลิปที่ลูกค้าส่งมาจริง ซึ่งต้องกด "สร้าง QR ใหม่" เพื่อลองอีกครั้งได้)
+    await prisma.payment.delete({ where: { id: pending.id } });
+    return;
+  }
+
+  const account = await defaultPromptPayAccount();
+  const qrPayload = account?.promptpayId ? buildPromptPayPayload(account.promptpayId, correctAmount) : null;
+  await prisma.payment.update({
+    where: { id: pending.id },
+    data: {
+      amount: correctAmount,
+      qrPayload,
+      bankAccountId: account?.id ?? pending.bankAccountId,
+      expiresAt: new Date(Date.now() + PAYMENT_TTL_MS),
+    },
+  });
+}
+
+/**
+ * เช็คว่าออเดอร์นี้ยังมียอดค้างชำระอยู่ไหม — ชำระครบแล้วแก้ไขรายการ/ค่าเสียหายเพิ่มเติมไม่ได้อีก
+ * เพราะยอดที่จ่ายไปแล้วจะไม่ถูกเรียกเก็บเพิ่มอัตโนมัติ (ไม่มี pending QR ให้ sync ต่อ)
+ */
+async function assertOrderNotFullyPaid(orderId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true, extraCharges: true },
+  });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  const verifiedSum = order.payments
+    .filter((p) => p.status === "VERIFIED")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const amountOwed = order.total + order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
+  if (amountOwed > 0 && verifiedSum >= amountOwed) {
+    return { ok: false, error: "ออเดอร์นี้ชำระเงินครบถ้วนแล้ว แก้ไขรายการไม่ได้อีก" };
+  }
+  return { ok: true };
+}
+
+/**
+ * ค่าเสียหายเพิ่มเติม (เช่น อาบน้ำแล้วโดนกัดต้องพาไปทำแผล) — เห็นเฉพาะฝั่งหลังบ้าน
+ * บันทึกแยกไว้เป็นข้อมูลอ้างอิง ไม่รวมเข้ายอดออเดอร์/QR หลัก แต่จะรวมเข้ายอดคงเหลือตอนเก็บเงินส่วนที่เหลือ
+ */
+const extraChargeSchema = z.object({
+  amount: z.coerce.number().int().min(1, "กรุณากรอกยอดเงิน"),
+  description: z.string().min(1, "กรุณากรอกรายละเอียด"),
+});
+
+export async function addExtraCharge(orderId: string, input: unknown): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = extraChargeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const notFullyPaid = await assertOrderNotFullyPaid(orderId);
+  if (!notFullyPaid.ok) return notFullyPaid;
+
+  await prisma.orderExtraCharge.create({
+    data: { orderId, ...parsed.data, createdById: user.id },
+  });
+  await syncPendingBalancePayment(orderId);
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "บันทึกค่าเสียหายเพิ่มเติมเรียบร้อย" };
+}
+
+export async function updateExtraCharge(id: string, input: unknown): Promise<ActionResult> {
+  await requireUser();
+  const parsed = extraChargeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  const existing = await prisma.orderExtraCharge.findUnique({ where: { id } });
+  if (!existing) return { ok: false, error: "ไม่พบรายการนี้" };
+  const notFullyPaid = await assertOrderNotFullyPaid(existing.orderId);
+  if (!notFullyPaid.ok) return notFullyPaid;
+
+  const charge = await prisma.orderExtraCharge.update({ where: { id }, data: parsed.data });
+  await syncPendingBalancePayment(charge.orderId);
+  revalidatePath(`/orders/${charge.orderId}`);
+  return { ok: true, message: "แก้ไขค่าเสียหายเพิ่มเติมเรียบร้อย" };
+}
+
+export async function deleteExtraCharge(id: string): Promise<ActionResult> {
+  await requireUser();
+  const existing = await prisma.orderExtraCharge.findUnique({ where: { id } });
+  if (!existing) return { ok: false, error: "ไม่พบรายการนี้" };
+  const notFullyPaid = await assertOrderNotFullyPaid(existing.orderId);
+  if (!notFullyPaid.ok) return notFullyPaid;
+
+  const charge = await prisma.orderExtraCharge.delete({ where: { id } });
+  await syncPendingBalancePayment(charge.orderId);
+  revalidatePath(`/orders/${charge.orderId}`);
+  return { ok: true, message: "ลบรายการเรียบร้อย" };
+}
+
+/**
+ * เพิ่มบริการเข้าออเดอร์ที่มีอยู่แล้วระหว่างทำงาน (เช่น ช่างเจอว่าต้องตัดขนพันกันเพิ่ม)
+ * ไม่ยุ่งกับ payment ที่มีอยู่แล้ว — ยอดที่เพิ่มจะไปรวมอยู่ในยอดคงเหลือตอนเก็บเงินส่วนที่เหลือ
+ * บันทึก log ไว้ทุกครั้งว่าใครเพิ่มอะไร เมื่อไหร่
+ */
+export async function addOrderItem(orderId: string, serviceId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.status === "CANCELLED") return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
+  const editable = assertOrderEditable(order, user);
+  if (!editable.ok) return editable;
+
+  const service = await prisma.service.findUnique({ where: { id: serviceId } });
+  if (!service || !service.active) return { ok: false, error: "ไม่พบบริการนี้" };
+
+  await prisma.$transaction([
+    prisma.orderItem.create({
+      data: {
+        orderId,
+        itemType: "SERVICE",
+        refId: service.id,
+        name: service.name,
+        unitPrice: service.price,
+        quantity: 1,
+        subtotal: service.price,
+      },
+    }),
+    prisma.order.update({
+      where: { id: orderId },
+      data: {
+        subtotal: { increment: service.price },
+        total: { increment: service.price },
+        updatedById: user.id,
+      },
+    }),
+    prisma.orderActivityLog.create({
+      data: {
+        orderId,
+        action: `เพิ่มบริการ: ${service.name} (${formatBaht(service.price)})`,
+        createdById: user.id,
+      },
+    }),
+  ]);
+
+  await syncPendingBalancePayment(orderId);
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "เพิ่มบริการเรียบร้อย" };
+}
+
+/** ลบรายการออกจากออเดอร์ — ต้องเหลืออย่างน้อย 1 รายการเสมอ */
+export async function removeOrderItem(itemId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const item = await prisma.orderItem.findUnique({ where: { id: itemId }, include: { order: true } });
+  if (!item) return { ok: false, error: "ไม่พบรายการนี้" };
+  if (item.order.status === "CANCELLED") return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
+  const editable = assertOrderEditable(item.order, user);
+  if (!editable.ok) return editable;
+
+  const itemCount = await prisma.orderItem.count({ where: { orderId: item.orderId } });
+  if (itemCount <= 1) {
+    return { ok: false, error: "ออเดอร์ต้องมีอย่างน้อย 1 รายการ ลบรายการสุดท้ายไม่ได้" };
+  }
+
+  await prisma.$transaction([
+    prisma.orderItem.delete({ where: { id: itemId } }),
+    prisma.order.update({
+      where: { id: item.orderId },
+      data: {
+        subtotal: { decrement: item.subtotal },
+        total: { decrement: item.subtotal },
+        updatedById: user.id,
+      },
+    }),
+    prisma.orderActivityLog.create({
+      data: {
+        orderId: item.orderId,
+        action: `ลบรายการ: ${item.name} (${formatBaht(item.subtotal)})`,
+        createdById: user.id,
+      },
+    }),
+  ]);
+
+  await syncPendingBalancePayment(item.orderId);
+  revalidatePath(`/orders/${item.orderId}`);
+  return { ok: true, message: "ลบรายการเรียบร้อย" };
 }

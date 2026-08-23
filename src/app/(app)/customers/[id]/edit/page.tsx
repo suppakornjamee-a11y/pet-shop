@@ -5,8 +5,10 @@ import { PageHeader } from "@/components/page-header";
 import { RegisterForm } from "@/components/register-form";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function EditCustomerPage(props: PageProps<"/customers/[id]/edit">) {
+  await requireStaffUser();
   const { id } = await props.params;
 
   const customer = await prisma.customer.findUnique({
@@ -58,7 +60,6 @@ export default async function EditCustomerPage(props: PageProps<"/customers/[id]
           note: p.note ?? "",
           photoUrls: p.photoUrls,
           vaccinePhotoUrls: p.vaccinePhotoUrls,
-          cctvConsent: p.cctvConsent,
           vaccineComplete: p.vaccineComplete ?? false,
         }))}
       />

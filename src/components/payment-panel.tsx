@@ -60,12 +60,15 @@ export function PaymentPanel({
   orderId,
   orderStatus,
   orderTotal,
+  extraChargesTotal = 0,
   payments,
   isQueueBooking = false,
 }: {
   orderId: string;
   orderStatus: OrderStatus;
   orderTotal: number;
+  /** ยอดค่าเสียหายเพิ่มเติมที่ยังไม่รวมอยู่ใน orderTotal — บวกรวมตอนเก็บยอดคงเหลือ */
+  extraChargesTotal?: number;
   payments: PaymentRow[];
   isQueueBooking?: boolean;
 }) {
@@ -73,12 +76,18 @@ export function PaymentPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const amountOwed = orderTotal + extraChargesTotal;
   const verifiedSum = payments
     .filter((p) => p.status === "VERIFIED")
     .reduce((sum, p) => sum + p.amount, 0);
-  const fullyPaid = verifiedSum >= orderTotal && orderTotal > 0;
-  const activePayment = [...payments].reverse().find((p) => p.status !== "VERIFIED") ?? null;
-  const showPurposeLabel = payments.length > 1;
+  const fullyPaid = verifiedSum >= amountOwed && amountOwed > 0;
+  // เช็คเฉพาะรายการล่าสุด (payments เรียงจากเก่า→ใหม่) — ถ้ารายการล่าสุดยืนยันแล้ว ถือว่าไม่มีอะไรค้าง
+  // แม้จะมีรายการเก่าที่เคยถูกปฏิเสธค้างอยู่ก่อนหน้าก็ตาม (เช่น ปฏิเสธแล้วสร้าง QR ใหม่แยกรายการ)
+  const latestPayment = payments[payments.length - 1] ?? null;
+  const activePayment = latestPayment && latestPayment.status !== "VERIFIED" ? latestPayment : null;
+  // รายการที่ถูกปฏิเสธไม่ต้องโชว์ในสรุปยอด — เหลือแค่รายการที่ยังมีผลอยู่จริง
+  const visiblePayments = payments.filter((p) => p.status !== "REJECTED");
+  const showPurposeLabel = visiblePayments.length > 1;
 
   return (
     <Card className="lg:sticky lg:top-20">
@@ -94,9 +103,9 @@ export function PaymentPanel({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {payments.length > 1 && (
+        {visiblePayments.length > 1 && (
           <div className="space-y-1.5 rounded-lg border bg-muted/30 p-2.5 text-xs">
-            {payments.map((p) => (
+            {visiblePayments.map((p) => (
               <div key={p.id} className="flex items-center justify-between">
                 <span className="text-muted-foreground">{t.labels.paymentPurpose[p.purpose]}</span>
                 <div className="flex items-center gap-1.5">
@@ -133,26 +142,29 @@ export function PaymentPanel({
                 {t.orders.payment.depositPaidLabel(formatBaht(verifiedSum))}
               </div>
               <div className="text-sm text-teal-700/80 dark:text-teal-400/80">
-                {t.orders.payment.remainingLabel(formatBaht(orderTotal - verifiedSum))}
+                {t.orders.payment.remainingLabel(formatBaht(amountOwed - verifiedSum))}
               </div>
             </div>
-            <Button
-              className="w-full"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  const res = await createBalancePayment(orderId);
-                  if (!res.ok) toast.error(res.error);
-                  else {
-                    toast.success(res.message);
-                    router.refresh();
-                  }
-                })
-              }
-            >
-              {isPending ? <Loader2 className="animate-spin" /> : <QrCode />}
-              {t.orders.payment.collectBalance}
-            </Button>
+            {/* เก็บยอดคงเหลือได้ก็ต่อเมื่อออเดอร์เสร็จสิ้น (COMPLETED) แล้วเท่านั้น */}
+            {orderStatus !== "COMPLETED" ? null : (
+              <Button
+                className="w-full"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const res = await createBalancePayment(orderId);
+                    if (!res.ok) toast.error(res.error);
+                    else {
+                      toast.success(res.message);
+                      router.refresh();
+                    }
+                  })
+                }
+              >
+                {isPending ? <Loader2 className="animate-spin" /> : <QrCode />}
+                {t.orders.payment.collectBalance}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

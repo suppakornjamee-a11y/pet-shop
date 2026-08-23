@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,8 @@ type ServiceRow = {
   sortOrder: number;
   price: number;
   active: boolean;
+  commissionPercent: number | null;
+  commissionFlat: number | null;
 };
 
 const empty = {
@@ -48,6 +51,9 @@ const empty = {
   defaultOn: false,
   sortOrder: "0",
   price: "0",
+  commissionPercent: "",
+  commissionFlat: "",
+  active: true,
 };
 
 export function ServiceManager({ services }: { services: ServiceRow[] }) {
@@ -100,6 +106,9 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
       defaultOn: s.defaultOn,
       sortOrder: String(s.sortOrder),
       price: String(s.price),
+      commissionPercent: s.commissionPercent != null ? String(s.commissionPercent) : "",
+      commissionFlat: s.commissionFlat != null ? String(s.commissionFlat) : "",
+      active: s.active,
     });
     setOpen(true);
   }
@@ -115,7 +124,9 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
         defaultOn: form.defaultOn,
         sortOrder: Number(form.sortOrder || 0),
         price: Number(form.price || 0),
-        active: true,
+        active: form.active,
+        commissionPercent: form.commissionPercent === "" ? undefined : Number(form.commissionPercent),
+        commissionFlat: form.commissionFlat === "" ? undefined : Number(form.commissionFlat),
       });
       if (!res.ok) {
         toast.error(res.error);
@@ -183,6 +194,14 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
                         {!s.active && (
                           <Badge variant="outline" className="text-[10px]">
                             {t.common.inactive}
+                          </Badge>
+                        )}
+                        {(s.commissionPercent || s.commissionFlat) && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {t.settings.services.commissionBadge(
+                              s.commissionPercent ?? 0,
+                              s.commissionFlat ?? 0
+                            )}
                           </Badge>
                         )}
                       </div>
@@ -315,6 +334,25 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
                 onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
               />
             </div>
+            <div className="space-y-2">
+              <Label>{t.settings.services.commissionPercentLabel}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={form.commissionPercent}
+                onChange={(e) => setForm({ ...form, commissionPercent: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t.settings.services.commissionFlatLabel}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.commissionFlat}
+                onChange={(e) => setForm({ ...form, commissionFlat: e.target.value })}
+              />
+            </div>
             <label className="flex items-start gap-2 pt-1 text-sm sm:col-span-2">
               <input
                 type="checkbox"
@@ -323,6 +361,13 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
               />
               <span>{t.settings.services.defaultOnCheckbox}</span>
+            </label>
+            <label className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm sm:col-span-2">
+              <span className="font-medium">{t.settings.services.activeToggleLabel}</span>
+              <Switch
+                checked={form.active}
+                onCheckedChange={(checked) => setForm({ ...form, active: checked })}
+              />
             </label>
           </div>
           <DialogFooter>

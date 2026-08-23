@@ -13,8 +13,14 @@ datasource db {
 // ---------- Enums ----------
 
 enum Role {
-  ADMIN // สิทธิ์เต็ม (จัดการบัญชีธนาคาร + ผู้ใช้งานได้)
+  ADMIN // สิทธิ์เต็ม (จัดการบัญชีธนาคาร + ผู้ใช้งานได้ + แก้ไขออเดอร์เก่าได้ไม่จำกัด)
   USER // พนักงานทั่วไป
+  GROOMER // ช่างอาบน้ำ (junior/senior — ดูคิวงานตัวเอง เพิ่มรายการได้ แต่แตะการชำระเงินไม่ได้)
+}
+
+enum GroomerLevel {
+  JUNIOR
+  SENIOR
 }
 
 enum Species {
@@ -47,6 +53,12 @@ enum RoomSize {
   MEDIUM
   LARGE
   XLARGE
+}
+
+enum NannyType {
+  NONE
+  REGULAR // พี่เลี้ยงดูแลพิเศษ +300/คืน/ตัว
+  VIP // พี่เลี้ยงดูแลพิเศษ VIP +400/ตัว/ทั้งการเข้าพัก
 }
 
 enum OrderStatus {
@@ -118,22 +130,25 @@ enum Locale {
 // ---------- Staff / Auth ----------
 
 model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
-  name         String
-  email        String?  @unique
-  passwordHash String
-  role         Role     @default(USER)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String        @id @default(cuid())
+  username      String        @unique
+  name          String
+  email         String?       @unique
+  passwordHash  String
+  role          Role          @default(USER)
+  groomerLevel  GroomerLevel? // ใช้เฉพาะ role = GROOMER — คิดคอมมิชชั่นไม่เท่ากันตาม level
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  ordersCreated    Order[]         @relation("OrderCreatedBy")
-  ordersUpdated    Order[]         @relation("OrderUpdatedBy")
-  paymentsVerified Payment[]       @relation("PaymentVerifiedBy")
-  stockMovements   StockMovement[]
-  productsCreated  Product[]       @relation("ProductCreatedBy")
-  productsUpdated  Product[]       @relation("ProductUpdatedBy")
+  ordersCreated     Order[]            @relation("OrderCreatedBy")
+  ordersUpdated     Order[]            @relation("OrderUpdatedBy")
+  paymentsVerified  Payment[]          @relation("PaymentVerifiedBy")
+  stockMovements    StockMovement[]
+  productsCreated   Product[]          @relation("ProductCreatedBy")
+  productsUpdated   Product[]          @relation("ProductUpdatedBy")
+  orderExtraCharges OrderExtraCharge[]
+  orderActivityLogs OrderActivityLog[]
 }
 
 // ---------- Customers & Pets ----------
@@ -182,7 +197,6 @@ model Pet {
   neutered         Boolean   @default(false) // ทำหมันแล้ว
   vaccinePhotoUrl  String? // รูปสมุดวัคซีน/ใบรับรองวัคซีน (เดิม — เก็บไว้เพื่อ backward compat)
   vaccinePhotoUrls String[]  @default([]) // รูปสมุดวัคซีน/ใบรับรองวัคซีน (หลายรูป)
-  cctvConsent      Boolean   @default(false) // ยินยอมให้บันทึกภาพกล้องวงจรปิดขณะฝากเลี้ยง
   vaccineComplete  Boolean? // วัคซีนครบล่าสุดที่ทราบ (เอาไว้ prefill ตอนจองครั้งถัดไป)
   vaccine5in1At    DateTime? // วันที่ฉีดวัคซีนรวม 5/6 โรคล่าสุด
   rabiesVaccineAt  DateTime? // วันที่ฉีดวัคซีนพิษสุนัขบ้าล่าสุด
@@ -208,6 +222,8 @@ model Service {
   sortOrder    Int             @default(0)
   description  String?
   price        Int // หน่วยเป็นบาท
+  commissionPercent Float? // ค่าคอมมิชชั่นแบบ % ของยอดบริการนี้ (เลือกอย่างใดอย่างหนึ่งกับ commissionFlat)
+  commissionFlat    Int? // ค่าคอมมิชชั่นแบบยอดเงินคงที่ต่อครั้ง
   active       Boolean         @default(true)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
@@ -322,13 +338,16 @@ model Order {
   checkInAt        DateTime? // เช็คอิน (ใช้กับการจองห้อง/คอก/พื้นที่)
   checkOutAt       DateTime? // เช็คเอาท์
   nights           Int         @default(0)
-  nanny            Boolean     @default(false) // มีพี่เลี้ยงดูแลพิเศษหรือไม่
+  nannyType        NannyType   @default(NONE) // พี่เลี้ยงดูแลพิเศษ (ปกติ/VIP)
+  cctvRequested    Boolean     @default(false) // เลือกห้องกล้องวงจรปิด (+100)
   depositAmount    Int         @default(0) // มัดจำ (0 = ไม่มีมัดจำ จ่ายเต็มยอด)
   vaccineComplete  Boolean     @default(false) // วัคซีนครบ (ณ ตอนจองนี้)
   lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด (ณ ตอนจองนี้)
   fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด
   subtotal         Int         @default(0)
   discount         Int         @default(0)
+  holidaySurcharge Int         @default(0) // ค่าบริการเพิ่มเติมวันหยุด (snapshot ตอนสร้างออเดอร์ กันวันหยุดถูกแก้ทีหลังแล้วยอดเก่าเปลี่ยน)
+  holidayLabel     String? // ชื่อวันหยุด ณ ตอนสร้างออเดอร์
   total            Int         @default(0)
   note             String?
   createdBy        User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
@@ -338,8 +357,10 @@ model Order {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  items    OrderItem[]
-  payments Payment[]
+  items        OrderItem[]
+  payments     Payment[]
+  extraCharges OrderExtraCharge[]
+  activityLogs OrderActivityLog[]
 
   @@index([customerId])
   @@index([status])
@@ -348,6 +369,43 @@ model Order {
   @@index([roomId])
   @@index([checkInAt])
   @@index([checkOutAt])
+}
+
+// log ว่าใครเพิ่ม/แก้ไขรายการอะไรในออเดอร์ เมื่อไหร่ (ไว้ตรวจสอบย้อนหลัง โดยเฉพาะตอนช่างเพิ่มรายการเอง)
+model OrderActivityLog {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  action    String // เช่น "เพิ่มบริการ: ตัดเล็บ"
+  createdBy User?    @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// วันหยุดประจำปี — ตั้งค่าใหม่ (Settings > วันหยุด) ถ้าออเดอร์ตรงกับวันนี้จะบวกค่าบริการเพิ่มเติมอัตโนมัติ
+model Holiday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique
+  title       String // เช่น "วันปีใหม่"
+  extraCharge Int // ค่าบริการเพิ่มเติมวันหยุด (บาท)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ค่าเสียหายเพิ่มเติม (เช่น อาบน้ำแล้วโดนกัดต้องพาไปทำแผล) — เห็นเฉพาะฝั่งหลังบ้าน
+model OrderExtraCharge {
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  amount      Int
+  description String
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderItem {
@@ -360,6 +418,7 @@ model OrderItem {
   unitPrice Int
   quantity  Int           @default(1)
   subtotal  Int
+  createdAt DateTime      @default(now()) // ใช้เรียงลำดับรายการที่เพิ่มทีหลังให้ต่อท้ายของเดิม
 
   @@index([orderId])
 }

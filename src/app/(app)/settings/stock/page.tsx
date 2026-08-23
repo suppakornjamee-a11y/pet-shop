@@ -3,8 +3,10 @@ import { PageHeader } from "@/components/page-header";
 import { StockManager } from "@/components/settings/stock-manager";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function StockSettingsPage() {
+  await requireStaffUser();
   const products = await prisma.product.findMany({ orderBy: { createdAt: "desc" } });
   const t = getDictionary(await getLocale());
   return (
