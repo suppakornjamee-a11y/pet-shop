@@ -4,10 +4,10 @@ import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Search, Phone, ChevronRight, Users } from "lucide-react";
 import { searchCustomers } from "@/app/actions/customers";
-import { speciesEmoji } from "@/lib/labels";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useI18n } from "@/components/i18n-provider";
+import { SpeciesIcon } from "@/components/species-icon";
 
 type Pet = { id: string; name: string; species: "DOG" | "CAT" };
 type Customer = { id: string; name: string; phone: string; pets: Pet[] };
@@ -57,9 +57,13 @@ export function CustomerSearch({ initial }: { initial: Customer[] }) {
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Phone className="h-3 w-3" /> {c.phone}
                     </div>
-                    <div className="mt-1 text-sm">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                       {c.pets.length > 0
-                        ? c.pets.map((p) => `${speciesEmoji[p.species]} ${p.name}`).join("  ")
+                        ? c.pets.map((p) => (
+                            <span key={p.id} className="inline-flex items-center gap-1">
+                              <SpeciesIcon species={p.species} className="h-3.5 w-3.5" /> {p.name}
+                            </span>
+                          ))
                         : t.customers.noPetsYet}
                     </div>
                   </div>

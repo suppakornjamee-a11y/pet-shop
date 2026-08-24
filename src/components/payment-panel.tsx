@@ -93,7 +93,7 @@ export function PaymentPanel({
     <Card className="lg:sticky lg:top-20">
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
-          <QrCode className="h-4 w-4" /> {t.orders.payment.title}
+          {t.orders.payment.title}
         </CardTitle>
         {activePayment && (
           <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>

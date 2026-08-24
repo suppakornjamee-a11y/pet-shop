@@ -1,9 +1,4 @@
-import type { Species, OrderStatus, PaymentStatus } from "@/generated/prisma/enums";
-
-export const speciesEmoji: Record<Species, string> = {
-  DOG: "🐶",
-  CAT: "🐱",
-};
+import type { OrderStatus, PaymentStatus } from "@/generated/prisma/enums";
 
 const FLEA_TICK_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 วัน
 

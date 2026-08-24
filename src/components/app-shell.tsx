@@ -4,24 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { LogOut, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import type { Dictionary } from "@/i18n/dictionaries/th";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import {
   CustomerRecordFlatIcon,
-  DocumentFlatIcon,
   ClipboardFlatIcon,
   StockFlatIcon,
   CalendarFlatIcon,
-  CalendarDayFlatIcon,
-  CalendarRangeFlatIcon,
   DashboardImageIcon,
   HolidayImageIcon,
+  BankAccountsImageIcon,
+  BoardingImageIcon,
+  ShopImageIcon,
+  RegisterImageIcon,
+  BathCalendarImageIcon,
+  OrdersImageIcon,
   UserAvatarFlatIcon,
-  BankPaymentFlatIcon,
   BedFlatIcon,
+  LogoutImageIcon,
 } from "@/components/nav-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -31,14 +34,6 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
 type NavItem = {
@@ -59,14 +54,14 @@ function getNavGroups(t: Dictionary): NavGroup[] {
     {
       items: [
         { href: "/", label: t.nav.dashboard, icon: DashboardImageIcon, hiddenForGroomer: true },
-        { href: "/register", label: t.nav.register, icon: ClipboardFlatIcon, hiddenForGroomer: true },
-        { href: "/calendar", label: t.nav.queueCalendar, icon: CalendarDayFlatIcon },
-        { href: "/orders/bath", label: t.nav.ordersBath, icon: DocumentFlatIcon },
+        { href: "/register", label: t.nav.register, icon: RegisterImageIcon, hiddenForGroomer: true },
+        { href: "/calendar", label: t.nav.queueCalendar, icon: BathCalendarImageIcon },
+        { href: "/orders/bath", label: t.nav.ordersBath, icon: OrdersImageIcon },
         { href: "/calendar-other", label: t.nav.otherServiceCalendar, icon: CalendarFlatIcon },
-        { href: "/orders/other", label: t.nav.ordersOther, icon: DocumentFlatIcon },
-        { href: "/boarding", label: t.nav.boardingCalendar, icon: CalendarRangeFlatIcon, hiddenForGroomer: true },
+        { href: "/orders/other", label: t.nav.ordersOther, icon: OrdersImageIcon },
+        { href: "/boarding", label: t.nav.boardingCalendar, icon: BoardingImageIcon, hiddenForGroomer: true },
         { href: "/customers", label: t.nav.customers, icon: CustomerRecordFlatIcon, hiddenForGroomer: true },
-        { href: "/shop", label: t.nav.shopCafe, icon: StockFlatIcon, hiddenForGroomer: true },
+        { href: "/shop", label: t.nav.shopCafe, icon: ShopImageIcon, hiddenForGroomer: true },
       ],
     },
     {
@@ -75,7 +70,7 @@ function getNavGroups(t: Dictionary): NavGroup[] {
         { href: "/settings/stock", label: t.nav.stock, icon: StockFlatIcon, hiddenForGroomer: true },
         { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon, hiddenForGroomer: true },
         { href: "/settings/services", label: t.nav.services, icon: ClipboardFlatIcon, hiddenForGroomer: true },
-        { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankPaymentFlatIcon, adminOnly: true },
+        { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankAccountsImageIcon, adminOnly: true },
         { href: "/settings/users", label: t.nav.users, icon: UserAvatarFlatIcon, adminOnly: true },
         { href: "/settings/holidays", label: t.nav.holidays, icon: HolidayImageIcon, adminOnly: true },
       ],
@@ -169,13 +164,6 @@ function SidebarContent({
             </Badge>
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="mt-2.5 w-full justify-start text-destructive hover:text-destructive"
-          onClick={() => signOut({ callbackUrl: "/login" })}
-        >
-          <LogOut /> {t.nav.logout}
-        </Button>
       </div>
     </div>
   );
@@ -226,33 +214,14 @@ export function AppShell({
           <LanguageToggle />
           <ThemeToggle />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" />}>
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
-                  {user.name.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium sm:inline">{user.name}</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel>
-                <div className="font-medium">{user.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  @{user.username} ·{" "}
-                  {user.role === "ADMIN" ? t.nav.admin : t.nav.staff}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => signOut({ callbackUrl: "/login" })}
-              >
-                <LogOut />
-                {t.nav.logout}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t.nav.logout}
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >
+            <LogoutImageIcon className="h-5 w-5" />
+          </Button>
         </header>
 
         <main className="flex-1 p-4 lg:p-6">{children}</main>

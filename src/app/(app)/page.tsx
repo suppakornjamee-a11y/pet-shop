@@ -1,14 +1,11 @@
 import Link from "next/link";
 import {
-  ClipboardPlus,
-  PawPrint,
+  // ClipboardPlus,
+  // PawPrint,
   Wallet,
   // ReceiptText,
   // Clock,
   // TrendingUp,
-  LogIn,
-  LogOut,
-  Bath,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatBaht, formatDateTime } from "@/lib/format";
@@ -22,6 +19,19 @@ import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
 import { cn } from "@/lib/utils";
 import { requireStaffUser } from "@/lib/auth-helpers";
+
+function CheckInStatIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/checkin.png" alt="" className={className} />;
+}
+function CheckOutStatIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/checkout.png" alt="" className={className} />;
+}
+function GroomingQueueStatIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/grooming-queue.png" alt="" className={className} />;
+}
 
 function parseDate(input?: string) {
   if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
@@ -133,21 +143,21 @@ export default async function DashboardPage(props: PageProps<"/">) {
     {
       label: t.dashboard.statCheckInsToday,
       value: checkInsToday.toString(),
-      icon: LogIn,
+      icon: CheckInStatIcon,
       color: "text-teal-600 bg-teal-100 dark:bg-teal-950 dark:text-teal-400",
       tint: "from-teal-50 dark:from-teal-950/30",
     },
     {
       label: t.dashboard.statCheckOutsToday,
       value: checkOutsToday.toString(),
-      icon: LogOut,
+      icon: CheckOutStatIcon,
       color: "text-orange-600 bg-orange-100 dark:bg-orange-950 dark:text-orange-400",
       tint: "from-orange-50 dark:from-orange-950/30",
     },
     {
       label: t.dashboard.statGroomingQueueToday,
       value: groomingQueueToday.toString(),
-      icon: Bath,
+      icon: GroomingQueueStatIcon,
       color: "text-pink-600 bg-pink-100 dark:bg-pink-950 dark:text-pink-400",
       tint: "from-pink-50 dark:from-pink-950/30",
     },
@@ -157,15 +167,16 @@ export default async function DashboardPage(props: PageProps<"/">) {
     <div>
       <PageHeader
         title={t.dashboard.title}
-        description={isToday ? t.dashboard.overviewToday : t.dashboard.overviewOn(formatDate(startOfDay))}
         action={
           <>
+            {/* ปุ่มลงทะเบียน/จองคิว คอมเม้นปิดไว้ก่อน
             <Button render={<Link href="/register" />} nativeButton={false} variant="outline">
               <PawPrint /> {t.dashboard.register}
             </Button>
             <Button render={<Link href="/calendar" />} nativeButton={false}>
               <ClipboardPlus /> {t.dashboard.bookOrder}
             </Button>
+            */}
           </>
         }
       />
@@ -180,17 +191,12 @@ export default async function DashboardPage(props: PageProps<"/">) {
           return (
             <Card key={s.label} className="w-full">
               <CardContent className="flex items-center gap-3.5 py-2">
-                <div
-                  className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
-                    s.color
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+                  <Icon className="h-10 w-10" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1 text-right">
                   <div className="truncate text-2xl font-semibold tracking-tight">{s.value}</div>
-                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                  <div className="truncate text-xs text-muted-foreground">{s.label}</div>
                 </div>
               </CardContent>
             </Card>

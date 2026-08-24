@@ -127,4 +127,11 @@
   html {
     @apply font-sans;
   }
+
+  /* ขยายขนาด UI บนจอ desktop ให้เท่ากับซูม 120% ของเดิม (ไม่กระทบ mobile) */
+  @media (min-width: 1024px) {
+    html {
+      font-size: 19.2px;
+    }
+  }
 }

@@ -327,7 +327,14 @@ const bankSchema = z.object({
   id: z.string().optional(),
   bankName: z.string().min(1, "กรุณากรอกชื่อธนาคาร/ช่องทาง"),
   accountName: z.string().min(1, "กรุณากรอกชื่อบัญชี"),
-  accountNumber: z.string().min(1, "กรุณากรอกเลขบัญชี"),
+  accountNumber: z
+    .string()
+    .min(1, "กรุณากรอกเลขบัญชี")
+    .refine((v) => {
+      // เครื่องหมาย "-" ใช้คั่นได้ ไม่นับรวมเป็นจำนวนหลัก แต่ที่เหลือต้องเป็นตัวเลขล้วน 10-12 หลัก
+      const digitsOnly = v.replace(/-/g, "");
+      return /^\d+$/.test(digitsOnly) && digitsOnly.length >= 10 && digitsOnly.length <= 12;
+    }, "เลขบัญชีต้องเป็นตัวเลข 10-12 หลัก (คั่นด้วย - ได้ ไม่นับรวมจำนวนหลัก)"),
   promptpayId: z.string().optional(),
   type: z.enum(["PROMPTPAY", "BANK"]).default("BANK"),
   isDefault: z.coerce.boolean().default(false),

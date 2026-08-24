@@ -26,6 +26,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useI18n } from "@/components/i18n-provider";
+import { SpeciesIcon } from "@/components/species-icon";
+
+function MaleGenderIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/male.png" alt="" className={className} />;
+}
+function FemaleGenderIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/female.png" alt="" className={className} />;
+}
 
 type PetForm = {
   id?: string;
@@ -324,8 +334,9 @@ export function RegisterForm({
       {pets.map((pet, i) => (
         <Card key={i}>
           <CardHeader>
-            <CardTitle className="text-base">
-              {pet.species === "CAT" ? "🐱" : "🐶"} {t.register.petNumberTitle(i + 1)}
+            <CardTitle className="flex items-center gap-2 text-base">
+              <SpeciesIcon species={pet.species} className="h-5 w-5" />
+              {t.register.petNumberTitle(i + 1)}
             </CardTitle>
             {!readOnly && pets.length > 1 && !pet.id && (
               <CardAction>
@@ -369,15 +380,34 @@ export function RegisterForm({
               <Select
                 value={pet.species}
                 onValueChange={(v) => updatePet(i, { species: v as "DOG" | "CAT" })}
-                items={{ DOG: t.customers.petDialog.dog, CAT: t.customers.petDialog.cat }}
+                items={{
+                  DOG: (
+                    <span className="flex items-center gap-2">
+                      <SpeciesIcon species="DOG" className="h-4 w-4" /> {t.labels.species.DOG}
+                    </span>
+                  ),
+                  CAT: (
+                    <span className="flex items-center gap-2">
+                      <SpeciesIcon species="CAT" className="h-4 w-4" /> {t.labels.species.CAT}
+                    </span>
+                  ),
+                }}
                 disabled={readOnly}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="DOG">{t.customers.petDialog.dog}</SelectItem>
-                  <SelectItem value="CAT">{t.customers.petDialog.cat}</SelectItem>
+                  <SelectItem value="DOG">
+                    <span className="flex items-center gap-2">
+                      <SpeciesIcon species="DOG" className="h-4 w-4" /> {t.labels.species.DOG}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="CAT">
+                    <span className="flex items-center gap-2">
+                      <SpeciesIcon species="CAT" className="h-4 w-4" /> {t.labels.species.CAT}
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -398,8 +428,16 @@ export function RegisterForm({
                   updatePet(i, { gender: v as PetForm["gender"] })
                 }
                 items={{
-                  MALE: t.customers.petDialog.male,
-                  FEMALE: t.customers.petDialog.female,
+                  MALE: (
+                    <span className="flex items-center gap-2">
+                      <MaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.male}
+                    </span>
+                  ),
+                  FEMALE: (
+                    <span className="flex items-center gap-2">
+                      <FemaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.female}
+                    </span>
+                  ),
                   UNKNOWN: t.customers.petDialog.unknown,
                 }}
                 disabled={readOnly}
@@ -408,8 +446,16 @@ export function RegisterForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MALE">{t.customers.petDialog.male}</SelectItem>
-                  <SelectItem value="FEMALE">{t.customers.petDialog.female}</SelectItem>
+                  <SelectItem value="MALE">
+                    <span className="flex items-center gap-2">
+                      <MaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.male}
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="FEMALE">
+                    <span className="flex items-center gap-2">
+                      <FemaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.female}
+                    </span>
+                  </SelectItem>
                   <SelectItem value="UNKNOWN">{t.customers.petDialog.unknown}</SelectItem>
                 </SelectContent>
               </Select>
@@ -418,6 +464,7 @@ export function RegisterForm({
               <Label>{t.register.birthDateLabel}</Label>
               <Input
                 type="date"
+                lang="en-GB"
                 value={pet.birthDate}
                 onChange={(e) => updatePet(i, { birthDate: e.target.value })}
                 required
@@ -430,8 +477,12 @@ export function RegisterForm({
               <Input
                 type="number"
                 step="0.1"
+                min={0}
                 value={pet.weightKg}
                 onChange={(e) => updatePet(i, { weightKg: e.target.value })}
+                onKeyDown={(e) => {
+                  if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+                }}
                 required
                 disabled={readOnly}
               />
@@ -481,6 +532,7 @@ export function RegisterForm({
               </Label>
               <Input
                 type="date"
+                lang="en-GB"
                 value={pet.vaccine5in1Date}
                 onChange={(e) => updatePet(i, { vaccine5in1Date: e.target.value })}
                 required
@@ -493,6 +545,7 @@ export function RegisterForm({
               </Label>
               <Input
                 type="date"
+                lang="en-GB"
                 value={pet.rabiesVaccineDate}
                 onChange={(e) => updatePet(i, { rabiesVaccineDate: e.target.value })}
                 required
@@ -505,6 +558,7 @@ export function RegisterForm({
               </Label>
               <Input
                 type="date"
+                lang="en-GB"
                 value={pet.lastFleaTickDate}
                 onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
                 required

@@ -14,7 +14,6 @@ export default async function BankAccountsSettingsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title={t.settings.bankAccounts.title}
-        description={t.settings.bankAccounts.description}
       />
       <BankManager
         accounts={accounts.map((a) => ({

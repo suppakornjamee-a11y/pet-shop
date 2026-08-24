@@ -134,6 +134,48 @@ export function HolidayImageIcon({ className }: IconProps) {
   return <img src="/images/icons/holiday.png" alt="" className={className} />;
 }
 
+/** ไอคอนจองโรงแรม/ห้องพัก — รูปภาพเตียง+ปฏิทินจองที่ผู้ใช้เตรียมมาให้ */
+export function BoardingImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/boarding.png" alt="" className={className} />;
+}
+
+/** ไอคอนออเดอร์ — รูปภาพปฏิทินติ๊กถูกที่ผู้ใช้เตรียมมาให้ */
+export function OrdersImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/orders.png" alt="" className={className} />;
+}
+
+/** ไอคอนร้านอาหาร — รูปภาพเบอร์เกอร์+เครื่องดื่มที่ผู้ใช้เตรียมมาให้ */
+export function ShopImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/shop.png" alt="" className={className} />;
+}
+
+/** ไอคอนลงทะเบียน — รูปภาพกระดานเช็คลิสต์ที่ผู้ใช้เตรียมมาให้ */
+export function RegisterImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/register.png" alt="" className={className} />;
+}
+
+/** ไอคอนจองอาบน้ำ — รูปภาพหมาอาบน้ำในอ่างที่ผู้ใช้เตรียมมาให้ */
+export function BathCalendarImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/bath-calendar.png" alt="" className={className} />;
+}
+
+/** ไอคอนบัญชีธนาคาร — รูปภาพมือถือ+เหรียญเงินที่ผู้ใช้เตรียมมาให้ */
+export function BankAccountsImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/bank-accounts.png" alt="" className={className} />;
+}
+
+/** ไอคอนออกจากระบบ — รูปภาพคนก้าวออกประตูที่ผู้ใช้เตรียมมาให้ */
+export function LogoutImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/logout.png" alt="" className={className} />;
+}
+
 /** ไอคอนผู้ใช้งาน — อวตารในวงกลม สไตล์ flat สีฟ้า */
 export function UserAvatarFlatIcon({ className }: IconProps) {
   return (

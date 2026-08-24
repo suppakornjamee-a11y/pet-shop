@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { todayThaiStr, dateRangeThai, addDaysThai, thaiDayRange, isValidDateStr } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
 import { buildRoomGrid, countSpeciesByDate, type GridBooking } from "@/lib/room-grid";
-import { orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
@@ -105,7 +106,6 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title={t.boarding.title}
-        description={t.boarding.description}
         action={
           <div className="flex items-center gap-1.5">
             <Button
@@ -150,10 +150,17 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
                     <div>{weekday}</div>
                     <div className={cn("text-sm", isToday && "font-bold")}>{day}</div>
                     {(counts.dog > 0 || counts.cat > 0) && (
-                      <div className="mt-0.5 text-[9px] leading-none font-normal text-muted-foreground/80">
-                        {counts.dog > 0 && `${speciesEmoji.DOG}${counts.dog}`}
-                        {counts.dog > 0 && counts.cat > 0 && " "}
-                        {counts.cat > 0 && `${speciesEmoji.CAT}${counts.cat}`}
+                      <div className="mt-0.5 flex items-center justify-center gap-1 text-[9px] leading-none font-normal text-muted-foreground/80">
+                        {counts.dog > 0 && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <SpeciesIcon species="DOG" className="h-2.5 w-2.5" /> {counts.dog}
+                          </span>
+                        )}
+                        {counts.cat > 0 && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <SpeciesIcon species="CAT" className="h-2.5 w-2.5" /> {counts.cat}
+                          </span>
+                        )}
                       </div>
                     )}
                   </th>

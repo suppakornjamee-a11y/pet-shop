@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useI18n } from "@/components/i18n-provider";
+import { SpeciesIcon } from "@/components/species-icon";
 
 const emptyForm = {
   name: "",
@@ -85,14 +86,33 @@ export function PetFormDialog({
             <Select
               value={form.species}
               onValueChange={(v) => setForm({ ...form, species: v as "DOG" | "CAT" })}
-              items={{ DOG: t.customers.petDialog.dog, CAT: t.customers.petDialog.cat }}
+              items={{
+                DOG: (
+                  <span className="flex items-center gap-2">
+                    <SpeciesIcon species="DOG" className="h-4 w-4" /> {t.customers.petDialog.dog}
+                  </span>
+                ),
+                CAT: (
+                  <span className="flex items-center gap-2">
+                    <SpeciesIcon species="CAT" className="h-4 w-4" /> {t.customers.petDialog.cat}
+                  </span>
+                ),
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="DOG">{t.customers.petDialog.dog}</SelectItem>
-                <SelectItem value="CAT">{t.customers.petDialog.cat}</SelectItem>
+                <SelectItem value="DOG">
+                  <span className="flex items-center gap-2">
+                    <SpeciesIcon species="DOG" className="h-4 w-4" /> {t.customers.petDialog.dog}
+                  </span>
+                </SelectItem>
+                <SelectItem value="CAT">
+                  <span className="flex items-center gap-2">
+                    <SpeciesIcon species="CAT" className="h-4 w-4" /> {t.customers.petDialog.cat}
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

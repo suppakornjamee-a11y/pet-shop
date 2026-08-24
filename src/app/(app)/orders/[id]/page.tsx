@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  Printer,
   ArrowLeft,
   PawPrint,
   Pencil,
@@ -15,9 +14,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,11 @@ import { AddOrderItemForm } from "@/components/add-order-item-form";
 import { OrderItemsRows } from "@/components/order-items-rows";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
+
+function PrintIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/print.png" alt="" className={className} />;
+}
 
 export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) {
   const user = await requireUser();
@@ -91,9 +96,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               <Button
                 render={<Link href={`/print/orders/${order.id}`} target="_blank" />}
                 nativeButton={false}
-                variant="secondary"
+                variant="outline"
               >
-                <Printer /> {t.orders.printDocument}
+                <PrintIcon className="h-4 w-4" /> {t.orders.printDocument}
               </Button>
             )}
           </>
@@ -191,9 +196,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   <div className="text-xs text-muted-foreground">{t.orders.pet}</div>
                   <div className="font-medium">
                     {order.pet ? (
-                      <>
-                        {speciesEmoji[order.pet.species]} {order.pet.name}
-                      </>
+                      <span className="inline-flex items-center gap-1.5">
+                        <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
+                      </span>
                     ) : (
                       "-"
                     )}

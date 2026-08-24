@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { ClipboardPlus, Wallet, ReceiptText, CalendarClock, Pencil, History } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
-import { speciesEmoji, orderStatusColor, isFleaTickCheckStale } from "@/lib/labels";
+import { orderStatusColor, isFleaTickCheckStale } from "@/lib/labels";
 import { toThaiDateStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -193,9 +194,12 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                               {t.labels.orderStatus[o.status]}
                             </Badge>
                           </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {o.pet ? `${speciesEmoji[o.pet.species]} ${o.pet.name} · ` : ""}
-                            {o.items.map((i) => i.name).join(", ")}
+                          <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}
+                            <span className="truncate">
+                              {o.pet ? `${o.pet.name} · ` : ""}
+                              {o.items.map((i) => i.name).join(", ")}
+                            </span>
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {formatDateTime(o.createdAt)}

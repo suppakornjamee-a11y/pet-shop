@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/components/i18n-provider";
@@ -20,12 +19,11 @@ export function DashboardDatePicker({ value }: { value: string }) {
   return (
     <div className="flex items-center gap-2">
       <div className="relative">
-        <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="date"
           value={value}
           onChange={(e) => router.push(`/?date=${e.target.value}`)}
-          className="w-[180px] pl-8"
+          className="w-[180px]"
         />
       </div>
       {value !== todayStr() && (

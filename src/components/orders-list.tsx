@@ -3,9 +3,10 @@ import { ClipboardPlus, ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,9 +106,11 @@ export async function OrdersList({
                         {t.labels.orderStatus[o.status]}
                       </Badge>
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {o.pet ? speciesEmoji[o.pet.species] : ""} {o.customer.name} ·{" "}
-                      {o.customer.phone} · {formatDateTime(o.createdAt)}
+                    <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                      {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}
+                      <span className="truncate">
+                        {o.customer.name} · {o.customer.phone} · {formatDateTime(o.createdAt)}
+                      </span>
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>

@@ -21,8 +21,8 @@ import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
 import { formatBaht } from "@/lib/format";
 import { toThaiDateStr, addDaysThai, daysBetween } from "@/lib/slots";
-import { speciesEmoji } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -439,8 +439,10 @@ export function OrderForm({
                           <span className="font-medium">{c.name}</span>
                           <span className="text-muted-foreground"> · {c.phone}</span>
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {c.pets.map((p) => speciesEmoji[p.species]).join("")}
+                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                          {c.pets.map((p) => (
+                            <SpeciesIcon key={p.id} species={p.species} className="h-3.5 w-3.5" />
+                          ))}
                         </span>
                       </button>
                     ))}
@@ -457,7 +459,11 @@ export function OrderForm({
                   onValueChange={(v) => onPetChange(v ?? "")}
                   items={customer.pets.map((p) => ({
                     value: p.id,
-                    label: `${speciesEmoji[p.species]} ${p.name}`,
+                    label: (
+                      <span className="flex items-center gap-1.5">
+                        <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+                      </span>
+                    ),
                   }))}
                 >
                   <SelectTrigger className="w-full">
@@ -466,7 +472,9 @@ export function OrderForm({
                   <SelectContent>
                     {customer.pets.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {speciesEmoji[p.species]} {p.name}
+                        <span className="flex items-center gap-1.5">
+                          <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

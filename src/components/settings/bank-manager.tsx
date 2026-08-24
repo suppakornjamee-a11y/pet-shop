@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, Landmark, QrCode, Star } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Star } from "lucide-react";
 import { upsertBankAccount, deleteBankAccount } from "@/app/actions/settings";
 import type { AccountType } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
@@ -26,6 +26,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+// เรียงตามหลักพจนานุกรมไทย ก-ฮ (Intl.Collator("th"))
+const THAI_BANKS = [
+  "กรุงเทพ",
+  "กรุงไทย",
+  "กรุงศรีอยุธยา",
+  "กสิกรไทย",
+  "เกียรตินาคินภัทร",
+  "ซีไอเอ็มบี ไทย",
+  "ทหารไทยธนชาต (ttb)",
+  "ไทยพาณิชย์",
+  "เพื่อการเกษตรและสหกรณ์การเกษตร (ธ.ก.ส.)",
+  "ยูโอบี",
+  "แลนด์ แอนด์ เฮ้าส์",
+  "ออมสิน",
+  "อาคารสงเคราะห์",
+  "อิสลามแห่งประเทศไทย",
+  "ไอซีบีซี (ไทย)",
+] satisfies readonly string[] as readonly string[];
+const BANK_OTHER = "OTHER";
+
+function BankTypeIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/bank-type.png" alt="" className={className} />;
+}
+function PromptPayTypeIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/promptpay-type.png" alt="" className={className} />;
+}
 
 type Account = {
   id: string;
@@ -123,9 +152,9 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   {a.type === "PROMPTPAY" ? (
-                    <QrCode className="h-5 w-5 text-primary" />
+                    <PromptPayTypeIcon className="h-6 w-6" />
                   ) : (
-                    <Landmark className="h-5 w-5 text-primary" />
+                    <BankTypeIcon className="h-6 w-6" />
                   )}
                   <div>
                     <div className="font-semibold">{a.bankName}</div>
@@ -139,9 +168,6 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                 )}
               </div>
               <div className="font-mono text-sm">{a.accountNumber}</div>
-              {a.promptpayId && (
-                <div className="text-xs text-muted-foreground">PromptPay: {a.promptpayId}</div>
-              )}
               <div className="mt-auto flex justify-end gap-1 pt-1">
                 <Button size="sm" variant="ghost" onClick={() => openEdit(a)}>
                   <Pencil className="h-4 w-4" /> {t.common.edit}
@@ -159,7 +185,7 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editing ? t.settings.bankAccounts.editAccount : t.settings.bankAccounts.addAccount}
@@ -170,7 +196,20 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <Label>{t.settings.bankAccounts.typeLabel}</Label>
               <Select
                 value={form.type}
-                onValueChange={(v) => setForm({ ...form, type: v as AccountType })}
+                onValueChange={(v) => {
+                  const type = (v ?? "BANK") as AccountType;
+                  setForm({
+                    ...form,
+                    type,
+                    // PromptPay ไม่ต้องเลือกธนาคาร — ใช้ชื่อ "PromptPay" คงที่แทน
+                    bankName:
+                      type === "PROMPTPAY"
+                        ? t.settings.bankAccounts.typePromptpay
+                        : form.bankName === t.settings.bankAccounts.typePromptpay
+                          ? ""
+                          : form.bankName,
+                  });
+                }}
                 items={{ BANK: t.settings.bankAccounts.typeBank, PROMPTPAY: t.settings.bankAccounts.typePromptpay }}
               >
                 <SelectTrigger className="w-full">
@@ -184,10 +223,42 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
             </div>
             <div className="space-y-2">
               <Label>{t.settings.bankAccounts.bankNameLabel} *</Label>
-              <Input
-                value={form.bankName}
-                onChange={(e) => setForm({ ...form, bankName: e.target.value })}
-              />
+              <Select
+                value={THAI_BANKS.includes(form.bankName) ? form.bankName : BANK_OTHER}
+                onValueChange={(v) =>
+                  setForm({
+                    ...form,
+                    bankName: !v || v === BANK_OTHER
+                      ? THAI_BANKS.includes(form.bankName) ? "" : form.bankName
+                      : v,
+                  })
+                }
+                items={{
+                  ...Object.fromEntries(THAI_BANKS.map((b) => [b, b])),
+                  [BANK_OTHER]: t.settings.bankAccounts.bankNameOther,
+                }}
+                disabled={form.type === "PROMPTPAY"}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {THAI_BANKS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={BANK_OTHER}>{t.settings.bankAccounts.bankNameOther}</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.type !== "PROMPTPAY" && !THAI_BANKS.includes(form.bankName) && (
+                <Input
+                  className="mt-2"
+                  placeholder={t.settings.bankAccounts.bankNameOtherPlaceholder}
+                  value={form.bankName}
+                  onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t.settings.bankAccounts.accountNameLabel} *</Label>

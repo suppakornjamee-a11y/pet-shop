@@ -12,9 +12,10 @@ import {
   isPastSlot,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
-import { orderStatusColor, speciesEmoji } from "@/lib/labels";
+import { orderStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -212,8 +213,8 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   >
                     <div className="flex items-center gap-2.5">
                       <span className="font-mono font-semibold tabular-nums">{slot}</span>
-                      <span className="text-muted-foreground">
-                        {booked.pet ? `${speciesEmoji[booked.pet.species]} ` : ""}
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        {booked.pet && <SpeciesIcon species={booked.pet.species} className="h-3.5 w-3.5" />}
                         {booked.customer.name}
                       </span>
                     </div>
@@ -264,8 +265,8 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   <span className="font-mono font-semibold tabular-nums">
                     {toThaiTimeStr(b.appointmentAt!)}
                   </span>
-                  <span className="text-muted-foreground">
-                    {b.pet ? `${speciesEmoji[b.pet.species]} ` : ""}
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    {b.pet && <SpeciesIcon species={b.pet.species} className="h-3.5 w-3.5" />}
                     {b.customer.name}
                   </span>
                 </div>
