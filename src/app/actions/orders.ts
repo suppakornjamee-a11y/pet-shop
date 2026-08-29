@@ -17,6 +17,7 @@ import { isSlotHolding } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
 import { sendLinePush } from "@/lib/line";
 import { formatBaht } from "@/lib/format";
+import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder } from "@/lib/order-kind";
 import type { RoomModel, RoomCategoryModel } from "@/generated/prisma/models";
 import type { Role } from "@/generated/prisma/enums";
 import type { ActionResult } from "./customers";
@@ -547,15 +548,16 @@ export async function createBalancePayment(orderId: string): Promise<ActionResul
     include: { payments: true, extraCharges: true },
   });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  // เก็บยอดคงเหลือได้ก็ต่อเมื่อออเดอร์เสร็จสิ้น (เช็คเอ้าท์/ทำงานเสร็จ) แล้วเท่านั้น
+  // เก็บยอดคงเหลือได้ตั้งแต่เริ่มดำเนินการแล้ว (ให้พนักงานขอ QR ตอนลูกค้ามาจ่ายหน้างานได้ ไม่ต้องรอเช็คเอ้าท์ก่อน)
+  // — ออเดอร์อาบน้ำต้องจ่ายครบก่อนถึงจะเช็คเอ้าท์ได้อยู่แล้ว ถ้าบังคับ COMPLETED ก่อนถึงจะสร้าง QR ได้จะกลายเป็นชนกันเอง
   if (order.status === "PENDING_PAYMENT") {
     return { ok: false, error: "ออเดอร์นี้ยังไม่ได้ชำระมัดจำ" };
   }
   if (order.status === "CANCELLED") {
     return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
   }
-  if (order.status !== "COMPLETED") {
-    return { ok: false, error: "ออเดอร์ต้องเสร็จสิ้นก่อน จึงจะเก็บยอดคงเหลือได้" };
+  if (order.status !== "COMPLETED" && order.status !== "IN_PROGRESS") {
+    return { ok: false, error: "ออเดอร์ต้องเริ่มดำเนินการก่อน จึงจะเก็บยอดคงเหลือได้" };
   }
   const hasOpenPayment = order.payments.some((p) => p.status !== "VERIFIED" && p.status !== "REJECTED");
   if (hasOpenPayment) {
@@ -608,16 +610,6 @@ export async function regeneratePayment(paymentId: string): Promise<ActionResult
   });
   revalidatePath(`/orders/${payment.orderId}`);
   return { ok: true, message: "สร้าง QR ใหม่เรียบร้อย (มีเวลา 15 นาที)" };
-}
-
-export async function markSlipSubmitted(paymentId: string, slipUrl?: string): Promise<ActionResult> {
-  await requireUser();
-  const payment = await prisma.payment.update({
-    where: { id: paymentId },
-    data: { status: "SUBMITTED", submittedAt: new Date(), slipUrl: slipUrl || null },
-  });
-  revalidatePath(`/orders/${payment.orderId}`);
-  return { ok: true, message: "บันทึกการอัปโหลดสลิปแล้ว รอตรวจสอบ" };
 }
 
 export async function verifyPayment(paymentId: string): Promise<ActionResult> {
@@ -719,28 +711,105 @@ const statusSchema = z.enum([
   "CANCELLED",
 ]);
 
-export async function updateOrderStatus(orderId: string, status: string): Promise<ActionResult> {
+export type UpdateOrderStatusResult = ActionResult & { cctvReminder?: boolean };
+
+export async function updateOrderStatus(orderId: string, status: string): Promise<UpdateOrderStatusResult> {
   const user = await requireUser();
   const parsed = statusSchema.safeParse(status);
   if (!parsed.success) return { ok: false, error: "สถานะไม่ถูกต้อง" };
+  const target = parsed.data;
 
-  const order = await prisma.order.update({
+  const order = await prisma.order.findUnique({
     where: { id: orderId },
-    data: { status: parsed.data, updatedById: user.id },
+    include: { payments: true, extraCharges: true },
   });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+
+  const orderKind = getOrderKind(order);
+  const fullyPaid = isOrderFullyPaid(order);
+
+  if (target === "IN_PROGRESS" && !canStartOrder(orderKind, user.role)) {
+    return {
+      ok: false,
+      error:
+        orderKind === "BOARDING"
+          ? "จัดการสถานะออเดอร์ฝากเลี้ยงได้เฉพาะแอดมินเท่านั้น"
+          : "เริ่มดำเนินการงานอาบน้ำได้เฉพาะช่างอาบน้ำหรือแอดมินเท่านั้น",
+    };
+  }
+  if (target === "COMPLETED" && !canCheckoutOrder(orderKind, user.role)) {
+    return {
+      ok: false,
+      error:
+        orderKind === "BOARDING"
+          ? "จัดการสถานะออเดอร์ฝากเลี้ยงได้เฉพาะแอดมินเท่านั้น"
+          : "เช็คเอ้าท์ได้เฉพาะพนักงานหรือแอดมินเท่านั้น",
+    };
+  }
+  if (orderKind === "BOARDING" && target === "IN_PROGRESS" && !fullyPaid) {
+    return { ok: false, error: "ออเดอร์ฝากเลี้ยงต้องชำระเงินเต็มจำนวนก่อนเริ่มดำเนินการ" };
+  }
+  if (orderKind === "BATH" && target === "COMPLETED" && !fullyPaid) {
+    return { ok: false, error: "ต้องชำระเงินให้ครบก่อนเช็คเอ้าท์" };
+  }
+  // orderKind === "OTHER": ไม่จำกัดเพิ่ม เหมือนเดิม
+
+  const alreadyInProgress = order.status === "IN_PROGRESS";
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: { status: target, updatedById: user.id },
+  });
+
+  let joinedOnly = false;
+  if (target === "IN_PROGRESS" && orderKind === "BATH") {
+    const actor = user.role === "ADMIN" ? "แอดมิน" : "ช่าง";
+    await prisma.orderActivityLog.create({
+      data: { orderId, action: `${actor} ${user.name} เริ่มดำเนินการ`, createdById: user.id },
+    });
+    // ออเดอร์นี้ IN_PROGRESS อยู่แล้ว (ช่างคนอื่นกดไว้ก่อน) — แค่บันทึกว่าเข้าร่วมงานเพิ่ม ไม่ใช่การเริ่มงานครั้งแรก
+    joinedOnly = alreadyInProgress;
+  }
+
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
   revalidatePath("/boarding");
 
-  if (parsed.data === "COMPLETED") {
+  if (target === "COMPLETED") {
     void notifyCustomerLine(
       orderId,
-      `บริการเสร็จเรียบร้อยแล้วค่ะ 🎉\nออเดอร์ ${order.code}\nสามารถมารับได้เลยค่ะ 🐾`
+      `บริการเสร็จเรียบร้อยแล้วค่ะ 🎉\nออเดอร์ ${updated.code}\nสามารถมารับได้เลยค่ะ 🐾`
     );
   }
 
-  return { ok: true, message: "อัปเดตสถานะเรียบร้อย" };
+  const cctvReminder = target === "COMPLETED" && orderKind === "BOARDING" && order.cctvRequested;
+  const message = joinedOnly ? `บันทึกแล้ว: ${user.name} เข้าร่วมงานนี้ด้วย` : "อัปเดตสถานะเรียบร้อย";
+
+  return { ok: true, message, ...(cctvReminder ? { cctvReminder: true } : {}) };
+}
+
+/**
+ * ช่าง (หรือแอดมิน) กดว่าทำส่วนของตัวเองในงานอาบน้ำนี้เสร็จแล้ว — แค่บันทึก log ไม่เปลี่ยนสถานะออเดอร์
+ * (สถานะจะเป็น COMPLETED จริงก็ต่อเมื่อพนักงาน/แอดมินกดเช็คเอ้าท์ตอนลูกค้าชำระเงินครบแล้วเท่านั้น)
+ */
+export async function markGroomerFinished(orderId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (user.role !== "GROOMER" && user.role !== "ADMIN") {
+    return { ok: false, error: "เฉพาะช่างอาบน้ำหรือแอดมินเท่านั้น" };
+  }
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (getOrderKind(order) !== "BATH") return { ok: false, error: "ใช้ได้เฉพาะออเดอร์อาบน้ำ" };
+  if (order.status !== "IN_PROGRESS") return { ok: false, error: "ออเดอร์นี้ยังไม่ได้เริ่มดำเนินการ" };
+
+  const actor = user.role === "ADMIN" ? "แอดมิน" : "ช่าง";
+  await prisma.orderActivityLog.create({
+    data: { orderId, action: `${actor} ${user.name} ทำรายการเสร็จสิ้น`, createdById: user.id },
+  });
+
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: `บันทึกแล้ว: ${user.name} ทำรายการเสร็จสิ้น` };
 }
 
 /**
@@ -819,16 +888,25 @@ export async function addExtraCharge(orderId: string, input: unknown): Promise<A
   const notFullyPaid = await assertOrderNotFullyPaid(orderId);
   if (!notFullyPaid.ok) return notFullyPaid;
 
-  await prisma.orderExtraCharge.create({
-    data: { orderId, ...parsed.data, createdById: user.id },
-  });
+  await prisma.$transaction([
+    prisma.orderExtraCharge.create({
+      data: { orderId, ...parsed.data, createdById: user.id },
+    }),
+    prisma.orderActivityLog.create({
+      data: {
+        orderId,
+        action: `เพิ่มค่าเสียหายเพิ่มเติม: ${parsed.data.description} (${formatBaht(parsed.data.amount)})`,
+        createdById: user.id,
+      },
+    }),
+  ]);
   await syncPendingBalancePayment(orderId);
   revalidatePath(`/orders/${orderId}`);
   return { ok: true, message: "บันทึกค่าเสียหายเพิ่มเติมเรียบร้อย" };
 }
 
 export async function updateExtraCharge(id: string, input: unknown): Promise<ActionResult> {
-  await requireUser();
+  const user = await requireUser();
   const parsed = extraChargeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
@@ -837,20 +915,38 @@ export async function updateExtraCharge(id: string, input: unknown): Promise<Act
   const notFullyPaid = await assertOrderNotFullyPaid(existing.orderId);
   if (!notFullyPaid.ok) return notFullyPaid;
 
-  const charge = await prisma.orderExtraCharge.update({ where: { id }, data: parsed.data });
+  const [charge] = await prisma.$transaction([
+    prisma.orderExtraCharge.update({ where: { id }, data: parsed.data }),
+    prisma.orderActivityLog.create({
+      data: {
+        orderId: existing.orderId,
+        action: `แก้ไขค่าเสียหายเพิ่มเติม: ${parsed.data.description} (${formatBaht(parsed.data.amount)})`,
+        createdById: user.id,
+      },
+    }),
+  ]);
   await syncPendingBalancePayment(charge.orderId);
   revalidatePath(`/orders/${charge.orderId}`);
   return { ok: true, message: "แก้ไขค่าเสียหายเพิ่มเติมเรียบร้อย" };
 }
 
 export async function deleteExtraCharge(id: string): Promise<ActionResult> {
-  await requireUser();
+  const user = await requireUser();
   const existing = await prisma.orderExtraCharge.findUnique({ where: { id } });
   if (!existing) return { ok: false, error: "ไม่พบรายการนี้" };
   const notFullyPaid = await assertOrderNotFullyPaid(existing.orderId);
   if (!notFullyPaid.ok) return notFullyPaid;
 
-  const charge = await prisma.orderExtraCharge.delete({ where: { id } });
+  const [charge] = await prisma.$transaction([
+    prisma.orderExtraCharge.delete({ where: { id } }),
+    prisma.orderActivityLog.create({
+      data: {
+        orderId: existing.orderId,
+        action: `ลบค่าเสียหายเพิ่มเติม: ${existing.description} (${formatBaht(existing.amount)})`,
+        createdById: user.id,
+      },
+    }),
+  ]);
   await syncPendingBalancePayment(charge.orderId);
   revalidatePath(`/orders/${charge.orderId}`);
   return { ok: true, message: "ลบรายการเรียบร้อย" };

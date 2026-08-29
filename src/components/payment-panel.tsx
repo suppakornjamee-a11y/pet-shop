@@ -8,7 +8,6 @@ import {
   RefreshCw,
   CheckCircle2,
   XCircle,
-  Upload,
   Clock,
   QrCode,
   Wallet,
@@ -17,7 +16,6 @@ import {
   regeneratePayment,
   verifyPayment,
   rejectPayment,
-  markSlipSubmitted,
   createBalancePayment,
 } from "@/app/actions/orders";
 import type { PaymentStatus, PaymentPurpose, OrderStatus } from "@/generated/prisma/enums";
@@ -145,8 +143,8 @@ export function PaymentPanel({
                 {t.orders.payment.remainingLabel(formatBaht(amountOwed - verifiedSum))}
               </div>
             </div>
-            {/* เก็บยอดคงเหลือได้ก็ต่อเมื่อออเดอร์เสร็จสิ้น (COMPLETED) แล้วเท่านั้น */}
-            {orderStatus !== "COMPLETED" ? null : (
+            {/* เก็บยอดคงเหลือได้ตั้งแต่เริ่มดำเนินการแล้ว — พนักงานขอ QR ให้ลูกค้าจ่ายหน้างานได้เลย ไม่ต้องรอเช็คเอ้าท์ก่อน */}
+            {orderStatus !== "COMPLETED" && orderStatus !== "IN_PROGRESS" ? null : (
               <Button
                 className="w-full"
                 disabled={isPending}
@@ -360,16 +358,6 @@ function ActivePaymentPanel({
           <div className="text-xs font-medium text-muted-foreground">
             {t.orders.payment.adminVerification}
           </div>
-          {payment.status === "PENDING" && (
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={() => run(() => markSlipSubmitted(payment.id))}
-              disabled={isPending}
-            >
-              <Upload /> {t.orders.payment.slipSubmitted}
-            </Button>
-          )}
           <div className="grid grid-cols-2 gap-2">
             <Button
               className="bg-emerald-600 hover:bg-emerald-700"

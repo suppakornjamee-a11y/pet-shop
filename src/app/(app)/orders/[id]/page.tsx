@@ -14,7 +14,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusColor } from "@/lib/labels";
+import { getOrderKind, getMyGroomerPhase, getStatusBadgeInfo } from "@/lib/order-kind";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { OrderExtraCharges } from "@/components/order-extra-charges";
 import { AddOrderItemForm } from "@/components/add-order-item-form";
 import { OrderItemsRows } from "@/components/order-items-rows";
@@ -64,6 +65,19 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   const canEditItems =
     order.status !== "CANCELLED" && verifiedSum < order.total + extraChargesTotal;
   const isGroomer = user.role === "GROOMER";
+  const orderKind = getOrderKind(order);
+  const isFullyPaid = verifiedSum >= order.total + extraChargesTotal;
+  // รายชื่อคนที่กด "เริ่มดำเนินการ" ไปแล้ว (ไม่ซ้ำ) — ใช้แสดงผลยืนยันให้ช่างเห็นว่าการกดมีผลจริง
+  const activeWorkers = [
+    ...new Set(
+      order.activityLogs
+        .filter((l) => l.action.endsWith("เริ่มดำเนินการ") && l.createdBy)
+        .map((l) => l.createdBy!.name)
+    ),
+  ];
+  const { startedNotFinished: iHaveStartedNotFinished } = getMyGroomerPhase(order.activityLogs, user.id);
+  // badge สถานะแบบ personalize (ช่างที่ทำเสร็จแล้ว / รอลูกค้าชำระเงิน) — ใช้ฟังก์ชันเดียวกับหน้าปฏิทินคิว กันขึ้นไม่ตรงกัน
+  const badgeInfo = getStatusBadgeInfo(order, user);
   const locale = await getLocale();
   const t = getDictionary(locale);
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
@@ -108,14 +122,29 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
       <div className={cn("grid gap-6", !isGroomer && "lg:grid-cols-3")}>
         <div className={cn("space-y-6", !isGroomer && "lg:col-span-2")}>
           <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
-              <Badge
-                variant="outline"
-                className={cn("text-xs", orderStatusColor[order.status])}
-              >
-                {t.labels.orderStatus[order.status]}
-              </Badge>
+            <CardHeader className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
+                {orderKind === "BATH" && activeWorkers.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t.orders.activeWorkersLabel}:{" "}
+                    <span className="font-medium text-foreground">{activeWorkers.join(", ")}</span>
+                  </p>
+                )}
+                <div className="mt-1.5">
+                  <OrderStatusBadges info={badgeInfo} t={t} />
+                </div>
+              </div>
+              <OrderStatusControl
+                orderId={order.id}
+                status={order.status}
+                role={user.role}
+                orderKind={orderKind}
+                isFullyPaid={isFullyPaid}
+                roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
+                iHaveStartedNotFinished={iHaveStartedNotFinished}
+                badgeInfo={badgeInfo}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               {order.appointmentAt && (
@@ -223,7 +252,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     <OrderItemsRows items={order.items} canEdit={canEditItems} />
                     {order.extraCharges.map((c) => (
                       <tr key={c.id} className="text-red-600">
-                        <td className="px-3 py-2">{c.description}</td>
+                        <td className="px-3 py-2">
+                          {c.description} ({t.orders.extraCharges.title})
+                        </td>
                         <td className="px-3 py-2 text-center">1</td>
                         <td className="px-3 py-2 text-right">{formatBaht(c.amount)}</td>
                         <td className="px-3 py-2 text-right font-medium">
@@ -263,8 +294,6 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               )}
             </CardContent>
           </Card>
-
-          <OrderStatusControl orderId={order.id} status={order.status} />
 
           {(isGroomer || canEditItems) && order.status !== "CANCELLED" && (
             <Card>
@@ -308,7 +337,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     ? "text-emerald-600 dark:text-emerald-400"
                     : log.action.startsWith("ลบ")
                       ? "text-red-600 dark:text-red-400"
-                      : "";
+                      : log.action.startsWith("แก้ไข")
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "";
                   return (
                     <div key={log.id} className="flex items-center justify-between text-sm">
                       <span>

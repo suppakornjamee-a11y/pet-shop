@@ -12,18 +12,21 @@ import {
   isPastSlot,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
-import { orderStatusColor } from "@/lib/labels";
+import { getStatusBadgeInfo } from "@/lib/order-kind";
+import { requireUser } from "@/lib/auth-helpers";
 import { cn } from "@/lib/utils";
+import type { OrderStatus } from "@/generated/prisma/enums";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSlotPicker } from "@/components/custom-slot-picker";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
 export default async function CalendarPage(props: PageProps<"/calendar">) {
+  const user = await requireUser();
   const sp = await props.searchParams;
   const locale = await getLocale();
   const t = getDictionary(locale);
@@ -48,11 +51,33 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
     include: {
       customer: true,
       pet: true,
-      payments: { select: { status: true, expiresAt: true } },
+      payments: { select: { status: true, amount: true, expiresAt: true } },
+      extraCharges: { select: { amount: true } },
+      activityLogs: {
+        orderBy: { createdAt: "desc" },
+        select: { action: true, createdById: true },
+      },
     },
     orderBy: { appointmentAt: "asc" },
   });
   const bookings = rawBookings.filter((b) => isSlotHolding(b));
+
+  // ใช้ getStatusBadgeInfo ตัวเดียวกับหน้ารายละเอียดออเดอร์ กันสถานะขึ้นไม่ตรงกันระหว่างสองหน้า
+  function StatusBadge({
+    o,
+  }: {
+    o: {
+      status: OrderStatus;
+      roomId: string | null;
+      queueType: string | null;
+      total: number;
+      payments: { status: string; amount: number }[];
+      extraCharges: { amount: number }[];
+      activityLogs: { action: string; createdById: string | null }[];
+    };
+  }) {
+    return <OrderStatusBadges info={getStatusBadgeInfo(o, user)} t={t} size="xs" />;
+  }
 
   // นับต่อวัน + หาคิวของวันที่เลือก
   const countByDay = new Map<string, number>();
@@ -218,12 +243,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                         {booked.customer.name}
                       </span>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-[10px]", orderStatusColor[booked.status])}
-                    >
-                      {t.labels.orderStatus[booked.status]}
-                    </Badge>
+                    <StatusBadge o={booked} />
                   </Link>
                 );
               }
@@ -270,9 +290,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                     {b.customer.name}
                   </span>
                 </div>
-                <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[b.status])}>
-                  {t.labels.orderStatus[b.status]}
-                </Badge>
+                <StatusBadge o={b} />
               </Link>
             ))}
 

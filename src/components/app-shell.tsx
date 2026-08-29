@@ -52,6 +52,7 @@ type NavGroup = {
 function getNavGroups(t: Dictionary): NavGroup[] {
   return [
     {
+      title: t.nav.mainGroup,
       items: [
         { href: "/", label: t.nav.dashboard, icon: DashboardImageIcon, hiddenForGroomer: true },
         { href: "/register", label: t.nav.register, icon: RegisterImageIcon, hiddenForGroomer: true },
@@ -94,14 +95,9 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-18 items-center gap-3 border-b px-5">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl">
-          🐾
-        </span>
-        <div className="leading-tight">
-          <div className="text-lg font-bold tracking-tight">{t.nav.brand}</div>
-          <div className="text-xs text-muted-foreground">{t.nav.brandSubtitle}</div>
-        </div>
+      <div className="border-b">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logo.png" alt={t.nav.brand} className="block h-auto w-full object-cover" />
       </div>
 
       <nav className="flex-1 space-y-7 overflow-y-auto px-3.5 py-5">
@@ -132,7 +128,7 @@ function SidebarContent({
                         href={item.href}
                         onClick={onNavigate}
                         className={cn(
-                          "flex items-center gap-3.5 rounded-lg px-3.5 py-2.5 text-[15px] transition-colors",
+                          "flex items-center gap-3.5 rounded-full px-3.5 py-2.5 text-[15px] transition-colors",
                           active
                             ? "bg-primary/10 font-semibold text-primary"
                             : "font-medium text-foreground/65 hover:bg-accent/70 hover:text-foreground"

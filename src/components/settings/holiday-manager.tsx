@@ -92,14 +92,10 @@ export function HolidayManager({ holidays }: { holidays: Holiday[] }) {
             {holidays.map((h) => (
               <div key={h.id} className="flex items-center justify-between gap-3 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/images/icons/holiday.png" alt="" className="h-full w-full object-cover" />
-                  </div>
                   <div>
                     <div className="font-medium">{h.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {formatDateLong(`${h.date}T00:00:00+07:00`)} · +{formatBaht(h.extraCharge)}
+                      {formatDateLong(`${h.date}T00:00:00+07:00`)} · ({formatBaht(h.extraCharge)})
                     </div>
                   </div>
                 </div>

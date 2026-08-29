@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ClipboardPlus, Wallet, ReceiptText, CalendarClock, Pencil, History } from "lucide-react";
+import { Wallet, ReceiptText, CalendarClock, Pencil, History } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
 import { orderStatusColor, isFleaTickCheckStale } from "@/lib/labels";
@@ -54,18 +54,13 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
         title={t.customers.customerNameWithTitle(customer.name)}
         description={t.customers.customerSince(formatDate(customer.createdAt))}
         action={
-          <>
-            <Button
-              render={<Link href={`/customers/${customer.id}/edit`} />}
-              nativeButton={false}
-              variant="outline"
-            >
-              <Pencil /> {t.customers.editInfo}
-            </Button>
-            <Button render={<Link href={`/calendar?customerId=${customer.id}`} />} nativeButton={false}>
-              <ClipboardPlus /> {t.customers.bookOrder}
-            </Button>
-          </>
+          <Button
+            render={<Link href={`/customers/${customer.id}/edit`} />}
+            nativeButton={false}
+            variant="outline"
+          >
+            <Pencil /> {t.customers.editInfo}
+          </Button>
         }
       />
 
