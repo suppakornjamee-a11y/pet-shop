@@ -29,25 +29,25 @@ function MenuButton({ color, icon, label }: { color: string; icon: string; label
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 26,
+        gap: 30,
         padding: "0 30px",
       }}
     >
       <div
         style={{
           display: "flex",
-          width: 260,
-          height: 260,
+          width: 360,
+          height: 360,
           borderRadius: 999,
           background: color,
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 140,
+          fontSize: 200,
         }}
       >
         {icon}
       </div>
-      <div style={{ display: "flex", fontSize: 54, fontWeight: 700, color, whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ display: "flex", fontSize: 62, fontWeight: 700, color, whiteSpace: "nowrap" }}>{label}</div>
     </div>
   );
 }
