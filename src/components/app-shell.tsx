@@ -25,6 +25,7 @@ import {
   UserAvatarFlatIcon,
   BedFlatIcon,
   LogoutImageIcon,
+  DocumentFlatIcon,
 } from "@/components/nav-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -74,6 +75,7 @@ function getNavGroups(t: Dictionary): NavGroup[] {
         { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankAccountsImageIcon, adminOnly: true },
         { href: "/settings/users", label: t.nav.users, icon: UserAvatarFlatIcon, adminOnly: true },
         { href: "/settings/holidays", label: t.nav.holidays, icon: HolidayImageIcon, adminOnly: true },
+        { href: "/settings/shop-info", label: t.nav.shopInfo, icon: DocumentFlatIcon, adminOnly: true },
       ],
     },
   ];

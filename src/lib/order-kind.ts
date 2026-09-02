@@ -60,7 +60,9 @@ export function canStartOrder(orderKind: OrderKind, role: Role): boolean {
 }
 
 export type StatusBadgeInfo =
+  | { kind: "SLIP_SUBMITTED" }
   | { kind: "GROOMER_FINISHED" }
+  | { kind: "BATHING_IN_PROGRESS" }
   | { kind: "AWAITING_PAYMENT" }
   | { kind: "PLAIN"; status: OrderStatus };
 
@@ -80,6 +82,10 @@ export function getStatusBadgeInfo(
   },
   viewer: { id: string; role: Role }
 ): StatusBadgeInfo {
+  // มีสลิปรอตรวจสอบอยู่ ให้ขึ้นก่อนเสมอไม่ว่าสถานะออเดอร์จะเป็นอะไร (ยกเว้นยกเลิกแล้ว) กันสับสนว่าลูกค้าจ่ายหรือยัง
+  if (order.status !== "CANCELLED" && order.payments.some((p) => p.status === "SUBMITTED")) {
+    return { kind: "SLIP_SUBMITTED" };
+  }
   if (order.status !== "IN_PROGRESS") {
     return { kind: "PLAIN", status: order.status };
   }
@@ -88,6 +94,12 @@ export function getStatusBadgeInfo(
   if (orderKind === "BATH" && viewer.role === "GROOMER") {
     const { finished } = getMyGroomerPhase(order.activityLogs, viewer.id);
     if (finished) return { kind: "GROOMER_FINISHED" };
+  }
+
+  // ยังไม่มีช่างคนไหนกด "ทำรายการเสร็จสิ้น" เลย — งานยังอาบน้ำอยู่จริง ห้ามขึ้น "รอลูกค้าชำระเงิน"
+  // ก่อนงานเสร็จ (ไม่งั้นพนักงาน/แอดมินจะเข้าใจผิดว่าอาบน้ำเสร็จแล้วทั้งที่ช่างยังไม่กดจบงาน)
+  if (orderKind === "BATH" && !order.activityLogs.some((l) => l.action.endsWith("ทำรายการเสร็จสิ้น"))) {
+    return { kind: "BATHING_IN_PROGRESS" };
   }
 
   const showCheckout = canCheckoutOrder(orderKind, viewer.role);

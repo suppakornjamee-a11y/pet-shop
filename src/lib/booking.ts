@@ -1,4 +1,6 @@
 import type { OrderStatus, PaymentStatus } from "@/generated/prisma/enums";
+import { prisma } from "@/lib/prisma";
+import { buildSlotDate, isValidDateStr, isValidTimeStr } from "@/lib/slots";
 
 export type OrderForHold = {
   status: OrderStatus;
@@ -30,4 +32,31 @@ export function isSlotHolding(o: OrderForHold, now: Date = new Date()): boolean 
     }
     return true; // VERIFIED, SUBMITTED, หรือ PENDING ที่ยังไม่หมดอายุ → กันชั่วคราว
   });
+}
+
+/**
+ * เช็คว่า slot คิวส่วนกลางนี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่)
+ * แยกพูลคิวตาม queueType (BATH = จองอาบน้ำ, OTHER = จองบริการอื่นๆ) ไม่แย่งเวลากัน
+ * ออเดอร์เก่าก่อนมีฟีเจอร์นี้ (queueType เป็น null) ถือเป็นพูล BATH
+ */
+export async function isSlotAvailable(
+  dateStr: string,
+  timeStr: string,
+  excludeOrderId?: string,
+  queueType: "BATH" | "OTHER" = "BATH"
+): Promise<boolean> {
+  if (!isValidDateStr(dateStr) || !isValidTimeStr(timeStr)) return false;
+  const at = buildSlotDate(dateStr, timeStr);
+  const orders = await prisma.order.findMany({
+    where: {
+      appointmentAt: at,
+      ...(queueType === "BATH" ? { OR: [{ queueType: "BATH" }, { queueType: null }] } : { queueType: "OTHER" }),
+      ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
+    },
+    select: {
+      status: true,
+      payments: { select: { status: true, expiresAt: true } },
+    },
+  });
+  return !orders.some((o) => isSlotHolding(o));
 }

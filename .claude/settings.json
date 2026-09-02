@@ -24,7 +24,31 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 5 https://www.google.com)",
       "Bash(curl -s -o /dev/null -w \"google.com: %{http_code}\\\\n\" --max-time 5 https://www.google.com)",
       "Bash(curl -s -o /dev/null -w \"github.com: %{http_code}\\\\n\" --max-time 5 https://github.com)",
-      "Bash(ping -n 1 -w 3000 github.com)"
+      "Bash(ping -n 1 -w 3000 github.com)",
+      "Bash(cat)",
+      "Bash(DATABASE_URL=\"postgres://postgres:postgres@localhost:51215/template1?sslmode=disable&connection_limit=10&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0\" npx prisma db execute --file reset_shadow_tmp.sql)",
+      "Bash(rm -f reset_shadow_tmp.sql)",
+      "Bash(cd c:/Users/SuppakornJame/petcare-app && mkdir -p src/app/liff/register src/app/liff/link src/app/liff/book \"src/app/liff/pay/[id]\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/liff)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/liff/register)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/liff/link)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/liff/book)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/liff/pay/test123)",
+      "Bash(cat /tmp/nextdev.log; echo \"---ps---\"; ps aux | grep -i \"next\\\\|node\" | grep -v grep)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/liff)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/liff/register)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/liff/link)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/liff/book)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/liff/pay/test123)",
+      "Bash(curl -s http://localhost:3000/liff)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/register)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "WebSearch",
+      "WebFetch(domain:developers.line.biz)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\SuppakornJame\\petcare-app\\src\\app\\liff\\pay"
     ]
   }
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { CalendarClock, BedDouble } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { isSlotAvailable } from "@/app/actions/orders";
+import { isSlotAvailable } from "@/lib/booking";
 import { isValidDateStr, isValidTimeStr, isPastSlot } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { OrderForm } from "@/components/order-form";

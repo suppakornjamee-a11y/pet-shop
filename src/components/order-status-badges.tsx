@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { orderStatusColor } from "@/lib/labels";
+import { orderStatusColor, paymentStatusColor } from "@/lib/labels";
 import type { StatusBadgeInfo } from "@/lib/order-kind";
 import type { Dictionary } from "@/i18n/dictionaries/th";
 
@@ -15,6 +15,22 @@ export function OrderStatusBadges({
   size?: "sm" | "xs";
 }) {
   const textSize = size === "sm" ? "text-xs" : "text-[10px]";
+
+  if (info.kind === "SLIP_SUBMITTED") {
+    return (
+      <Badge variant="outline" className={cn(textSize, paymentStatusColor.SUBMITTED)}>
+        {t.orders.slipPendingReviewBadge}
+      </Badge>
+    );
+  }
+
+  if (info.kind === "BATHING_IN_PROGRESS") {
+    return (
+      <Badge variant="outline" className={cn(textSize, orderStatusColor.IN_PROGRESS)}>
+        {t.orders.bathingInProgressBadge}
+      </Badge>
+    );
+  }
 
   if (info.kind === "GROOMER_FINISHED") {
     return (

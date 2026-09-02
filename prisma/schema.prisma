@@ -127,6 +127,11 @@ enum Locale {
   EN
 }
 
+enum CreationChannel {
+  STAFF // ค่าเริ่มต้น — พนักงานสร้าง/ลงทะเบียนผ่านระบบหลังบ้าน
+  LIFF // ลูกค้าทำเองผ่าน LINE LIFF mini-app
+}
+
 // ---------- Staff / Auth ----------
 
 model User {
@@ -154,19 +159,20 @@ model User {
 // ---------- Customers & Pets ----------
 
 model Customer {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
   name              String // ชื่อจริง นามสกุลจริงเจ้าของ
   nickname          String? // ชื่อเล่นเจ้าของ
   phone             String
   email             String?
   address           String?
   lineId            String?
-  lineUserId        String?  @unique // LINE userId ที่ผูกผ่าน webhook (แยกจาก lineId ที่เป็นข้อความอิสระ)
+  lineUserId        String?         @unique // LINE userId ที่ผูกผ่าน webhook (แยกจาก lineId ที่เป็นข้อความอิสระ)
   petInstagram      String? // Instagram ของสัตว์เลี้ยง
-  preferredLanguage Locale   @default(TH) // ภาษาที่ลูกค้าใช้สื่อสารด้วย
+  preferredLanguage Locale          @default(TH) // ภาษาที่ลูกค้าใช้สื่อสารด้วย
+  createdVia        CreationChannel @default(STAFF) // สร้างโดยพนักงาน หรือลูกค้าลงทะเบียนเองผ่าน LINE LIFF
   note              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   pets   Pet[]
   orders Order[]
@@ -354,6 +360,7 @@ model Order {
   createdById      String?
   updatedBy        User?       @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
   updatedById      String?
+  createdVia       CreationChannel @default(STAFF) // สร้างโดยพนักงาน หรือลูกค้าจองเองผ่าน LINE LIFF
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 

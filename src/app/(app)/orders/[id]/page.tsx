@@ -10,6 +10,7 @@ import {
   Bug,
   UserCheck,
   Video,
+  Smartphone,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
@@ -124,7 +125,14 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
           <Card>
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
+                  {order.createdVia === "LIFF" && (
+                    <Badge variant="outline" className="gap-1 text-sky-700 dark:text-sky-400">
+                      <Smartphone className="h-3 w-3" /> {t.orders.bookedViaLiff}
+                    </Badge>
+                  )}
+                </div>
                 {orderKind === "BATH" && activeWorkers.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     {t.orders.activeWorkersLabel}:{" "}

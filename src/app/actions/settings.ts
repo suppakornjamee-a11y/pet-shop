@@ -6,6 +6,7 @@ import ExcelJS from "exceljs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireAdmin } from "@/lib/auth-helpers";
+import { SHOP_INFO_KEYS } from "@/lib/settings";
 import type { ActionResult } from "./customers";
 
 /* ---------------- Products / Stock ---------------- */
@@ -485,4 +486,35 @@ export async function deleteHoliday(id: string): Promise<ActionResult> {
   await prisma.holiday.delete({ where: { id } });
   revalidatePath("/settings/holidays");
   return { ok: true, message: "ลบวันหยุดเรียบร้อย" };
+}
+
+/* ---------------- ข้อมูลร้าน (ADMIN only) — ใช้แสดงบนใบเสร็จ ---------------- */
+
+const shopInfoSchema = z.object({
+  name: z.string().min(1, "กรุณากรอกชื่อร้าน"),
+  address: z.string().optional(),
+  taxId: z.string().optional(),
+  lineId: z.string().optional(),
+});
+
+export async function upsertShopInfo(input: unknown): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = shopInfoSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { name, address, taxId, lineId } = parsed.data;
+
+  const values: Record<string, string> = {
+    [SHOP_INFO_KEYS.name]: name,
+    [SHOP_INFO_KEYS.address]: address ?? "",
+    [SHOP_INFO_KEYS.taxId]: taxId ?? "",
+    [SHOP_INFO_KEYS.lineId]: lineId ?? "",
+  };
+  await prisma.$transaction(
+    Object.entries(values).map(([key, value]) =>
+      prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } })
+    )
+  );
+
+  revalidatePath("/settings/shop-info");
+  return { ok: true, message: "บันทึกข้อมูลร้านเรียบร้อย" };
 }

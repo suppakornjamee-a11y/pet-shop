@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Save, ImagePlus, X, Syringe, Bug } from "lucide-react";
-import { createCustomerWithPets, updateCustomerWithPets } from "@/app/actions/customers";
+import { createCustomerWithPets, updateCustomerWithPets, type ActionResult } from "@/app/actions/customers";
 import { fileToDataUrl } from "@/lib/file";
 import { ageFromBirthDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,8 @@ const emptyPet: PetForm = {
   vaccineComplete: false,
 };
 
+const MAX_PHOTOS = 2;
+
 function MultiPhotoUpload({
   label,
   values,
@@ -99,12 +101,15 @@ function MultiPhotoUpload({
 }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
+  const remaining = MAX_PHOTOS - values.length;
 
   async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || remaining <= 0) return;
     setLoading(true);
     try {
-      const uploaded = await Promise.all(Array.from(files).map((f) => fileToDataUrl(f)));
+      const uploaded = await Promise.all(
+        Array.from(files).slice(0, remaining).map((f) => fileToDataUrl(f))
+      );
       onChange([...values, ...uploaded]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t.register.uploadFailed);
@@ -140,7 +145,7 @@ function MultiPhotoUpload({
             )}
           </div>
         ))}
-        {!readOnly && (
+        {!readOnly && remaining > 0 && (
           <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors hover:bg-accent/50">
             {loading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -215,6 +220,8 @@ export function RegisterForm({
   initialCustomer,
   initialPets,
   footer,
+  onSubmit,
+  onSuccess,
 }: {
   mode?: "create" | "edit" | "view";
   customerId?: string;
@@ -222,6 +229,11 @@ export function RegisterForm({
   initialPets?: PetForm[];
   /** เนื้อหาเสริมต่อท้าย (เช่น สรุปยอดใช้จ่าย/ประวัติการใช้บริการ) — ใช้กับหน้าประวัติลูกค้าเท่านั้น */
   footer?: React.ReactNode;
+  /** ปลายทางบันทึกข้อมูลแบบอื่นนอกจากพนักงาน (เช่น ลูกค้าลงทะเบียนเองผ่าน LINE) — ไม่ระบุ = ใช้ createCustomerWithPets/updateCustomerWithPets ตามเดิม
+   * รับ/คืนค่าแบบเดียวกับ createCustomerWithPets (unknown เข้า ActionResult ออก) เพราะฝั่งรับไป Zod-parse เองอยู่แล้ว */
+  onSubmit?: (args: { customer: unknown; pets: unknown }) => Promise<ActionResult>;
+  /** พาไปหน้าอื่นหลังบันทึกสำเร็จ นอกเหนือจากค่าเริ่มต้น (ไปหน้ารายละเอียดลูกค้าฝั่งพนักงาน) */
+  onSuccess?: (id: string | undefined, message: string | undefined) => void;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -255,8 +267,9 @@ export function RegisterForm({
         ...p,
         weightKg: p.weightKg ? Number(p.weightKg) : undefined,
       }));
-      const res =
-        isEdit && customerId
+      const res = onSubmit
+        ? await onSubmit({ customer, pets: petsPayload })
+        : isEdit && customerId
           ? await updateCustomerWithPets({ customerId, customer, pets: petsPayload })
           : await createCustomerWithPets({ customer, pets: petsPayload });
       if (!res.ok) {
@@ -264,7 +277,8 @@ export function RegisterForm({
         return;
       }
       toast.success(res.message ?? t.register.saveSuccess);
-      router.push(`/customers/${res.id ?? customerId}`);
+      if (onSuccess) onSuccess(res.id ?? customerId, res.message);
+      else router.push(`/customers/${res.id ?? customerId}`);
     });
   }
 
@@ -535,7 +549,6 @@ export function RegisterForm({
                 lang="en-GB"
                 value={pet.vaccine5in1Date}
                 onChange={(e) => updatePet(i, { vaccine5in1Date: e.target.value })}
-                required
                 disabled={readOnly}
               />
             </div>
@@ -548,7 +561,6 @@ export function RegisterForm({
                 lang="en-GB"
                 value={pet.rabiesVaccineDate}
                 onChange={(e) => updatePet(i, { rabiesVaccineDate: e.target.value })}
-                required
                 disabled={readOnly}
               />
             </div>
@@ -561,7 +573,6 @@ export function RegisterForm({
                 lang="en-GB"
                 value={pet.lastFleaTickDate}
                 onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
-                required
                 disabled={readOnly}
               />
             </div>
@@ -570,7 +581,6 @@ export function RegisterForm({
               <Input
                 value={pet.fleaTickMedicine}
                 onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
-                required
                 disabled={readOnly}
               />
             </div>
@@ -639,9 +649,6 @@ export function RegisterForm({
       {/* Section ล่างสุด: ภาษาที่เลือก — ไม่แสดงในโหมดดูอย่างเดียว (หน้าประวัติลูกค้า) */}
       {!readOnly && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.register.languageSectionTitle}</CardTitle>
-          </CardHeader>
           <CardContent className="max-w-xs space-y-2">
             <Label>{t.register.preferredLanguageLabel}</Label>
             <Select

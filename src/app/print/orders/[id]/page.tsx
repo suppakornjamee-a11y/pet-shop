@@ -1,15 +1,11 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { getShopInfo } from "@/lib/settings";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
-
-async function getSetting(key: string, fallback: string) {
-  const s = await prisma.setting.findUnique({ where: { key } });
-  return s?.value ?? fallback;
-}
 
 export default async function PrintOrderPage(props: PageProps<"/print/orders/[id]">) {
   await requireUser();
@@ -22,8 +18,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
   if (!order) notFound();
 
   const extraChargesTotal = order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
-  const shopName = await getSetting("shop_name", "PetCare");
-  const shopAddress = await getSetting("shop_address", "");
+  const shop = await getShopInfo();
   const t = getDictionary(await getLocale());
 
   return (
@@ -36,10 +31,11 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
       <div className="mx-auto max-w-[800px] rounded-lg bg-white p-8 shadow-sm print:max-w-none print:rounded-none print:shadow-none">
         <div className="flex items-start justify-between border-b pb-4">
           <div>
-            <div className="text-2xl font-bold">🐾 {shopName}</div>
-            {shopAddress && (
-              <div className="mt-1 text-sm text-zinc-500">{shopAddress}</div>
+            <div className="text-2xl font-bold">{shop.name}</div>
+            {shop.address && (
+              <div className="mt-1 text-sm whitespace-pre-line text-zinc-500">{shop.address}</div>
             )}
+            {shop.taxId && <div className="text-sm text-zinc-500">{t.print.taxIdLabel(shop.taxId)}</div>}
           </div>
           <div className="text-right">
             <div className="text-lg font-bold">{t.print.receiptTitle}</div>
@@ -114,6 +110,7 @@ export default async function PrintOrderPage(props: PageProps<"/print/orders/[id
 
         <div className="mt-6 border-t pt-4 text-center text-sm text-zinc-400">
           {t.print.thankYou}
+          {shop.lineId && <div className="mt-1">{t.print.lineIdLabel(shop.lineId)}</div>}
         </div>
       </div>
 

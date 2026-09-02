@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Wallet, ReceiptText, CalendarClock, Pencil, History } from "lucide-react";
+import { Wallet, ReceiptText, CalendarClock, Pencil, History, Smartphone } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatBaht, formatDate, formatDateTime } from "@/lib/format";
-import { orderStatusColor, isFleaTickCheckStale } from "@/lib/labels";
+import { isFleaTickCheckStale } from "@/lib/labels";
+import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { toThaiDateStr } from "@/lib/slots";
-import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { getLocale } from "@/i18n/get-locale";
 import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function CustomerDetailPage(props: PageProps<"/customers/[id]">) {
-  await requireStaffUser();
+  const user = await requireStaffUser();
   const { id } = await props.params;
 
   const customer = await prisma.customer.findUnique({
@@ -28,7 +29,13 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
       pets: { orderBy: { createdAt: "asc" } },
       orders: {
         orderBy: { createdAt: "desc" },
-        include: { pet: true, items: true },
+        include: {
+          pet: true,
+          items: true,
+          payments: { select: { status: true, amount: true } },
+          extraCharges: { select: { amount: true } },
+          activityLogs: { select: { action: true, createdById: true } },
+        },
       },
     },
   });
@@ -68,7 +75,14 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <History className="h-3 w-3" /> {t.customers.lastEdited(formatDateTime(customer.updatedAt))}
         </div>
-        <LineConnectButton linked={!!customer.lineUserId} linkUrl={buildLineLinkUrl(customer.id)} />
+        <div className="flex flex-wrap items-center gap-2">
+          <LineConnectButton linked={!!customer.lineUserId} linkUrl={buildLineLinkUrl(customer.id)} />
+          {customer.createdVia === "LIFF" && (
+            <Badge variant="outline" className="gap-1 text-sky-700 dark:text-sky-400">
+              <Smartphone className="h-3 w-3" /> {t.customers.registeredViaLiff}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {petsNeedingFleaCheck.length > 0 && (
@@ -182,12 +196,7 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{o.code}</span>
-                            <Badge
-                              variant="outline"
-                              className={cn("text-[10px]", orderStatusColor[o.status])}
-                            >
-                              {t.labels.orderStatus[o.status]}
-                            </Badge>
+                            <OrderStatusBadges info={getStatusBadgeInfo(o, user)} t={t} size="xs" />
                           </div>
                           <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                             {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}

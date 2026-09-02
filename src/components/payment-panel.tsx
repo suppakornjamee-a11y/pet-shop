@@ -11,6 +11,7 @@ import {
   Clock,
   QrCode,
   Wallet,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   regeneratePayment,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/components/i18n-provider";
 
 type PaymentRow = {
@@ -86,6 +88,8 @@ export function PaymentPanel({
   // รายการที่ถูกปฏิเสธไม่ต้องโชว์ในสรุปยอด — เหลือแค่รายการที่ยังมีผลอยู่จริง
   const visiblePayments = payments.filter((p) => p.status !== "REJECTED");
   const showPurposeLabel = visiblePayments.length > 1;
+  // สลิปที่ลูกค้าแนบมา — เก็บไว้ดูย้อนหลังได้เสมอผ่านปุ่มนี้ แม้ออเดอร์จะจ่ายครบแล้วจนการ์ด QR หายไปก็ตาม
+  const paymentsWithSlip = payments.filter((p) => p.slipUrl);
 
   return (
     <Card className="lg:sticky lg:top-20">
@@ -93,12 +97,15 @@ export function PaymentPanel({
         <CardTitle className="flex items-center gap-2 text-base">
           {t.orders.payment.title}
         </CardTitle>
-        {activePayment && (
-          <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>
-            {showPurposeLabel && `${t.labels.paymentPurpose[activePayment.purpose]} · `}
-            {t.labels.paymentStatus[activePayment.status]}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {paymentsWithSlip.length > 0 && <SlipViewerDialog payments={paymentsWithSlip} />}
+          {activePayment && (
+            <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>
+              {showPurposeLabel && `${t.labels.paymentPurpose[activePayment.purpose]} · `}
+              {t.labels.paymentStatus[activePayment.status]}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {visiblePayments.length > 1 && (
@@ -167,6 +174,45 @@ export function PaymentPanel({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SlipViewerDialog({ payments }: { payments: PaymentRow[] }) {
+  const { t } = useI18n();
+  const showPurposeLabel = payments.length > 1;
+
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm">
+            <ImageIcon className="h-3.5 w-3.5" /> {t.orders.payment.viewSlipButton}
+          </Button>
+        }
+      />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t.orders.payment.viewSlipButton}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto">
+          {payments.map((p) => (
+            <div key={p.id} className="space-y-1.5">
+              {showPurposeLabel && (
+                <div className="text-xs font-medium text-muted-foreground">
+                  {t.labels.paymentPurpose[p.purpose]} · {formatBaht(p.amount)}
+                </div>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.slipUrl!}
+                alt={t.orders.payment.slipFromCustomer}
+                className="mx-auto w-full rounded-lg border object-contain"
+              />
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -247,81 +293,84 @@ function ActivePaymentPanel({
 
       {isQueueBooking && payment.purpose === "DEPOSIT" && (
         <div className="rounded-lg border-2 border-red-600 bg-red-50 p-3 text-center dark:bg-red-950/40">
-          <p className="text-base leading-snug font-extrabold text-red-600 dark:text-red-400">
+          <p className="text-xs leading-snug font-extrabold text-red-600 dark:text-red-400">
             {t.orders.payment.depositQueueWarning}
           </p>
         </div>
       )}
 
-      {/* QR แบบ Thai QR Payment / PromptPay */}
-      <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
-        <div className="overflow-hidden rounded-3xl bg-white">
-          <div className="flex items-center justify-center gap-2.5 bg-[#0b2f6b] px-6 py-3 text-white">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/15">
-              <QrCode className="h-4.5 w-4.5" />
-            </span>
-            <div className="text-left text-sm leading-tight font-extrabold tracking-wide">
-              <div>THAI QR</div>
-              <div>PAYMENT</div>
+      {/* QR แบบ Thai QR Payment / PromptPay — ลูกค้าแนบสลิปมาแล้ว (SUBMITTED) ไม่ต้องโชว์อีก
+          เพราะรอพนักงานตรวจสลิปด้านล่างแทน ไม่ใช่รอให้จ่ายเพิ่ม */}
+      {payment.status !== "SUBMITTED" && (
+        <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
+          <div className="overflow-hidden rounded-3xl bg-white">
+            <div className="flex items-center justify-center gap-2.5 bg-[#0b2f6b] px-6 py-3 text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/15">
+                <QrCode className="h-4.5 w-4.5" />
+              </span>
+              <div className="text-left text-sm leading-tight font-extrabold tracking-wide">
+                <div>THAI QR</div>
+                <div>PAYMENT</div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-col items-center gap-0.5 pt-3">
-            <span className="text-[9px] font-medium text-[#0b2f6b]">พร้อมเพย์</span>
-            <div className="flex overflow-hidden rounded border border-[#0b2f6b] text-xs font-bold">
-              <span className="px-1.5 py-0.5 text-[#0b2f6b]">Prompt</span>
-              <span className="bg-[#0b2f6b] px-1.5 py-0.5 text-white">Pay</span>
+            <div className="flex flex-col items-center gap-0.5 pt-3">
+              <span className="text-[9px] font-medium text-[#0b2f6b]">พร้อมเพย์</span>
+              <div className="flex overflow-hidden rounded border border-[#0b2f6b] text-xs font-bold">
+                <span className="px-1.5 py-0.5 text-[#0b2f6b]">Prompt</span>
+                <span className="bg-[#0b2f6b] px-1.5 py-0.5 text-white">Pay</span>
+              </div>
             </div>
-          </div>
 
-          <div className="relative p-4">
-            {qrDataUrl ? (
-              <div className={cn("relative transition", isUnusable && "opacity-30 blur-[2px]")}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qrDataUrl}
-                  alt="PromptPay QR"
-                  width={220}
-                  height={220}
-                  className="mx-auto"
-                />
-                <div className="absolute top-1/2 left-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border-2 border-[#0b2f6b] bg-white shadow">
-                  <QrCode className="h-4 w-4 text-[#0b2f6b]" />
+            <div className="relative p-4">
+              {qrDataUrl ? (
+                <div className={cn("relative transition", isUnusable && "opacity-30 blur-[2px]")}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrDataUrl}
+                    alt="PromptPay QR"
+                    width={220}
+                    height={220}
+                    className="mx-auto"
+                  />
+                  <div className="absolute top-1/2 left-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border-2 border-[#0b2f6b] bg-white shadow">
+                    <QrCode className="h-4 w-4 text-[#0b2f6b]" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-zinc-400">
+                  {t.orders.payment.noQrYet}<br />{t.orders.payment.noQrHint}
+                </div>
+              )}
+              {isUnusable && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 text-center">
+                  {isCancelled ? (
+                    <>
+                      <XCircle className="h-8 w-8 text-rose-500" />
+                      <span className="font-medium text-zinc-800">{t.orders.payment.orderCancelled}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-8 w-8 text-zinc-500" />
+                      <span className="font-medium text-zinc-800">{t.orders.payment.qrExpired}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {account && (
+              <div className="px-4 pb-4 text-center">
+                <div className="text-base font-bold text-zinc-800">{account.accountName}</div>
+                <div className="mt-1 text-xs text-zinc-500">{t.orders.payment.accountLabel}{account.accountName}</div>
+                <div className="text-xs tracking-wide text-zinc-400">
+                  {t.orders.payment.refNumber}{account.accountNumber}
                 </div>
               </div>
-            ) : (
-              <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-zinc-400">
-                {t.orders.payment.noQrYet}<br />{t.orders.payment.noQrHint}
-              </div>
-            )}
-            {isUnusable && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 text-center">
-                {isCancelled ? (
-                  <>
-                    <XCircle className="h-8 w-8 text-rose-500" />
-                    <span className="font-medium text-zinc-800">{t.orders.payment.orderCancelled}</span>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-8 w-8 text-zinc-500" />
-                    <span className="font-medium text-zinc-800">{t.orders.payment.qrExpired}</span>
-                  </>
-                )}
-              </div>
             )}
           </div>
-
-          {account && (
-            <div className="px-4 pb-4 text-center">
-              <div className="text-base font-bold text-zinc-800">{account.accountName}</div>
-              <div className="mt-1 text-xs text-zinc-500">{t.orders.payment.accountLabel}{account.accountName}</div>
-              <div className="text-xs tracking-wide text-zinc-400">
-                {t.orders.payment.refNumber}{account.accountNumber}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Countdown */}
       {!isUnusable && payment.expiresAt && payment.status !== "SUBMITTED" && (
@@ -334,7 +383,7 @@ function ActivePaymentPanel({
         </div>
       )}
 
-      {!isCancelled && (
+      {!isCancelled && payment.status !== "SUBMITTED" && (
         <Button
           variant="outline"
           className="w-full"
@@ -349,6 +398,20 @@ function ActivePaymentPanel({
       {payment.rejectReason && payment.status === "REJECTED" && (
         <div className="rounded-lg bg-rose-50 p-3 text-center text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-400">
           {t.orders.payment.rejectedReason(payment.rejectReason)}
+        </div>
+      )}
+
+      {/* สลิปที่ลูกค้าแนบมาเอง (ผ่านหน้าจ่ายเงินฝั่ง LINE) — เผื่อกรณี API เช็คสลิปอัตโนมัติใช้งานไม่ได้
+          พนักงานยังตรวจด้วยตาตรงนี้ได้เสมอ ก่อนกดยืนยัน/ปฏิเสธด้านล่าง */}
+      {payment.slipUrl && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium text-muted-foreground">{t.orders.payment.slipFromCustomer}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={payment.slipUrl}
+            alt={t.orders.payment.slipFromCustomer}
+            className="mx-auto max-h-80 w-full rounded-lg border object-contain"
+          />
         </div>
       )}
 

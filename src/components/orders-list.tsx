@@ -2,13 +2,13 @@ import Link from "next/link";
 import { ClipboardPlus, ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { OrderStatus } from "@/generated/prisma/enums";
+import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusColor } from "@/lib/labels";
-import { cn } from "@/lib/utils";
+import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
@@ -24,6 +24,7 @@ export async function OrdersList({
   bookHref: string;
   status: string;
 }) {
+  const user = await requireUser();
   const t = getDictionary(await getLocale());
 
   const filters: { label: string; value: string }[] = [
@@ -46,7 +47,13 @@ export async function OrdersList({
       ...queueWhere,
       ...(status !== "all" ? { status: status as OrderStatus } : {}),
     },
-    include: { customer: true, pet: true },
+    include: {
+      customer: true,
+      pet: true,
+      payments: { select: { status: true, amount: true } },
+      extraCharges: { select: { amount: true } },
+      activityLogs: { select: { action: true, createdById: true } },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -99,12 +106,7 @@ export async function OrdersList({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{o.code}</span>
-                      <Badge
-                        variant="outline"
-                        className={cn("text-[10px]", orderStatusColor[o.status])}
-                      >
-                        {t.labels.orderStatus[o.status]}
-                      </Badge>
+                      <OrderStatusBadges info={getStatusBadgeInfo(o, user)} t={t} size="xs" />
                     </div>
                     <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                       {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}

@@ -9,15 +9,15 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatBaht, formatDateTime } from "@/lib/format";
-import { orderStatusColor } from "@/lib/labels";
+import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { PageHeader } from "@/components/page-header";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
-import { cn } from "@/lib/utils";
 import { requireStaffUser } from "@/lib/auth-helpers";
 
 function CheckInStatIcon({ className }: { className?: string }) {
@@ -50,7 +50,7 @@ function toDateStr(d: Date) {
 }
 
 export default async function DashboardPage(props: PageProps<"/">) {
-  await requireStaffUser();
+  const user = await requireStaffUser();
   const t = getDictionary(await getLocale());
   const searchParams = await props.searchParams;
   const dateParam = typeof searchParams.date === "string" ? searchParams.date : undefined;
@@ -90,7 +90,9 @@ export default async function DashboardPage(props: PageProps<"/">) {
       include: {
         customer: true,
         pet: true,
-        payments: { where: { status: "VERIFIED" }, select: { amount: true } },
+        payments: { select: { status: true, amount: true } },
+        extraCharges: { select: { amount: true } },
+        activityLogs: { select: { action: true, createdById: true } },
       },
     }),
     prisma.order.count({
@@ -227,7 +229,9 @@ export default async function DashboardPage(props: PageProps<"/">) {
           ) : (
             <div className="divide-y">
               {dayOrderList.map((o) => {
-                const paidSum = o.payments.reduce((sum, p) => sum + p.amount, 0);
+                const paidSum = o.payments
+                  .filter((p) => p.status === "VERIFIED")
+                  .reduce((sum, p) => sum + p.amount, 0);
                 const isUnderpaid = o.status === "COMPLETED" && paidSum < o.total;
                 return (
                 <Link
@@ -238,9 +242,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{o.code}</span>
-                      <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[o.status])}>
-                        {t.labels.orderStatus[o.status]}
-                      </Badge>
+                      <OrderStatusBadges info={getStatusBadgeInfo(o, user)} t={t} size="xs" />
                       {isUnderpaid && (
                         <Badge
                           variant="outline"

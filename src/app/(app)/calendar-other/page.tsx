@@ -12,18 +12,20 @@ import {
   isPastSlot,
 } from "@/lib/slots";
 import { isSlotHolding } from "@/lib/booking";
-import { orderStatusColor } from "@/lib/labels";
+import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { cn } from "@/lib/utils";
+import { requireUser } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
+import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSlotPicker } from "@/components/custom-slot-picker";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
 export default async function CalendarOtherPage(props: PageProps<"/calendar-other">) {
+  const user = await requireUser();
   const sp = await props.searchParams;
   const locale = await getLocale();
   const t = getDictionary(locale);
@@ -45,7 +47,9 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
     include: {
       customer: true,
       pet: true,
-      payments: { select: { status: true, expiresAt: true } },
+      payments: { select: { status: true, expiresAt: true, amount: true } },
+      extraCharges: { select: { amount: true } },
+      activityLogs: { select: { action: true, createdById: true } },
     },
     orderBy: { appointmentAt: "asc" },
   });
@@ -213,12 +217,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
                         {booked.customer.name}
                       </span>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-[10px]", orderStatusColor[booked.status])}
-                    >
-                      {t.labels.orderStatus[booked.status]}
-                    </Badge>
+                    <OrderStatusBadges info={getStatusBadgeInfo(booked, user)} t={t} size="xs" />
                   </Link>
                 );
               }
@@ -267,9 +266,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
                     {b.customer.name}
                   </span>
                 </div>
-                <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[b.status])}>
-                  {t.labels.orderStatus[b.status]}
-                </Badge>
+                <OrderStatusBadges info={getStatusBadgeInfo(b, user)} t={t} size="xs" />
               </Link>
             ))}
 
