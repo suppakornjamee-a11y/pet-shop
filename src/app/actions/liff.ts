@@ -8,8 +8,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { verifyLiffIdToken, sendLinePush, buildLiffDeepLink } from "@/lib/line";
-import { formatBaht } from "@/lib/format";
+import { verifyLiffIdToken } from "@/lib/line";
 import { customerSchema, petRegisterSchema, petCreateData } from "@/lib/customer-schema";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
 import { createInitialPayments } from "./orders";
@@ -25,16 +24,6 @@ const LIFF_TIME_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
   const totalMin = 10 * 60 + i * 30;
   return `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
 });
-
-/** ส่ง push แจ้งลิงก์กลับไปหาลูกค้า — เงียบๆ ไม่ throw ถ้าส่งไม่สำเร็จ (lineUserId ยืนยันแล้วแน่นอน
- * ตอนถูกเรียกทุกจุด ไม่ต้อง query ซ้ำเหมือน notifyCustomerLine ฝั่งพนักงานที่ต้องหาจาก orderId) */
-async function notifyLiffCustomer(lineUserId: string, text: string) {
-  try {
-    await sendLinePush(lineUserId, text);
-  } catch (e) {
-    console.error("[LIFF] push notification failed:", e);
-  }
-}
 
 function maskName(name: string): string {
   return name
@@ -413,17 +402,6 @@ export async function liffCreateOrder(idToken: string, input: unknown): Promise<
   if (!result.ok) return result;
 
   await createInitialPayments(result.id, result.total, plan.depositAmount);
-
-  // ส่งลิงก์จ่ายเงินย้อนกลับทาง LINE ทันที — เผื่อลูกค้าปิดแอปไปก่อนสแกน QR ในหน้าที่กำลังเปิดอยู่
-  // จะได้ยังมีทางกลับมาจ่ายเองได้โดยไม่ต้องรอพนักงานส่งลิงก์ให้ใหม่
-  const link = buildLiffDeepLink(`/pay/${result.id}`);
-  if (link) {
-    const payDue = plan.depositAmount > 0 ? plan.depositAmount : result.total;
-    void notifyLiffCustomer(
-      identity.userId,
-      `จองสำเร็จแล้ว ✅\nยอดที่ต้องชำระ ${formatBaht(payDue)}\nกดลิงก์นี้เพื่อชำระเงิน:\n${link}`
-    );
-  }
 
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");

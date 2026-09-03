@@ -32,6 +32,7 @@ function assertOrderEditable(
  */
 function buildPaymentReceiptText(params: {
   orderCode: string;
+  petName: string | null;
   items: { name: string; quantity: number; subtotal: number }[];
   extraCharges: { description: string; amount: number }[];
   holidaySurcharge: number;
@@ -41,7 +42,9 @@ function buildPaymentReceiptText(params: {
   paidAmount: number;
   remainingAmount: number;
 }): string {
-  const lines = [`🧾 สรุปรายการชำระเงิน`, `ออเดอร์ ${params.orderCode}`, ""];
+  const lines = [`🧾 สรุปรายการชำระเงิน`, `เลขที่การจอง ${params.orderCode}`];
+  if (params.petName) lines.push(`น้อง ${params.petName}`);
+  lines.push("");
   for (const it of params.items) {
     lines.push(`${it.name} x${it.quantity}  ${formatBaht(it.subtotal)}`);
   }
@@ -61,7 +64,7 @@ function buildPaymentReceiptText(params: {
       ? `คงเหลือ: ${formatBaht(params.remainingAmount)}`
       : `สถานะ: ชำระครบแล้ว ✅`,
     "",
-    `ขอบคุณที่ใช้บริการค่ะ 🐾`
+    `ขอบคุณที่ใช้บริการค่ะ`
   );
   return lines.join("\n");
 }
@@ -309,7 +312,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
   const result = await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.findUnique({
       where: { id: paymentId },
-      include: { order: { include: { items: true, payments: true, extraCharges: true } } },
+      include: { order: { include: { items: true, payments: true, extraCharges: true, pet: true } } },
     });
     if (!payment) return { ok: false as const, error: "ไม่พบรายการชำระเงิน" };
     if (payment.status === "VERIFIED") {
@@ -369,6 +372,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       justFullyPaid,
       justDepositPaid,
       orderCode: order.code,
+      petName: order.pet?.name ?? null,
       orderTotal: order.total,
       depositAmount: payment.amount,
       verifiedSum,
@@ -391,6 +395,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       orderId,
       buildPaymentReceiptText({
         orderCode: result.orderCode,
+        petName: result.petName,
         items: result.items,
         extraCharges: result.extraCharges,
         holidaySurcharge: result.holidaySurcharge,
@@ -406,6 +411,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       orderId,
       buildPaymentReceiptText({
         orderCode: result.orderCode,
+        petName: result.petName,
         items: result.items,
         extraCharges: result.extraCharges,
         holidaySurcharge: result.holidaySurcharge,

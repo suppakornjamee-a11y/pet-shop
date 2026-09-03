@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RegisterForm } from "@/components/register-form";
-import { LineConnectButton } from "@/components/line-connect-button";
-import { buildLineLinkUrl } from "@/lib/line";
+// import { LineConnectButton } from "@/components/line-connect-button"; -- ปุ่มเชื่อมต่อ LINE คอมเม้นปิดไว้ก่อน ดูจุดใช้งานด้านล่าง
+// import { buildLineLinkUrl } from "@/lib/line";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 import { requireStaffUser } from "@/lib/auth-helpers";
@@ -76,7 +76,10 @@ export default async function CustomerDetailPage(props: PageProps<"/customers/[i
           <History className="h-3 w-3" /> {t.customers.lastEdited(formatDateTime(customer.updatedAt))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* คอมเม้นปิดไว้ก่อนตามคำขอ — ตอนนี้ลูกค้าผูกบัญชี LINE เองผ่าน LIFF แล้ว ปุ่มนี้ทำให้สับสน
+              เปิดกลับมาใช้ได้ทีหลังถ้าต้องการ (เช่น กรณีลูกค้าเก่าที่ยังไม่เคยผูกผ่าน LIFF)
           <LineConnectButton linked={!!customer.lineUserId} linkUrl={buildLineLinkUrl(customer.id)} />
+          */}
           {customer.createdVia === "LIFF" && (
             <Badge variant="outline" className="gap-1 text-sky-700 dark:text-sky-400">
               <Smartphone className="h-3 w-3" /> {t.customers.registeredViaLiff}
