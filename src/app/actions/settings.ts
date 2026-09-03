@@ -495,19 +495,23 @@ const shopInfoSchema = z.object({
   address: z.string().optional(),
   taxId: z.string().optional(),
   lineId: z.string().optional(),
+  phone: z.string().optional(),
+  hours: z.string().optional(),
 });
 
 export async function upsertShopInfo(input: unknown): Promise<ActionResult> {
   await requireAdmin();
   const parsed = shopInfoSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { name, address, taxId, lineId } = parsed.data;
+  const { name, address, taxId, lineId, phone, hours } = parsed.data;
 
   const values: Record<string, string> = {
     [SHOP_INFO_KEYS.name]: name,
     [SHOP_INFO_KEYS.address]: address ?? "",
     [SHOP_INFO_KEYS.taxId]: taxId ?? "",
     [SHOP_INFO_KEYS.lineId]: lineId ?? "",
+    [SHOP_INFO_KEYS.phone]: phone ?? "",
+    [SHOP_INFO_KEYS.hours]: hours ?? "",
   };
   await prisma.$transaction(
     Object.entries(values).map(([key, value]) =>

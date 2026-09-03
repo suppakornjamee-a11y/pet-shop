@@ -141,6 +141,8 @@ const th = {
       addressLabel: "ที่อยู่ (รองรับหลายบรรทัด)",
       taxIdLabel: "เลขประจำตัวผู้เสียภาษี (TAX ID)",
       lineIdLabel: "LINE ID ร้าน",
+      phoneLabel: "เบอร์โทรร้าน",
+      hoursLabel: "เวลาเปิด-ปิด",
       saveButton: "บันทึก",
     },
     stock: {

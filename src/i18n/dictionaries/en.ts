@@ -130,6 +130,8 @@ const en: Dictionary = {
       addressLabel: "Address (multi-line supported)",
       taxIdLabel: "Tax ID",
       lineIdLabel: "Shop LINE ID",
+      phoneLabel: "Shop phone number",
+      hoursLabel: "Opening hours",
       saveButton: "Save",
     },
     stock: {

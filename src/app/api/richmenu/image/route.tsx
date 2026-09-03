@@ -1,8 +1,12 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 // ภาพพื้นหลัง Rich Menu ของ LINE OA — เข้าดูตรงๆ ที่ /api/richmenu/image เพื่อพรีวิวได้ทุกเมื่อ
 // สร้างเป็นโค้ด (ไม่ใช่ไฟล์รูปนิ่ง) เพื่อแก้ข้อความ/สีตรงนี้แล้วเห็นผลทันทีตอนอัปโหลดรอบต่อไป
 // ต้องใช้ฟอนต์ "Prompt" (ตัวเดียวกับที่ทั้งแอปใช้ ดู src/app/layout.tsx) เพราะ satori ไม่มีฟอนต์ไทยติดตั้งมาให้เอง
+// ไอคอนเป็นรูปที่ผู้ใช้ครอปมาจากเทมเพลตตัวอย่าง (src/assets/richmenu/icon-*-clean.png) — รูปครอปดิบมี
+// พื้นหลังทึบติดมา จึงตัดพื้นหลังออกด้วยสคริปต์ flood-fill ก่อนเก็บเป็นไฟล์ "-clean" (มี alpha transparency)
 
 const BRAND_GREEN = "#0f3d33";
 const BRAND_PINK = "#ec4899";
@@ -20,7 +24,13 @@ async function loadPromptFont(weight: number, text: string): Promise<ArrayBuffer
   return res.arrayBuffer();
 }
 
-function MenuButton({ color, icon, label }: { color: string; icon: string; label: string }) {
+async function loadIconDataUri(filename: string): Promise<string> {
+  const filePath = path.join(process.cwd(), "src", "assets", "richmenu", filename);
+  const buf = await readFile(filePath);
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
+
+function MenuCard({ color, iconSrc, label }: { color: string; iconSrc: string; label: string }) {
   return (
     <div
       style={{
@@ -29,35 +39,27 @@ function MenuButton({ color, icon, label }: { color: string; icon: string; label
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 30,
-        padding: "0 30px",
+        gap: 24,
+        background: "#ffffff",
+        borderRadius: 56,
+        boxShadow: "0 24px 50px rgba(15,61,51,0.14)",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          width: 360,
-          height: 360,
-          borderRadius: 999,
-          background: color,
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 200,
-        }}
-      >
-        {icon}
-      </div>
-      <div style={{ display: "flex", fontSize: 62, fontWeight: 700, color, whiteSpace: "nowrap" }}>{label}</div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={iconSrc} width={230} height={230} alt="" />
+      <div style={{ display: "flex", fontSize: 54, fontWeight: 700, color, whiteSpace: "nowrap" }}>{label}</div>
     </div>
   );
 }
 
 export async function GET() {
   try {
-    const fontData = await loadPromptFont(700, LABEL_BOOK + LABEL_ORDERS + LABEL_PROFILE);
-    const divider = (
-      <div style={{ display: "flex", width: 2, height: "62%", alignSelf: "center", background: "#e7e1d6" }} />
-    );
+    const [fontData, calendarIcon, notepadIcon, chatIcon] = await Promise.all([
+      loadPromptFont(700, LABEL_BOOK + LABEL_ORDERS + LABEL_PROFILE),
+      loadIconDataUri("icon-calendar-clean.png"),
+      loadIconDataUri("icon-notepad-clean.png"),
+      loadIconDataUri("icon-chat-clean.png"),
+    ]);
 
     return new ImageResponse(
       (
@@ -68,13 +70,13 @@ export async function GET() {
             display: "flex",
             background: "#fdfbf6",
             fontFamily: "Prompt",
+            padding: "45px",
+            gap: 40,
           }}
         >
-          <MenuButton color={BRAND_GREEN} icon="🐾" label={LABEL_BOOK} />
-          {divider}
-          <MenuButton color={BRAND_PINK} icon="📋" label={LABEL_ORDERS} />
-          {divider}
-          <MenuButton color={BRAND_GOLD} icon="👤" label={LABEL_PROFILE} />
+          <MenuCard color={BRAND_GREEN} iconSrc={calendarIcon} label={LABEL_BOOK} />
+          <MenuCard color={BRAND_PINK} iconSrc={notepadIcon} label={LABEL_ORDERS} />
+          <MenuCard color={BRAND_GOLD} iconSrc={chatIcon} label={LABEL_PROFILE} />
         </div>
       ),
       {

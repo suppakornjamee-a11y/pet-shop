@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
-type ShopInfo = { name: string; address: string; taxId: string; lineId: string };
+type ShopInfo = { name: string; address: string; taxId: string; lineId: string; phone: string; hours: string };
 
 export function ShopInfoForm({ shopInfo }: { shopInfo: ShopInfo }) {
   const { t } = useI18n();
@@ -57,6 +57,22 @@ export function ShopInfoForm({ shopInfo }: { shopInfo: ShopInfo }) {
             value={form.lineId}
             onChange={(e) => setForm({ ...form, lineId: e.target.value })}
             placeholder="@pawsomespacebkk"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>{t.settings.shopInfo.phoneLabel}</Label>
+          <Input
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            placeholder="065 392 2899"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>{t.settings.shopInfo.hoursLabel}</Label>
+          <Input
+            value={form.hours}
+            onChange={(e) => setForm({ ...form, hours: e.target.value })}
+            placeholder="10:00 - 20:00 ทุกวัน"
           />
         </div>
         <Button onClick={save} disabled={isPending}>
