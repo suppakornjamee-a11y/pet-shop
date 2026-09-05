@@ -285,6 +285,7 @@ model Product {
   cost        Int?
   stockQty    Int           @default(0)
   unit        String        @default("ชิ้น")
+  imageUrl    String? // รูปสินค้า (data URL) — โชว์บนหน้าร้านอาหาร
   active      Boolean       @default(true)
   createdBy   User?         @relation("ProductCreatedBy", fields: [createdById], references: [id])
   createdById String?

@@ -296,7 +296,6 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <div className="space-y-2 sm:col-span-2">
                 <Label>{t.settings.bankAccounts.promptpayIdFullLabel}</Label>
                 <Input
-                  placeholder={t.settings.bankAccounts.promptpayIdPlaceholder}
                   value={form.promptpayId}
                   onChange={(e) => setForm({ ...form, promptpayId: e.target.value })}
                 />

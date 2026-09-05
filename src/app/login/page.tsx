@@ -1,59 +1,51 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { getLocale } from "@/i18n/get-locale";
-import { getDictionary } from "@/i18n/get-dictionary";
 import { LoginForm } from "@/components/login-form";
 import { LanguageToggle } from "@/components/language-toggle";
 
-// pattern อุ้งเท้าสัตว์ ซ้ำเป็นพื้นหลัง (SVG inline เพื่อไม่ต้องพึ่งไฟล์ภายนอก)
-const PAW_PATTERN =
-  "PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCcgdmlld0JveD0nMCAwIDI0IDI0JyBmaWxsPScjZjU5ZTBiJyBmaWxsLW9wYWNpdHk9JzAuMTAnPjxjaXJjbGUgY3g9JzEyJyBjeT0nMTYuNScgcj0nNC4yJy8+PGNpcmNsZSBjeD0nNC41JyBjeT0nMTAnIHI9JzIuMycvPjxjaXJjbGUgY3g9JzE5LjUnIGN5PScxMCcgcj0nMi4zJy8+PGNpcmNsZSBjeD0nOCcgY3k9JzQuNScgcj0nMicvPjxjaXJjbGUgY3g9JzE2JyBjeT0nNC41JyByPScyJy8+PC9zdmc+";
+// หน้านี้ตั้งใจตรึงเป็นโทนสว่างโทนเดียว (ครีมอุ่นให้เข้ากับสีไม้ในรูปล็อบบี้) ไม่ตามธีมมืดของแอป
+// จึงระบุสีตรงๆ ทุกจุด เพื่อกันไม่ให้ token ของธีมมืดเล็ดลอดเข้ามาทำสีเพี้ยน
+const CREAM = "#f7f1e8"; // พื้นแผงฟอร์ม
+const INK = "#2f2a24"; // ตัวอักษรหลัก
+const TAUPE = "#8c8177"; // ตัวอักษรรอง
+const LINE = "#e4d9c9"; // เส้นคั่น
 
 export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) redirect("/");
 
-  const t = getDictionary(await getLocale());
-
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-[#fdf1de] to-[#fbe4c0] p-4 sm:p-8">
+    <main className="flex min-h-dvh flex-col lg:flex-row" style={{ background: CREAM, color: INK }}>
+      {/* รูปล็อบบี้ — มือถือเป็นแบนเนอร์ด้านบน จอใหญ่กินซ้ายเต็มความสูง
+          ไม่วางเลเยอร์ไล่เฉดทับ เพราะทำให้รูปดูจางและมัว */}
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage: `url("data:image/svg+xml;base64,${PAW_PATTERN}")`,
-          backgroundSize: "64px 64px",
-        }}
+        className="h-56 shrink-0 bg-cover bg-center sm:h-72 lg:h-auto lg:w-[56%]"
+        style={{ backgroundImage: "url(/images/login-hero.webp)" }}
       />
 
-      <div className="absolute top-4 right-4 z-10">
-        <LanguageToggle />
-      </div>
-
-      <div className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-3xl bg-card shadow-2xl md:min-h-[560px] md:grid-cols-2">
-        {/* Photo panel — public/images/login-hero.png (รูปเดี่ยว) */}
-        <div className="relative hidden overflow-hidden md:block">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-200 via-orange-200 to-rose-200" />
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: "url(/images/login-hero.png)" }}
-          />
+      {/* แผงฟอร์ม */}
+      <div className="relative flex flex-1 items-center justify-center px-6 py-12 sm:px-10 lg:px-14">
+        <div className="absolute top-5 right-5">
+          <LanguageToggle />
         </div>
 
-        {/* Form panel */}
-        <div className="flex flex-col justify-center p-8 sm:p-12">
-          <h1 className="mb-8 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent sm:text-4xl">
+        <div className="w-full max-w-[340px] text-center">
+          <h1
+            className="text-[2.35rem] leading-[1.08] font-semibold tracking-tight"
+            style={{ color: INK }}
+          >
             Pawsome Space
           </h1>
-
-          <div>
-            <LoginForm />
-          </div>
-
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            {t.login.demoAccountsLabel}: <span className="font-medium text-foreground">admin / admin</span> ·{" "}
-            <span className="font-medium text-foreground">user / user</span>
+          <p
+            className="mt-2.5 text-[11px] font-medium tracking-[0.24em] uppercase"
+            style={{ color: TAUPE }}
+          >
+            Hotel &amp; Care
           </p>
+
+          <div aria-hidden className="my-8 h-px" style={{ background: LINE }} />
+
+          <LoginForm />
         </div>
       </div>
     </main>

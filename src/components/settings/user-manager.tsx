@@ -26,6 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type User = {
   id: string;
@@ -131,63 +139,106 @@ export function UserManager({
 
       <Card>
         <CardContent className="p-0">
-          <div className="divide-y">
-            {users.map((u) => (
-              <div key={u.id} className="flex items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    {u.role === "ADMIN" ? (
-                      <ShieldCheck className="h-5 w-5" />
-                    ) : u.role === "GROOMER" ? (
-                      <Scissors className="h-5 w-5" />
+          <Table>
+            <TableHeader className="border-b bg-muted/50 text-muted-foreground">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="px-4 font-medium text-muted-foreground">
+                  {t.settings.users.nameLabel}
+                </TableHead>
+                <TableHead className="px-4 font-medium text-muted-foreground">
+                  {t.settings.users.usernameLabel}
+                </TableHead>
+                <TableHead className="px-4 font-medium text-muted-foreground">
+                  {t.settings.users.emailLabel}
+                </TableHead>
+                <TableHead className="px-4 font-medium text-muted-foreground">
+                  {t.settings.users.roleLabel}
+                </TableHead>
+                <TableHead className="px-4 font-medium text-muted-foreground">
+                  {t.settings.users.statusLabel}
+                </TableHead>
+                <TableHead className="w-24 px-4" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        {u.role === "ADMIN" ? (
+                          <ShieldCheck className="h-4.5 w-4.5" />
+                        ) : u.role === "GROOMER" ? (
+                          <Scissors className="h-4.5 w-4.5" />
+                        ) : (
+                          <UserIcon className="h-4.5 w-4.5" />
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium">{u.name}</span>
+                        {u.role === "GROOMER" && u.groomerLevel && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {u.groomerLevel === "SENIOR"
+                              ? t.settings.users.groomerLevelSenior
+                              : t.settings.users.groomerLevelJunior}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-muted-foreground">@{u.username}</TableCell>
+                  <TableCell className="px-4 py-3 text-muted-foreground">
+                    {u.email || "—"}
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    {u.role === "ADMIN"
+                      ? t.settings.users.roleAdmin
+                      : u.role === "GROOMER"
+                        ? t.settings.users.roleGroomer
+                        : t.settings.users.roleStaff}
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    {u.active ? (
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-300 bg-emerald-50 text-[10px] font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      >
+                        {t.settings.users.activeBadge}
+                      </Badge>
                     ) : (
-                      <UserIcon className="h-5 w-5" />
+                      <Badge variant="secondary" className="text-[10px]">
+                        {t.settings.users.inactiveBadge}
+                      </Badge>
                     )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 font-medium">
-                      {u.name}
-                      {!u.active && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {t.settings.users.inactiveBadge}
-                        </Badge>
-                      )}
-                      {u.role === "GROOMER" && u.groomerLevel && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {u.groomerLevel === "SENIOR"
-                            ? t.settings.users.groomerLevelSenior
-                            : t.settings.users.groomerLevelJunior}
-                        </Badge>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label={t.settings.users.editUser}
+                        onClick={() => openEdit(u)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {u.id !== currentUserId && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          aria-label={t.common.delete}
+                          onClick={() => remove(u.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      @{u.username} ·{" "}
-                      {u.role === "ADMIN"
-                        ? t.settings.users.roleAdmin
-                        : u.role === "GROOMER"
-                          ? t.settings.users.roleGroomer
-                          : t.settings.users.roleStaff}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  {u.id !== currentUserId && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => remove(u.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

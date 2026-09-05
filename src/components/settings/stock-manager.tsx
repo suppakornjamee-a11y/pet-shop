@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save, Plus, Pencil, Trash2, PackagePlus } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, PackagePlus, ImagePlus, X } from "lucide-react";
 import {
   upsertProduct,
   deleteProduct,
@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/settings";
 import type { ProductTarget } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
+import { fileToDataUrl } from "@/lib/file";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -44,6 +44,7 @@ type Product = {
   unit: string;
   stockQty: number;
   active: boolean;
+  imageUrl: string | null;
 };
 
 const empty = {
@@ -54,6 +55,7 @@ const empty = {
   cost: "",
   unit: "ชิ้น",
   stockQty: "",
+  imageUrl: "",
 };
 
 export function StockManager({ products }: { products: Product[] }) {
@@ -63,6 +65,8 @@ export function StockManager({ products }: { products: Product[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
+
+  const [uploading, setUploading] = useState(false);
 
   const [adjustFor, setAdjustFor] = useState<Product | null>(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -83,8 +87,24 @@ export function StockManager({ products }: { products: Product[] }) {
       cost: p.cost != null ? String(p.cost) : "",
       unit: p.unit,
       stockQty: String(p.stockQty),
+      imageUrl: p.imageUrl ?? "",
     });
     setOpen(true);
+  }
+
+  async function handleImage(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      // จำกัด 1MB เพราะรูปถูกเก็บเป็น data URL ลงฐานข้อมูลโดยตรง (แนวเดียวกับรูปสัตว์เลี้ยง)
+      setForm((prev) => ({ ...prev, imageUrl: "" }));
+      const dataUrl = await fileToDataUrl(file, 1024 * 1024);
+      setForm((prev) => ({ ...prev, imageUrl: dataUrl }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t.settings.stock.uploadFailed);
+    } finally {
+      setUploading(false);
+    }
   }
 
   function save() {
@@ -98,6 +118,7 @@ export function StockManager({ products }: { products: Product[] }) {
         cost: form.cost ? Number(form.cost) : undefined,
         unit: form.unit || "ชิ้น",
         stockQty: Number(form.stockQty || 0),
+        imageUrl: form.imageUrl || null,
         active: true,
       });
       if (!res.ok) {
@@ -167,10 +188,26 @@ export function StockManager({ products }: { products: Product[] }) {
                 {products.map((p) => (
                   <tr key={p.id}>
                     <td className="px-4 py-2">
-                      <div className="font-medium">{p.name}</div>
-                      <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                        {t.labels.productTarget[p.target]}
-                      </Badge>
+                      <div className="flex items-center gap-3">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.imageUrl}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded-md border object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted/50">
+                            <ImagePlus className="h-4 w-4 text-muted-foreground/40" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium">{p.name}</div>
+                          <Badge variant="secondary" className="mt-0.5 text-[10px]">
+                            {t.labels.productTarget[p.target]}
+                          </Badge>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{p.category ?? "-"}</td>
                     <td className="px-4 py-2 text-right">{formatBaht(p.price)}</td>
@@ -236,6 +273,49 @@ export function StockManager({ products }: { products: Product[] }) {
             <DialogTitle>{editing ? t.settings.stock.editProduct : t.settings.stock.addProduct}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* รูปสินค้า — เก็บเป็น data URL เหมือนรูปสัตว์เลี้ยง แล้วไปโชว์บนการ์ดหน้าร้านอาหาร */}
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t.settings.stock.imageLabel}</Label>
+              <div className="flex items-center gap-3">
+                {form.imageUrl ? (
+                  <div className="relative w-fit">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.imageUrl}
+                      alt=""
+                      className="h-24 w-24 rounded-lg border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, imageUrl: "" })}
+                      aria-label={t.common.delete}
+                      className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors hover:bg-accent/50">
+                    {uploading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <ImagePlus className="h-5 w-5" />
+                        {t.settings.stock.uploadImage}
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => handleImage(e.target.files?.[0])}
+                    />
+                  </label>
+                )}
+                <p className="text-xs text-muted-foreground">{t.settings.stock.imageHint}</p>
+              </div>
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>{t.settings.stock.productNameLabel}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

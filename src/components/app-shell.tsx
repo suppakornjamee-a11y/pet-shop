@@ -35,7 +35,6 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 
 type NavItem = {
   href: string;
@@ -82,6 +81,28 @@ function getNavGroups(t: Dictionary): NavGroup[] {
 }
 
 type User = { name: string; username: string; role: Role };
+
+function roleLabel(t: Dictionary, role: Role) {
+  return role === "ADMIN" ? t.nav.admin : role === "GROOMER" ? t.nav.groomer : t.nav.staff;
+}
+
+/** โปรไฟล์ผู้ใช้ที่ล็อกอินอยู่ — ย้ายมาไว้มุมบนขวาแทนที่จะอยู่ท้าย sidebar */
+function TopbarProfile({ user }: { user: User }) {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1">
+      <Avatar className="h-9 w-9">
+        <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+          {user.name.slice(0, 1).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="hidden leading-tight sm:block">
+        <div className="truncate text-sm font-medium">{user.name}</div>
+        <div className="truncate text-xs text-muted-foreground">{roleLabel(t, user.role)}</div>
+      </div>
+    </div>
+  );
+}
 
 function SidebarContent({
   user,
@@ -148,20 +169,16 @@ function SidebarContent({
         })}
       </nav>
 
+      {/* ออกจากระบบ — อยู่ท้าย sidebar ใช้ทรงเดียวกับเมนูด้านบนให้กลืนเป็นชุดเดียวกัน */}
       <div className="border-t p-3.5">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary/10 text-primary text-base font-semibold">
-              {user.name.slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-[15px] font-medium">{user.name}</div>
-            <Badge variant="secondary" className="mt-0.5 h-4 px-1.5 text-[10px]">
-              {user.role === "ADMIN" ? t.nav.admin : user.role === "GROOMER" ? t.nav.groomer : t.nav.staff}
-            </Badge>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex w-full items-center gap-3.5 rounded-full px-3.5 py-2.5 text-[15px] font-medium text-foreground/65 transition-colors hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogoutImageIcon className="h-6 w-6 shrink-0" />
+          {t.nav.logout}
+        </button>
       </div>
     </div>
   );
@@ -212,14 +229,8 @@ export function AppShell({
           <LanguageToggle />
           <ThemeToggle />
 
-          <Button
-            variant="ghost"
-            size="icon"
-            title={t.nav.logout}
-            onClick={() => signOut({ callbackUrl: "/login" })}
-          >
-            <LogoutImageIcon className="h-5 w-5" />
-          </Button>
+          <div className="ml-1 h-8 w-px bg-border" />
+          <TopbarProfile user={user} />
         </header>
 
         <main className="flex-1 p-4 lg:p-6">{children}</main>

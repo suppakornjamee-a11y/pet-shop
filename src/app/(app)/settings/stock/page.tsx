@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { StockManager } from "@/components/settings/stock-manager";
+import { ProductImportExport } from "@/components/product-import-export";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 import { requireStaffUser } from "@/lib/auth-helpers";
@@ -14,6 +15,7 @@ export default async function StockSettingsPage() {
       <PageHeader
         title={t.settings.stock.title}
         description={t.settings.stock.description}
+        action={<ProductImportExport />}
       />
       <StockManager
         products={products.map((p) => ({
@@ -25,6 +27,7 @@ export default async function StockSettingsPage() {
           cost: p.cost,
           unit: p.unit,
           stockQty: p.stockQty,
+          imageUrl: p.imageUrl,
           active: p.active,
         }))}
       />

@@ -1,14 +1,9 @@
 import Link from "next/link";
-import {
-  // ClipboardPlus,
-  // PawPrint,
-  Wallet,
-  // ReceiptText,
-  // Clock,
-  // TrendingUp,
-} from "lucide-react";
+// import { ClipboardPlus, PawPrint, ReceiptText, Clock, TrendingUp } from "lucide-react";
+import { OrdersImageIcon } from "@/components/nav-icons";
 import { prisma } from "@/lib/prisma";
-import { formatDate, formatBaht, formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { formatDate, formatBaht, formatTime } from "@/lib/format";
 import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -16,7 +11,6 @@ import { PageHeader } from "@/components/page-header";
 import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
 import { requireStaffUser } from "@/lib/auth-helpers";
 
@@ -146,22 +140,19 @@ export default async function DashboardPage(props: PageProps<"/">) {
       label: t.dashboard.statCheckInsToday,
       value: checkInsToday.toString(),
       icon: CheckInStatIcon,
-      color: "text-teal-600 bg-teal-100 dark:bg-teal-950 dark:text-teal-400",
-      tint: "from-teal-50 dark:from-teal-950/30",
+      chip: "bg-teal-100 dark:bg-teal-950",
     },
     {
       label: t.dashboard.statCheckOutsToday,
       value: checkOutsToday.toString(),
       icon: CheckOutStatIcon,
-      color: "text-orange-600 bg-orange-100 dark:bg-orange-950 dark:text-orange-400",
-      tint: "from-orange-50 dark:from-orange-950/30",
+      chip: "bg-orange-100 dark:bg-orange-950",
     },
     {
       label: t.dashboard.statGroomingQueueToday,
       value: groomingQueueToday.toString(),
       icon: GroomingQueueStatIcon,
-      color: "text-pink-600 bg-pink-100 dark:bg-pink-950 dark:text-pink-400",
-      tint: "from-pink-50 dark:from-pink-950/30",
+      chip: "bg-pink-100 dark:bg-pink-950",
     },
   ];
 
@@ -192,13 +183,20 @@ export default async function DashboardPage(props: PageProps<"/">) {
           const Icon = s.icon;
           return (
             <Card key={s.label} className="w-full">
-              <CardContent className="flex items-center gap-3.5 py-2">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-                  <Icon className="h-10 w-10" />
+              <CardContent className="flex items-center gap-4 py-3.5">
+                <div
+                  className={cn(
+                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
+                    s.chip
+                  )}
+                >
+                  <Icon className="h-9 w-9" />
                 </div>
-                <div className="min-w-0 flex-1 text-right">
-                  <div className="truncate text-2xl font-semibold tracking-tight">{s.value}</div>
-                  <div className="truncate text-xs text-muted-foreground">{s.label}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-muted-foreground">{s.label}</div>
+                  <div className="truncate text-2xl font-semibold tracking-tight tabular-nums">
+                    {s.value}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -207,18 +205,15 @@ export default async function DashboardPage(props: PageProps<"/">) {
       </div>
 
       <Card className="mt-6">
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="text-base">
-            {isToday ? t.dashboard.ordersToday : t.dashboard.ordersOn(dateLabel)}
+            {isToday ? t.dashboard.ordersToday(dateLabel) : t.dashboard.ordersOn(dateLabel)}
           </CardTitle>
-          <Button render={<Link href="/orders" />} nativeButton={false} variant="ghost" size="sm">
-            {t.dashboard.viewAll}
-          </Button>
         </CardHeader>
         <CardContent>
           {dayOrderList.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <Wallet className="h-10 w-10 text-muted-foreground/40" />
+              <OrdersImageIcon className="h-12 w-12 opacity-40" />
               <p className="text-sm text-muted-foreground">
                 {isToday ? t.dashboard.noOrdersToday : t.dashboard.noOrdersOn(dateLabel)}
               </p>
@@ -251,7 +246,8 @@ export default async function DashboardPage(props: PageProps<"/">) {
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {o.customer.name}
-                      {o.pet ? ` · ${o.pet.name}` : ""} · {formatDateTime(o.createdAt)}
+                      {o.pet ? ` (${o.pet.name})` : ""} {t.dashboard.timeLabel}{" "}
+                      {formatTime(o.createdAt)}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>

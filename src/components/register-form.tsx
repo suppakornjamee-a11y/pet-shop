@@ -210,7 +210,7 @@ function AgeDisplay({ birthDate }: { birthDate: string }) {
   if (isNaN(parsed.getTime())) return null;
   const { years, months } = ageFromBirthDate(parsed);
   return (
-    <p className="text-xs font-medium text-primary">
+    <p className="text-[11px] font-medium text-foreground">
       {t.register.ageLabel}
       {years > 0 ? `${t.register.ageYears(years)} ` : ""}
       {t.register.ageMonths(months)}

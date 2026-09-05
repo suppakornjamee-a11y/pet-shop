@@ -20,6 +20,7 @@ const productSchema = z.object({
   cost: z.coerce.number().int().min(0).optional(),
   stockQty: z.coerce.number().int().min(0).default(0),
   unit: z.string().default("ชิ้น"),
+  imageUrl: z.string().nullish(),
   active: z.coerce.boolean().default(true),
 });
 
