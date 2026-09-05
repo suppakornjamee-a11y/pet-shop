@@ -164,7 +164,7 @@ export function ShopInfoImageIcon({ className }: IconProps) {
   return <img src="/images/icons/shop-info.png" alt="" className={className} />;
 }
 
-/** ไอคอนรายงาน — รูปภาพวิเคราะห์ข้อมูลที่ผู้ใช้เตรียมมาให้ */
+/** ไอคอนรายงาน — รูปภาพที่ผู้ใช้เตรียมมาให้ */
 export function ReportsImageIcon({ className }: IconProps) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/images/icons/reports.png" alt="" className={className} />;

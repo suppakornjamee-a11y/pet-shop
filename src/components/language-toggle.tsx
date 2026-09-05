@@ -35,7 +35,9 @@ function UkFlag({ className }: { className?: string }) {
   );
 }
 
-const FLAG_CLASS = "h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/10";
+// กล่องธงต้องเป็นอัตราส่วน 3:2 เท่ากับ viewBox ของ SVG (60x40) พอดี
+// ไม่งั้น SVG จะย่อให้พอดีกรอบแล้วเหลือขอบว่างบน-ล่าง (21x14 = 3:2)
+const FLAG_CLASS = "block h-3.5 w-[21px] shrink-0 rounded-[2px] ring-1 ring-black/10";
 
 export function LanguageToggle() {
   const { locale, t, setLocale } = useI18n();
