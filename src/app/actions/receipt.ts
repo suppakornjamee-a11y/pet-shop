@@ -113,7 +113,7 @@ export async function emailReceipt(
     shop,
     code: order.code,
     createdAt: order.createdAt,
-    customerName: order.customer?.name ?? "ลูกค้าหน้าร้าน",
+    customerName: order.customer?.name ?? "ร้านคาเฟ่",
     items: order.items,
     extraCharges: order.extraCharges,
     holidaySurcharge: order.holidaySurcharge,

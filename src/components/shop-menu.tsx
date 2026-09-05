@@ -228,7 +228,7 @@ export function ShopMenu({
         <div className="sticky bottom-4 mt-4">
           <Card>
             <CardContent className="space-y-2 py-3">
-              <div className="max-h-28 space-y-1 overflow-y-auto text-sm">
+              <div className="max-h-44 space-y-1 overflow-y-auto text-sm">
                 {selectedLines.map((l) => (
                   <div key={l.product.id} className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate">

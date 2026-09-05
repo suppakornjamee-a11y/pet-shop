@@ -26,6 +26,10 @@ function GroomingQueueStatIcon({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/images/icons/grooming-queue.png" alt="" className={className} />;
 }
+function CafeStatIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/cafe.png" alt="" className={className} />;
+}
 
 function parseDate(input?: string) {
   if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
@@ -66,6 +70,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
     checkInsToday,
     checkOutsToday,
     groomingQueueToday,
+    cafeBillsToday,
   ] = await Promise.all([
     // prisma.order.count({ where: { createdAt: { gte: startOfDay, lt: endOfDay } } }),
     // prisma.order.aggregate({
@@ -99,6 +104,14 @@ export default async function DashboardPage(props: PageProps<"/">) {
       where: {
         appointmentAt: { gte: startOfDay, lt: endOfDay },
         queueType: { not: "OTHER" },
+        status: { not: "CANCELLED" },
+      },
+    }),
+    // บิลร้านอาหาร/คาเฟ่ที่เปิดในวันนั้น (ไม่นับบิลที่ถูกยกเลิก)
+    prisma.order.count({
+      where: {
+        orderType: "SHOP",
+        createdAt: { gte: startOfDay, lt: endOfDay },
         status: { not: "CANCELLED" },
       },
     }),
@@ -154,6 +167,12 @@ export default async function DashboardPage(props: PageProps<"/">) {
       icon: GroomingQueueStatIcon,
       chip: "bg-amber-100 dark:bg-amber-950",
     },
+    {
+      label: t.dashboard.statCafeToday,
+      value: cafeBillsToday.toString(),
+      icon: CafeStatIcon,
+      chip: "bg-sky-100 dark:bg-sky-950",
+    },
   ];
 
   return (
@@ -165,7 +184,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
         action={<DashboardDatePicker value={selectedDateStr} />}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => {
           const Icon = s.icon;
           return (

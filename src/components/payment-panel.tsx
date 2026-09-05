@@ -426,7 +426,6 @@ function ActivePaymentPanel({
             <ConfirmButton
               className="bg-emerald-600 hover:bg-emerald-700"
               title={t.orders.payment.confirmVerifyTitle}
-              description={t.orders.payment.confirmVerifyDescription(formatBaht(payment.amount))}
               confirmLabel={t.orders.payment.verify}
               onConfirm={() => run(() => verifyPayment(payment.id))}
               disabled={isPending}

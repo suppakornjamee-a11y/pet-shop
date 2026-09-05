@@ -89,7 +89,9 @@ export function getStatusBadgeInfo(
     return { kind: "SLIP_SUBMITTED" };
   }
   // บิลร้านอาหารไม่มีขั้นตอนอาบน้ำ/เช็คเอ้าท์ — สนใจแค่จ่ายเงินแล้วหรือยัง
+  // บิลที่ยกเลิกต้องขึ้น "ยกเลิก" เสมอ แม้จะเคยรับเงินไปแล้ว ไม่งั้นจะดูเหมือนบิลปกติในลิสต์
   if (order.orderType === "SHOP") {
+    if (order.status === "CANCELLED") return { kind: "PLAIN", status: order.status };
     return isOrderFullyPaid(order) ? { kind: "SHOP_PAID" } : { kind: "PLAIN", status: order.status };
   }
   if (order.status !== "IN_PROGRESS") {

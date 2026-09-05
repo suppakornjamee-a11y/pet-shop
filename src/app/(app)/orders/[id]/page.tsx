@@ -101,7 +101,8 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             <Button render={<Link href={backHref} />} nativeButton={false} variant="outline">
               <ArrowLeft /> {t.common.back}
             </Button>
-            {order.status === "PENDING_PAYMENT" && !isGroomer && (
+            {/* หน้าแก้ไขออเดอร์เป็นฟอร์มลูกค้า+สัตว์เลี้ยง บิลร้านอาหารไม่มีข้อมูลพวกนี้ จึงไม่มีปุ่ม */}
+            {!isShopOrder && order.status === "PENDING_PAYMENT" && !isGroomer && (
               <Button
                 render={<Link href={`/orders/${order.id}/edit`} />}
                 nativeButton={false}
@@ -310,7 +311,8 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             </CardContent>
           </Card>
 
-          {(isGroomer || canEditItems) && order.status !== "CANCELLED" && (
+          {/* เพิ่มบริการเข้าออเดอร์ใช้กับงานบริการเท่านั้น บิลร้านอาหารเพิ่มของผ่านหน้าเมนู */}
+          {!isShopOrder && (isGroomer || canEditItems) && order.status !== "CANCELLED" && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">{t.orders.addItem.title}</CardTitle>
