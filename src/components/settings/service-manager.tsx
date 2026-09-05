@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
 import { upsertService, deleteService } from "@/app/actions/settings";
 import type { ServiceCategory, ServiceGroup, Species } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
@@ -372,7 +372,7 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

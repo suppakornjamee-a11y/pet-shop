@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
 import { upsertHoliday, deleteHoliday } from "@/app/actions/settings";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { useI18n } from "@/components/i18n-provider";
@@ -151,7 +151,7 @@ export function HolidayManager({ holidays }: { holidays: Holiday[] }) {
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.date || !form.title}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

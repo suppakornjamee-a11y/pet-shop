@@ -1,37 +1,19 @@
-import Link from "next/link";
-import { PawPrint } from "lucide-react";
-import { searchCustomers } from "@/app/actions/customers";
+import { listCustomers } from "@/app/actions/customers";
 import { PageHeader } from "@/components/page-header";
-import { CustomerSearch } from "@/components/customer-search";
-import { Button } from "@/components/ui/button";
+import { CustomerTable, type CustomerRow } from "@/components/customer-table";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 import { requireStaffUser } from "@/lib/auth-helpers";
 
 export default async function CustomersPage() {
   await requireStaffUser();
-  const initial = await searchCustomers("");
+  const initial = await listCustomers({});
   const t = getDictionary(await getLocale());
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <PageHeader
-        title={t.customers.title}
-        description={t.customers.description}
-        action={
-          <Button render={<Link href="/register" />} nativeButton={false} variant="outline">
-            <PawPrint /> {t.customers.registerNew}
-          </Button>
-        }
-      />
-      <CustomerSearch
-        initial={initial.map((c) => ({
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-          pets: c.pets.map((p) => ({ id: p.id, name: p.name, species: p.species })),
-        }))}
-      />
+    <div className="mx-auto max-w-6xl">
+      <PageHeader title={t.customers.title} />
+      <CustomerTable initial={initial as CustomerRow[]} />
     </div>
   );
 }

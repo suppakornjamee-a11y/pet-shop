@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, TriangleAlert } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
 import { addExtraCharge, updateExtraCharge, deleteExtraCharge } from "@/app/actions/orders";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -91,8 +91,8 @@ export function OrderExtraCharges({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <TriangleAlert className="h-4 w-4 text-amber-600" /> {t.orders.extraCharges.title}
+        <CardTitle className="text-base">
+          {t.orders.extraCharges.title}
         </CardTitle>
         {canEdit && !adding && (
           <Button size="sm" variant="outline" onClick={openAdd}>
@@ -144,7 +144,7 @@ export function OrderExtraCharges({
                 {t.common.cancel}
               </Button>
               <Button size="sm" onClick={save} disabled={isPending || !amount || !description}>
-                {isPending ? <Loader2 className="animate-spin" /> : editingId ? <Pencil /> : <Plus />}
+                {isPending ? <Loader2 className="animate-spin" /> : <Save />}
                 {t.common.save}
               </Button>
             </div>

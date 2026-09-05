@@ -10,9 +10,9 @@ import type { Dictionary } from "@/i18n/dictionaries/th";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import {
-  CustomerRecordFlatIcon,
+  CustomersImageIcon,
   ClipboardFlatIcon,
-  StockFlatIcon,
+  StockImageIcon,
   CalendarFlatIcon,
   DashboardImageIcon,
   HolidayImageIcon,
@@ -62,14 +62,14 @@ function getNavGroups(t: Dictionary): NavGroup[] {
         { href: "/calendar-other", label: t.nav.otherServiceCalendar, icon: CalendarFlatIcon },
         { href: "/orders/other", label: t.nav.ordersOther, icon: OrdersImageIcon },
         { href: "/boarding", label: t.nav.boardingCalendar, icon: BoardingImageIcon, hiddenForGroomer: true },
-        { href: "/customers", label: t.nav.customers, icon: CustomerRecordFlatIcon, hiddenForGroomer: true },
+        { href: "/customers", label: t.nav.customers, icon: CustomersImageIcon, hiddenForGroomer: true },
         { href: "/shop", label: t.nav.shopCafe, icon: ShopImageIcon, hiddenForGroomer: true },
       ],
     },
     {
       title: t.nav.settingsGroup,
       items: [
-        { href: "/settings/stock", label: t.nav.stock, icon: StockFlatIcon, hiddenForGroomer: true },
+        { href: "/settings/stock", label: t.nav.stock, icon: StockImageIcon, hiddenForGroomer: true },
         { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon, hiddenForGroomer: true },
         { href: "/settings/services", label: t.nav.services, icon: ClipboardFlatIcon, hiddenForGroomer: true },
         { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankAccountsImageIcon, adminOnly: true },

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, PackagePlus } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, PackagePlus } from "lucide-react";
 import {
   upsertProduct,
   deleteProduct,
@@ -294,7 +294,7 @@ export function StockManager({ products }: { products: Product[] }) {
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>
@@ -340,7 +340,7 @@ export function StockManager({ products }: { products: Product[] }) {
           </div>
           <DialogFooter>
             <Button onClick={doAdjust} disabled={isPending || !adjustQty}>
-              {isPending ? <Loader2 className="animate-spin" /> : <PackagePlus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

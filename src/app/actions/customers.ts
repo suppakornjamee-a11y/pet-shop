@@ -160,3 +160,71 @@ export async function searchCustomers(query: string) {
     take: 20,
   });
 }
+
+export type CustomerFilter = {
+  query?: string;
+  createdVia?: "ALL" | "STAFF" | "LIFF";
+  species?: "ALL" | "DOG" | "CAT";
+};
+
+/** รายชื่อลูกค้าสำหรับตารางหน้าประวัติลูกค้า — ค้นหาได้ทั้งชื่อเจ้าของ/ชื่อเล่น/เบอร์โทร/ชื่อสัตว์เลี้ยง
+ * แยกจาก searchCustomers ที่ฟอร์มสร้างออเดอร์ใช้อยู่ (คนละรูปแบบข้อมูล จึงไม่แก้ของเดิม) */
+export async function listCustomers(filter: CustomerFilter) {
+  await requireUser();
+  const q = filter.query?.trim() ?? "";
+  const conditions = [];
+
+  if (q) {
+    conditions.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" as const } },
+        { nickname: { contains: q, mode: "insensitive" as const } },
+        { phone: { contains: q } },
+        { pets: { some: { name: { contains: q, mode: "insensitive" as const } } } },
+      ],
+    });
+  }
+  if (filter.createdVia && filter.createdVia !== "ALL") {
+    conditions.push({ createdVia: filter.createdVia });
+  }
+  if (filter.species && filter.species !== "ALL") {
+    conditions.push({ pets: { some: { species: filter.species } } });
+  }
+
+  const customers = await prisma.customer.findMany({
+    where: conditions.length > 0 ? { AND: conditions } : undefined,
+    select: {
+      id: true,
+      name: true,
+      nickname: true,
+      phone: true,
+      createdAt: true,
+      createdVia: true,
+      lineUserId: true,
+      pets: { select: { id: true, name: true, species: true }, orderBy: { createdAt: "asc" } },
+      // นับ "จำนวนครั้งที่ใช้บริการ" เฉพาะออเดอร์ที่เสร็จสิ้นแล้ว ให้ตรงกับหน้ารายละเอียดลูกค้า
+      _count: { select: { orders: { where: { status: "COMPLETED" } } } },
+      orders: {
+        where: { status: "COMPLETED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { createdAt: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  return customers.map((c) => ({
+    id: c.id,
+    name: c.name,
+    nickname: c.nickname,
+    phone: c.phone,
+    createdAt: c.createdAt.toISOString(),
+    createdVia: c.createdVia,
+    lineLinked: c.lineUserId != null,
+    pets: c.pets,
+    visitCount: c._count.orders,
+    lastVisitAt: c.orders[0]?.createdAt.toISOString() ?? null,
+  }));
+}

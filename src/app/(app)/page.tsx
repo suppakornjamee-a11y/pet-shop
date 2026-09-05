@@ -222,9 +222,6 @@ export default async function DashboardPage(props: PageProps<"/">) {
               <p className="text-sm text-muted-foreground">
                 {isToday ? t.dashboard.noOrdersToday : t.dashboard.noOrdersOn(dateLabel)}
               </p>
-              <Button render={<Link href="/calendar" />} nativeButton={false} size="sm">
-                {t.dashboard.bookOrder}
-              </Button>
             </div>
           ) : (
             <div className="divide-y">

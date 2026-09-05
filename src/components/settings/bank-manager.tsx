@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, Star } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, Star } from "lucide-react";
 import { upsertBankAccount, deleteBankAccount } from "@/app/actions/settings";
 import type { AccountType } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
@@ -192,6 +192,7 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* 1. ประเภท */}
             <div className="space-y-2">
               <Label>{t.settings.bankAccounts.typeLabel}</Label>
               <Select
@@ -208,6 +209,9 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                         : form.bankName === t.settings.bankAccounts.typePromptpay
                           ? ""
                           : form.bankName,
+                    // สลับประเภทแล้วล้างค่าของอีกฝั่งทิ้ง กันข้อมูลค้างจากประเภทเดิม
+                    accountNumber: type === "PROMPTPAY" ? "" : form.accountNumber,
+                    promptpayId: type === "BANK" ? "" : form.promptpayId,
                   });
                 }}
                 items={{ BANK: t.settings.bankAccounts.typeBank, PROMPTPAY: t.settings.bankAccounts.typePromptpay }}
@@ -221,6 +225,17 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* 2. ชื่อบัญชี */}
+            <div className="space-y-2">
+              <Label>{t.settings.bankAccounts.accountNameLabel} *</Label>
+              <Input
+                value={form.accountName}
+                onChange={(e) => setForm({ ...form, accountName: e.target.value })}
+              />
+            </div>
+
+            {/* 3. ชื่อธนาคาร */}
             <div className="space-y-2">
               <Label>{t.settings.bankAccounts.bankNameLabel} *</Label>
               <Select
@@ -251,36 +266,43 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                   <SelectItem value={BANK_OTHER}>{t.settings.bankAccounts.bankNameOther}</SelectItem>
                 </SelectContent>
               </Select>
-              {form.type !== "PROMPTPAY" && !THAI_BANKS.includes(form.bankName) && (
+            </div>
+
+            {/* 4. ช่องพิมพ์ชื่อธนาคารเอง — โผล่เฉพาะตอนเลือก "อื่นๆ" */}
+            {form.type !== "PROMPTPAY" && !THAI_BANKS.includes(form.bankName) && (
+              <div className="space-y-2">
+                <Label>{t.settings.bankAccounts.bankNameOther}</Label>
                 <Input
-                  className="mt-2"
                   placeholder={t.settings.bankAccounts.bankNameOtherPlaceholder}
                   value={form.bankName}
                   onChange={(e) => setForm({ ...form, bankName: e.target.value })}
                 />
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>{t.settings.bankAccounts.accountNameLabel} *</Label>
-              <Input
-                value={form.accountName}
-                onChange={(e) => setForm({ ...form, accountName: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t.settings.bankAccounts.accountNumberLabel} *</Label>
-              <Input
-                value={form.accountNumber}
-                onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t.settings.bankAccounts.promptpayIdFullLabel}</Label>
-              <Input
-                value={form.promptpayId}
-                onChange={(e) => setForm({ ...form, promptpayId: e.target.value })}
-              />
-            </div>
+              </div>
+            )}
+
+            {/* เลขบัญชี — เฉพาะบัญชีธนาคาร (พร้อมเพย์ใช้หมายเลขพร้อมเพย์แทน) */}
+            {form.type === "BANK" && (
+              <div className="space-y-2">
+                <Label>{t.settings.bankAccounts.accountNumberLabel} *</Label>
+                <Input
+                  value={form.accountNumber}
+                  onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+                />
+              </div>
+            )}
+
+            {/* 5. หมายเลขพร้อมเพย์ — โผล่เฉพาะตอนเลือกประเภท "พร้อมเพย์" */}
+            {form.type === "PROMPTPAY" && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>{t.settings.bankAccounts.promptpayIdFullLabel}</Label>
+                <Input
+                  placeholder={t.settings.bankAccounts.promptpayIdPlaceholder}
+                  value={form.promptpayId}
+                  onChange={(e) => setForm({ ...form, promptpayId: e.target.value })}
+                />
+              </div>
+            )}
+
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input
                 type="checkbox"
@@ -294,9 +316,14 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
           <DialogFooter>
             <Button
               onClick={save}
-              disabled={isPending || !form.bankName || !form.accountName || !form.accountNumber}
+              disabled={
+                isPending ||
+                !form.bankName ||
+                !form.accountName ||
+                (form.type === "BANK" ? !form.accountNumber : !form.promptpayId)
+              }
             >
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

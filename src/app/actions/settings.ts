@@ -324,23 +324,38 @@ export async function deleteService(id: string): Promise<ActionResult> {
 
 /* ---------------- Bank Accounts (ADMIN only) ---------------- */
 
-const bankSchema = z.object({
-  id: z.string().optional(),
-  bankName: z.string().min(1, "กรุณากรอกชื่อธนาคาร/ช่องทาง"),
-  accountName: z.string().min(1, "กรุณากรอกชื่อบัญชี"),
-  accountNumber: z
-    .string()
-    .min(1, "กรุณากรอกเลขบัญชี")
-    .refine((v) => {
+const bankSchema = z
+  .object({
+    id: z.string().optional(),
+    bankName: z.string().min(1, "กรุณากรอกชื่อธนาคาร/ช่องทาง"),
+    accountName: z.string().min(1, "กรุณากรอกชื่อบัญชี"),
+    accountNumber: z.string().default(""),
+    promptpayId: z.string().optional(),
+    type: z.enum(["PROMPTPAY", "BANK"]).default("BANK"),
+    isDefault: z.coerce.boolean().default(false),
+    active: z.coerce.boolean().default(true),
+  })
+  // บัญชีธนาคารต้องมีเลขบัญชี ส่วนพร้อมเพย์ใช้หมายเลขพร้อมเพย์แทน (ไม่ต้องกรอกเลขบัญชี)
+  .superRefine((data, ctx) => {
+    if (data.type === "BANK") {
       // เครื่องหมาย "-" ใช้คั่นได้ ไม่นับรวมเป็นจำนวนหลัก แต่ที่เหลือต้องเป็นตัวเลขล้วน 10-12 หลัก
-      const digitsOnly = v.replace(/-/g, "");
-      return /^\d+$/.test(digitsOnly) && digitsOnly.length >= 10 && digitsOnly.length <= 12;
-    }, "เลขบัญชีต้องเป็นตัวเลข 10-12 หลัก (คั่นด้วย - ได้ ไม่นับรวมจำนวนหลัก)"),
-  promptpayId: z.string().optional(),
-  type: z.enum(["PROMPTPAY", "BANK"]).default("BANK"),
-  isDefault: z.coerce.boolean().default(false),
-  active: z.coerce.boolean().default(true),
-});
+      const digitsOnly = data.accountNumber.replace(/-/g, "");
+      const valid = /^\d+$/.test(digitsOnly) && digitsOnly.length >= 10 && digitsOnly.length <= 12;
+      if (!valid) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["accountNumber"],
+          message: "เลขบัญชีต้องเป็นตัวเลข 10-12 หลัก (คั่นด้วย - ได้ ไม่นับรวมจำนวนหลัก)",
+        });
+      }
+    } else if (!data.promptpayId?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["promptpayId"],
+        message: "กรุณากรอกหมายเลขพร้อมเพย์",
+      });
+    }
+  });
 
 export async function upsertBankAccount(input: unknown): Promise<ActionResult> {
   await requireAdmin();

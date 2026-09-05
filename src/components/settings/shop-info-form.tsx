@@ -75,10 +75,12 @@ export function ShopInfoForm({ shopInfo }: { shopInfo: ShopInfo }) {
             placeholder="10:00 - 20:00 ทุกวัน"
           />
         </div>
-        <Button onClick={save} disabled={isPending}>
-          {isPending ? <Loader2 className="animate-spin" /> : <Save />}
-          {t.settings.shopInfo.saveButton}
-        </Button>
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={isPending}>
+            {isPending ? <Loader2 className="animate-spin" /> : <Save />}
+            {t.settings.shopInfo.saveButton}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

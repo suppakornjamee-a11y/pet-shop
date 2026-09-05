@@ -68,19 +68,20 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   const isGroomer = user.role === "GROOMER";
   const orderKind = getOrderKind(order);
   const isFullyPaid = verifiedSum >= order.total + extraChargesTotal;
-  // รายชื่อคนที่กด "เริ่มดำเนินการ" ไปแล้ว (ไม่ซ้ำ) — ใช้แสดงผลยืนยันให้ช่างเห็นว่าการกดมีผลจริง
-  const activeWorkers = [
-    ...new Set(
-      order.activityLogs
-        .filter((l) => l.action.endsWith("เริ่มดำเนินการ") && l.createdBy)
-        .map((l) => l.createdBy!.name)
-    ),
-  ];
   const { startedNotFinished: iHaveStartedNotFinished } = getMyGroomerPhase(order.activityLogs, user.id);
   // badge สถานะแบบ personalize (ช่างที่ทำเสร็จแล้ว / รอลูกค้าชำระเงิน) — ใช้ฟังก์ชันเดียวกับหน้าปฏิทินคิว กันขึ้นไม่ตรงกัน
   const badgeInfo = getStatusBadgeInfo(order, user);
   const locale = await getLocale();
   const t = getDictionary(locale);
+  // รายชื่อคนที่กด "เริ่มดำเนินการ" ไปแล้ว (ไม่ซ้ำ) — ใช้แสดงผลยืนยันให้ช่างเห็นว่าการกดมีผลจริง
+  // (ต้องอยู่หลัง t เพราะเติมคำนำหน้า "ช่าง" จากไฟล์ภาษา)
+  const activeWorkers = [
+    ...new Set(
+      order.activityLogs
+        .filter((l) => l.action.endsWith("เริ่มดำเนินการ") && l.createdBy)
+        .map((l) => `${t.orders.groomerPrefix}${l.createdBy!.name}`)
+    ),
+  ];
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
   const backHref = order.roomId
     ? "/boarding"
@@ -225,24 +226,24 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-xs text-muted-foreground">{t.orders.owner}</div>
-                  <div className="font-medium">{order.customer.name}</div>
-                  <div className="text-sm text-muted-foreground">{order.customer.phone}</div>
+                  <div className="text-sm font-bold">{t.orders.owner}</div>
+                  <div className="text-xs">{order.customer.name}</div>
+                  <div className="text-xs text-muted-foreground">{order.customer.phone}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">{t.orders.pet}</div>
-                  <div className="font-medium">
+                  <div className="text-sm font-bold">{t.orders.pet}</div>
+                  <div className="text-xs">
                     {order.pet ? (
                       <span className="inline-flex items-center gap-1.5">
                         <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
+                        {order.pet.allergies && (
+                          <span className="text-rose-600">({order.pet.allergies})</span>
+                        )}
                       </span>
                     ) : (
                       "-"
                     )}
                   </div>
-                  {order.pet?.allergies && (
-                    <div className="text-sm text-rose-600">{t.orders.allergyWarning(order.pet.allergies)}</div>
-                  )}
                 </div>
               </div>
 

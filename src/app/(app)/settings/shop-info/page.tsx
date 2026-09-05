@@ -12,7 +12,7 @@ export default async function ShopInfoSettingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title={t.settings.shopInfo.title} description={t.settings.shopInfo.description} />
+      <PageHeader title={t.settings.shopInfo.title} />
       <ShopInfoForm shopInfo={shopInfo} />
     </div>
   );

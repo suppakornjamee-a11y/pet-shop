@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, Wind, Fan, Camera } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, Wind, Fan, Camera } from "lucide-react";
 import { upsertRoom, deleteRoom } from "@/app/actions/settings";
 import type { RoomSize, BillingUnit } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
@@ -380,7 +380,7 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name || !form.categoryId}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

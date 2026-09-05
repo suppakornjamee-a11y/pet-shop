@@ -36,6 +36,10 @@ function FemaleGenderIcon({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/images/icons/female.png" alt="" className={className} />;
 }
+function UnknownGenderIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/unknown-gender.png" alt="" className={className} />;
+}
 
 type PetForm = {
   id?: string;
@@ -452,7 +456,11 @@ export function RegisterForm({
                       <FemaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.female}
                     </span>
                   ),
-                  UNKNOWN: t.customers.petDialog.unknown,
+                  UNKNOWN: (
+                    <span className="flex items-center gap-2">
+                      <UnknownGenderIcon className="h-4 w-4" /> {t.customers.petDialog.unknown}
+                    </span>
+                  ),
                 }}
                 disabled={readOnly}
               >
@@ -470,7 +478,11 @@ export function RegisterForm({
                       <FemaleGenderIcon className="h-4 w-4" /> {t.customers.petDialog.female}
                     </span>
                   </SelectItem>
-                  <SelectItem value="UNKNOWN">{t.customers.petDialog.unknown}</SelectItem>
+                  <SelectItem value="UNKNOWN">
+                    <span className="flex items-center gap-2">
+                      <UnknownGenderIcon className="h-4 w-4" /> {t.customers.petDialog.unknown}
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

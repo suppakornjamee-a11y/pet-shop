@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon, Scissors } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon, Scissors } from "lucide-react";
 import { createUser, updateUser, deleteUser } from "@/app/actions/settings";
 import type { Role, GroomerLevel } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
@@ -283,7 +283,7 @@ export function UserManager({
           </div>
           <DialogFooter>
             <Button onClick={save} disabled={isPending || !form.name}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {isPending ? <Loader2 className="animate-spin" /> : <Save />}
               {t.common.save}
             </Button>
           </DialogFooter>

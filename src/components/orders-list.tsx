@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { ClipboardPlus, ReceiptText } from "lucide-react";
+import { ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getStatusBadgeInfo } from "@/lib/order-kind";
+import { thaiDayRange, todayThaiStr, isValidDateStr } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
 import { OrderStatusBadges } from "@/components/order-status-badges";
+import { DateFilter } from "@/components/date-filter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -16,13 +18,14 @@ import { getLocale } from "@/i18n/get-locale";
 export async function OrdersList({
   queueType,
   basePath,
-  bookHref,
   status,
+  date,
 }: {
   queueType: "BATH" | "OTHER";
   basePath: string;
-  bookHref: string;
   status: string;
+  /** วันที่ที่เลือก (YYYY-MM-DD) — ไม่ส่งมา = วันนี้ */
+  date?: string;
 }) {
   const user = await requireUser();
   const t = getDictionary(await getLocale());
@@ -36,6 +39,10 @@ export async function OrdersList({
     { label: t.orders.filterCancelled, value: "CANCELLED" },
   ];
 
+  // ครั้งแรกที่เข้าหน้านี้ให้ดึงเฉพาะของวันนี้ก่อน
+  const selectedDate = date && isValidDateStr(date) ? date : todayThaiStr();
+  const { start, end } = thaiDayRange(selectedDate);
+
   const queueWhere =
     queueType === "BATH"
       ? { OR: [{ queueType: "BATH" as const }, { queueType: null }] }
@@ -44,6 +51,7 @@ export async function OrdersList({
   const orders = await prisma.order.findMany({
     where: {
       appointmentAt: { not: null },
+      createdAt: { gte: start, lt: end },
       ...queueWhere,
       ...(status !== "all" ? { status: status as OrderStatus } : {}),
     },
@@ -66,9 +74,11 @@ export async function OrdersList({
         title={title}
         description={t.orders.description}
         action={
-          <Button render={<Link href={bookHref} />} nativeButton={false}>
-            <ClipboardPlus /> {t.orders.bookOrder}
-          </Button>
+          <DateFilter
+            value={selectedDate}
+            basePath={basePath}
+            keepParams={{ status: status !== "all" ? status : undefined }}
+          />
         }
       />
 
@@ -77,7 +87,12 @@ export async function OrdersList({
           <Button
             key={f.value}
             render={
-              <Link href={f.value === "all" ? basePath : `${basePath}?status=${f.value}`} />
+              <Link
+                href={`${basePath}?${new URLSearchParams({
+                  ...(f.value !== "all" ? { status: f.value } : {}),
+                  date: selectedDate,
+                }).toString()}`}
+              />
             }
             nativeButton={false}
             size="sm"
@@ -110,9 +125,10 @@ export async function OrdersList({
                     </div>
                     <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                       {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate">
-                        {o.customer.name} · {o.customer.phone} · {formatDateTime(o.createdAt)}
-                      </span>
+                      <span className="truncate">{o.customer.name}</span>
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {t.orders.transactionDate}: {formatDateTime(o.createdAt)}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>
