@@ -23,7 +23,7 @@ import {
   BathCalendarImageIcon,
   OrdersImageIcon,
   UserAvatarFlatIcon,
-  DashboardFlatIcon,
+  ReportsImageIcon,
   RoomsImageIcon,
   LogoutImageIcon,
   ShopInfoImageIcon,
@@ -62,7 +62,7 @@ function getNavGroups(t: Dictionary): NavGroup[] {
         { href: "/boarding", label: t.nav.boardingCalendar, icon: BoardingImageIcon, hiddenForGroomer: true },
         { href: "/customers", label: t.nav.customers, icon: CustomersImageIcon, hiddenForGroomer: true },
         { href: "/shop", label: t.nav.shopCafe, icon: ShopImageIcon, hiddenForGroomer: true },
-        { href: "/reports", label: t.nav.reports, icon: DashboardFlatIcon, adminOnly: true },
+        { href: "/reports", label: t.nav.reports, icon: ReportsImageIcon, adminOnly: true },
       ],
     },
     {
