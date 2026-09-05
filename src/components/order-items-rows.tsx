@@ -8,17 +8,19 @@ import { removeOrderItem } from "@/app/actions/orders";
 import { formatBaht } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 
 type Item = { id: string; name: string; quantity: number; unitPrice: number; subtotal: number };
 
 /** แถวรายการในตารางออเดอร์ — ลบรายการได้เมื่อ canEdit (ยอดคงเหลือยังไม่ชำระ) */
 export function OrderItemsRows({ items, canEdit }: { items: Item[]; canEdit: boolean }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function remove(id: string) {
-    if (!confirm(t.orders.confirmDeleteItem)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.orders.confirmDeleteItem, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await removeOrderItem(id);
       if (!res.ok) {

@@ -146,10 +146,22 @@ export function CustomersImageIcon({ className }: IconProps) {
   return <img src="/images/icons/customers.png" alt="" className={className} />;
 }
 
-/** ไอคอนรายการสินค้า — รูปภาพกล่องพัสดุติ๊กถูกที่ผู้ใช้เตรียมมาให้ */
+/** ไอคอนรายการอาหาร/สินค้า — รูปภาพที่ผู้ใช้เตรียมมาให้ */
 export function StockImageIcon({ className }: IconProps) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/images/icons/stock.png" alt="" className={className} />;
+}
+
+/** ไอคอนห้องพัก — รูปภาพเตียงนอนที่ผู้ใช้เตรียมมาให้ */
+export function RoomsImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/rooms.png" alt="" className={className} />;
+}
+
+/** ไอคอนข้อมูลร้าน — รูปภาพหน้าร้านคาเฟ่ที่ผู้ใช้เตรียมมาให้ */
+export function ShopInfoImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/shop-info.png" alt="" className={className} />;
 }
 
 /** ไอคอนออเดอร์ — รูปภาพปฏิทินติ๊กถูกที่ผู้ใช้เตรียมมาให้ */

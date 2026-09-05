@@ -61,6 +61,11 @@ enum NannyType {
   VIP // พี่เลี้ยงดูแลพิเศษ VIP +400/ตัว/ทั้งการเข้าพัก
 }
 
+enum OrderType {
+  SERVICE // งานบริการ: อาบน้ำ/ตัดขน/บริการอื่นๆ/ห้องพัก
+  SHOP // บิลร้านอาหาร & คาเฟ่ (ขายหน้าร้าน)
+}
+
 enum OrderStatus {
   PENDING_PAYMENT // รอชำระเงิน
   DEPOSIT_PAID // มัดจำแล้ว รอชำระส่วนที่เหลือ
@@ -140,6 +145,7 @@ model User {
   name          String
   email         String?       @unique
   passwordHash  String
+  avatarUrl     String? // รูปโปรไฟล์ (data URL) — ผู้ใช้อัปโหลดเองจากมุมขวาบน
   role          Role          @default(USER)
   groomerLevel  GroomerLevel? // ใช้เฉพาะ role = GROOMER — คิดคอมมิชชั่นไม่เท่ากันตาม level
   active        Boolean       @default(true)
@@ -333,12 +339,13 @@ model BankAccount {
 model Order {
   id               String      @id @default(cuid())
   code             String      @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
-  customer         Customer    @relation(fields: [customerId], references: [id])
-  customerId       String
+  customer         Customer?   @relation(fields: [customerId], references: [id])
+  customerId       String? // บิลร้านอาหาร (SHOP) เปิดได้โดยไม่ต้องผูกลูกค้า
   pet              Pet?        @relation(fields: [petId], references: [id])
   petId            String?
   room             Room?       @relation(fields: [roomId], references: [id])
   roomId           String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
+  orderType        OrderType   @default(SERVICE) // SERVICE = อาบน้ำ/บริการ/โรงแรม, SHOP = บิลร้านอาหาร
   status           OrderStatus @default(PENDING_PAYMENT)
   appointmentAt    DateTime? // วัน-เวลาคิวที่จอง (slot) — ใช้กับคิวอาบน้ำ/ตัดขนแบบ walk-in
   queueType        QueueType? // พูลคิว (BATH/OTHER) เมื่อมี appointmentAt — null = จองก่อนเพิ่มฟีเจอร์นี้ ถือเป็น BATH
@@ -371,6 +378,7 @@ model Order {
   activityLogs OrderActivityLog[]
 
   @@index([customerId])
+  @@index([orderType])
   @@index([status])
   @@index([createdAt])
   @@index([appointmentAt])

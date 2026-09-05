@@ -240,7 +240,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                       <span className="font-mono font-semibold tabular-nums">{slot}</span>
                       <span className="inline-flex items-center gap-1 text-muted-foreground">
                         {booked.pet && <SpeciesIcon species={booked.pet.species} className="h-3.5 w-3.5" />}
-                        {booked.customer.name}
+                        {booked.customer?.name}
                       </span>
                     </div>
                     <StatusBadge o={booked} />
@@ -287,7 +287,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     {b.pet && <SpeciesIcon species={b.pet.species} className="h-3.5 w-3.5" />}
-                    {b.customer.name}
+                    {b.customer?.name}
                   </span>
                 </div>
                 <StatusBadge o={b} />

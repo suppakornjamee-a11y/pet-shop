@@ -8,6 +8,7 @@ import { upsertService, deleteService } from "@/app/actions/settings";
 import type { ServiceCategory, ServiceGroup, Species } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +59,7 @@ const empty = {
 
 export function ServiceManager({ services }: { services: ServiceRow[] }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -138,8 +140,8 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.services.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.services.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteService(id);
       if (!res.ok) {

@@ -13,6 +13,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { allergyText } from "@/lib/pet-notes";
 import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { getOrderKind, getMyGroomerPhase, getStatusBadgeInfo } from "@/lib/order-kind";
@@ -59,6 +60,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   if (!order) notFound();
 
   const extraChargesTotal = order.extraCharges.reduce((sum, c) => sum + c.amount, 0);
+  const isShopOrder = order.orderType === "SHOP";
   const verifiedSum = order.payments
     .filter((p) => p.status === "VERIFIED")
     .reduce((sum, p) => sum + p.amount, 0);
@@ -145,6 +147,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 </div>
               </div>
               <OrderStatusControl
+                isShopOrder={isShopOrder}
                 orderId={order.id}
                 status={order.status}
                 role={user.role}
@@ -224,11 +227,13 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   </div>
                 </div>
               )}
+              {/* บิลร้านอาหารเป็น walk-in ไม่ผูกลูกค้า/สัตว์เลี้ยง จึงไม่ต้องมีบล็อกนี้ */}
+              {!isShopOrder && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-sm font-bold">{t.orders.owner}</div>
-                  <div className="text-xs">{order.customer.name}</div>
-                  <div className="text-xs text-muted-foreground">{order.customer.phone}</div>
+                  <div className="text-xs">{order.customer?.name ?? "-"}</div>
+                  <div className="text-xs text-muted-foreground">{order.customer?.phone}</div>
                 </div>
                 <div>
                   <div className="text-sm font-bold">{t.orders.pet}</div>
@@ -236,8 +241,8 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     {order.pet ? (
                       <span className="inline-flex items-center gap-1.5">
                         <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
-                        {order.pet.allergies && (
-                          <span className="text-rose-600">({order.pet.allergies})</span>
+                        {allergyText(order.pet.allergies) && (
+                          <span className="text-rose-600">({allergyText(order.pet.allergies)})</span>
                         )}
                       </span>
                     ) : (
@@ -246,6 +251,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   </div>
                 </div>
               </div>
+              )}
 
               <div className="overflow-hidden rounded-lg border">
                 <table className="w-full text-sm">
@@ -320,6 +326,8 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             </Card>
           )}
 
+          {/* ค่าเสียหายเพิ่มเติมใช้กับงานบริการ/ห้องพักเท่านั้น */}
+          {!isShopOrder && (
           <OrderExtraCharges
             orderId={order.id}
             charges={order.extraCharges.map((c) => ({
@@ -331,6 +339,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             }))}
             canEdit={canEditItems}
           />
+          )}
 
           {order.activityLogs.length > 0 && (
             <Card>

@@ -7,6 +7,7 @@ import { Loader2, Save, Plus, Pencil, Trash2, ShieldCheck, User as UserIcon, Sci
 import { createUser, updateUser, deleteUser } from "@/app/actions/settings";
 import type { Role, GroomerLevel } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
+import { TablePagination, useTablePagination } from "@/components/ui/table-pagination";
 
 type User = {
   id: string;
@@ -53,10 +56,19 @@ export function UserManager({
   currentUserId: string;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const sort = useTableSort<User>(users, {
+    name: (u) => u.name,
+    username: (u) => u.username,
+    email: (u) => u.email,
+    role: (u) => u.role,
+    active: (u) => (u.active ? 1 : 0),
+  });
+  const pagination = useTablePagination(sort.sorted);
   const [form, setForm] = useState({
     username: "",
     name: "",
@@ -116,8 +128,8 @@ export function UserManager({
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.users.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.users.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteUser(id);
       if (!res.ok) {
@@ -142,26 +154,28 @@ export function UserManager({
           <Table>
             <TableHeader className="border-b bg-muted/50 text-muted-foreground">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                <SortableHead sortKey="name" sort={sort}>
                   {t.settings.users.nameLabel}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="username" sort={sort}>
                   {t.settings.users.usernameLabel}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="email" sort={sort}>
                   {t.settings.users.emailLabel}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="role" sort={sort}>
                   {t.settings.users.roleLabel}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="active" sort={sort}>
                   {t.settings.users.statusLabel}
+                </SortableHead>
+                <TableHead className="w-24 px-4 text-center font-medium text-muted-foreground">
+                  {t.common.actions}
                 </TableHead>
-                <TableHead className="w-24 px-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
+              {pagination.paged.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -241,6 +255,8 @@ export function UserManager({
           </Table>
         </CardContent>
       </Card>
+
+      {users.length > 0 && <TablePagination state={pagination} />}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

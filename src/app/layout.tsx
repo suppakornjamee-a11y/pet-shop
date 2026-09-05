@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/components/i18n-provider";
+import { ConfirmProvider } from "@/components/confirm-provider";
 import { getLocale } from "@/i18n/get-locale";
 
 const fontSans = Prompt({
@@ -29,8 +30,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-muted/40 font-sans">
         <ThemeProvider>
           <I18nProvider locale={locale}>
-            {children}
-            <Toaster richColors position="top-center" />
+            <ConfirmProvider>
+              {children}
+              <Toaster richColors position="top-center" />
+            </ConfirmProvider>
           </I18nProvider>
         </ThemeProvider>
       </body>

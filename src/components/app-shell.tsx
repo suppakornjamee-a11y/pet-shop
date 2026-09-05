@@ -23,18 +23,16 @@ import {
   BathCalendarImageIcon,
   OrdersImageIcon,
   UserAvatarFlatIcon,
-  BedFlatIcon,
+  RoomsImageIcon,
   LogoutImageIcon,
-  DocumentFlatIcon,
+  ShopInfoImageIcon,
 } from "@/components/nav-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfileDialog } from "@/components/profile-dialog";
 
 type NavItem = {
   href: string;
@@ -69,38 +67,60 @@ function getNavGroups(t: Dictionary): NavGroup[] {
       title: t.nav.settingsGroup,
       items: [
         { href: "/settings/stock", label: t.nav.stock, icon: StockImageIcon, hiddenForGroomer: true },
-        { href: "/settings/rooms", label: t.nav.rooms, icon: BedFlatIcon, hiddenForGroomer: true },
+        { href: "/settings/rooms", label: t.nav.rooms, icon: RoomsImageIcon, hiddenForGroomer: true },
         { href: "/settings/services", label: t.nav.services, icon: ClipboardFlatIcon, hiddenForGroomer: true },
         { href: "/settings/bank-accounts", label: t.nav.bankAccounts, icon: BankAccountsImageIcon, adminOnly: true },
         { href: "/settings/users", label: t.nav.users, icon: UserAvatarFlatIcon, adminOnly: true },
         { href: "/settings/holidays", label: t.nav.holidays, icon: HolidayImageIcon, adminOnly: true },
-        { href: "/settings/shop-info", label: t.nav.shopInfo, icon: DocumentFlatIcon, adminOnly: true },
+        { href: "/settings/shop-info", label: t.nav.shopInfo, icon: ShopInfoImageIcon, adminOnly: true },
       ],
     },
   ];
 }
 
-type User = { name: string; username: string; role: Role };
+type User = {
+  name: string;
+  username: string;
+  role: Role;
+  email: string;
+  avatarUrl: string | null;
+};
 
 function roleLabel(t: Dictionary, role: Role) {
   return role === "ADMIN" ? t.nav.admin : role === "GROOMER" ? t.nav.groomer : t.nav.staff;
 }
 
-/** โปรไฟล์ผู้ใช้ที่ล็อกอินอยู่ — ย้ายมาไว้มุมบนขวาแทนที่จะอยู่ท้าย sidebar */
+/** โปรไฟล์ผู้ใช้ที่ล็อกอินอยู่ — กดเพื่อแก้ไขชื่อ/อีเมล/รูป/รหัสผ่านของตัวเอง */
 function TopbarProfile({ user }: { user: User }) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1">
-      <Avatar className="h-9 w-9">
-        <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-          {user.name.slice(0, 1).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-      <div className="hidden leading-tight sm:block">
-        <div className="truncate text-sm font-medium">{user.name}</div>
-        <div className="truncate text-xs text-muted-foreground">{roleLabel(t, user.role)}</div>
-      </div>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={t.profile.title}
+        className="flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1 transition-colors hover:bg-accent/70"
+      >
+        <Avatar className="h-9 w-9">
+          {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+          <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+            {user.name.slice(0, 1).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="hidden text-left leading-tight sm:block">
+          <div className="truncate text-sm font-medium">{user.name}</div>
+          <div className="truncate text-xs text-muted-foreground">{roleLabel(t, user.role)}</div>
+        </div>
+      </button>
+
+      <ProfileDialog
+        open={open}
+        onOpenChange={setOpen}
+        profile={{ name: user.name, email: user.email, avatarUrl: user.avatarUrl }}
+      />
+    </>
   );
 }
 

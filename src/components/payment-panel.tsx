@@ -25,6 +25,7 @@ import { paymentStatusColor } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/components/i18n-provider";
@@ -422,20 +423,29 @@ function ActivePaymentPanel({
             {t.orders.payment.adminVerification}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Button
+            <ConfirmButton
               className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => run(() => verifyPayment(payment.id))}
+              title={t.orders.payment.confirmVerifyTitle}
+              description={t.orders.payment.confirmVerifyDescription(formatBaht(payment.amount))}
+              confirmLabel={t.orders.payment.verify}
+              onConfirm={() => run(() => verifyPayment(payment.id))}
               disabled={isPending}
             >
               <CheckCircle2 /> {t.orders.payment.verify}
-            </Button>
-            <Button
+            </ConfirmButton>
+            <ConfirmButton
               variant="destructive"
-              onClick={() => run(() => rejectPayment(payment.id, t.orders.payment.rejectReasonDefault))}
+              tone="danger"
+              title={t.orders.payment.confirmRejectTitle}
+              description={t.orders.payment.confirmRejectDescription}
+              confirmLabel={t.orders.payment.reject}
+              onConfirm={() =>
+                run(() => rejectPayment(payment.id, t.orders.payment.rejectReasonDefault))
+              }
               disabled={isPending}
             >
               <XCircle /> {t.orders.payment.reject}
-            </Button>
+            </ConfirmButton>
           </div>
         </div>
       )}

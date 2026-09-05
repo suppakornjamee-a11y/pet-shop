@@ -146,37 +146,24 @@ export default async function DashboardPage(props: PageProps<"/">) {
       label: t.dashboard.statCheckOutsToday,
       value: checkOutsToday.toString(),
       icon: CheckOutStatIcon,
-      chip: "bg-orange-100 dark:bg-orange-950",
+      chip: "bg-red-100 dark:bg-red-950",
     },
     {
       label: t.dashboard.statGroomingQueueToday,
       value: groomingQueueToday.toString(),
       icon: GroomingQueueStatIcon,
-      chip: "bg-pink-100 dark:bg-pink-950",
+      chip: "bg-amber-100 dark:bg-amber-950",
     },
   ];
 
   return (
     <div>
+      {/* ตัวเลือกวันที่อยู่มุมขวาของหัวข้อ ให้เหมือนหน้าออเดอร์อาบน้ำ
+          (ปุ่มลงทะเบียน/จองคิวเดิมคอมเม้นปิดไว้ ดู git history ถ้าต้องเปิดกลับ) */}
       <PageHeader
         title={t.dashboard.title}
-        action={
-          <>
-            {/* ปุ่มลงทะเบียน/จองคิว คอมเม้นปิดไว้ก่อน
-            <Button render={<Link href="/register" />} nativeButton={false} variant="outline">
-              <PawPrint /> {t.dashboard.register}
-            </Button>
-            <Button render={<Link href="/calendar" />} nativeButton={false}>
-              <ClipboardPlus /> {t.dashboard.bookOrder}
-            </Button>
-            */}
-          </>
-        }
+        action={<DashboardDatePicker value={selectedDateStr} />}
       />
-
-      <div className="mb-4">
-        <DashboardDatePicker value={selectedDateStr} />
-      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => {
@@ -192,10 +179,13 @@ export default async function DashboardPage(props: PageProps<"/">) {
                 >
                   <Icon className="h-9 w-9" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-muted-foreground">{s.label}</div>
-                  <div className="truncate text-2xl font-semibold tracking-tight tabular-nums">
-                    {s.value}
+                {/* กล่องข้อความชิดขวา แต่ตัวกล่องกว้างเท่าป้ายพอดี ตัวเลขจึงอยู่กึ่งกลางใต้คำ */}
+                <div className="flex min-w-0 flex-1 justify-end pr-3">
+                  <div className="min-w-0 text-center">
+                    <div className="truncate text-sm text-muted-foreground">{s.label}</div>
+                    <div className="truncate text-2xl font-semibold tracking-tight tabular-nums">
+                      {s.value}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -245,7 +235,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
                       )}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {o.customer.name}
+                      {o.customer?.name ?? t.common.walkInCustomer}
                       {o.pet ? ` (${o.pet.name})` : ""} {t.dashboard.timeLabel}{" "}
                       {formatTime(o.createdAt)}
                     </div>

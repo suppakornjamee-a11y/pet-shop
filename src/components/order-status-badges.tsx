@@ -16,6 +16,14 @@ export function OrderStatusBadges({
 }) {
   const textSize = size === "sm" ? "text-xs" : "text-[10px]";
 
+  if (info.kind === "SHOP_PAID") {
+    return (
+      <Badge variant="outline" className={cn(textSize, orderStatusColor.PAID)}>
+        {t.orders.shopPaidBadge}
+      </Badge>
+    );
+  }
+
   if (info.kind === "SLIP_SUBMITTED") {
     return (
       <Badge variant="outline" className={cn(textSize, paymentStatusColor.SUBMITTED)}>

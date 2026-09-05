@@ -7,6 +7,7 @@ import { Loader2, Save, Plus, Pencil, Trash2, Star } from "lucide-react";
 import { upsertBankAccount, deleteBankAccount } from "@/app/actions/settings";
 import type { AccountType } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,6 +79,7 @@ const empty = {
 
 export function BankManager({ accounts }: { accounts: Account[] }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -124,8 +126,8 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.bankAccounts.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.bankAccounts.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteBankAccount(id);
       if (!res.ok) {
@@ -152,9 +154,9 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   {a.type === "PROMPTPAY" ? (
-                    <PromptPayTypeIcon className="h-6 w-6" />
+                    <PromptPayTypeIcon className="h-10 w-10 shrink-0 rounded-md" />
                   ) : (
-                    <BankTypeIcon className="h-6 w-6" />
+                    <BankTypeIcon className="h-10 w-10 shrink-0 rounded-md" />
                   )}
                   <div>
                     <div className="font-semibold">{a.bankName}</div>

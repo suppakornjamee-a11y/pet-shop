@@ -60,6 +60,7 @@ export function canStartOrder(orderKind: OrderKind, role: Role): boolean {
 }
 
 export type StatusBadgeInfo =
+  | { kind: "SHOP_PAID" }
   | { kind: "SLIP_SUBMITTED" }
   | { kind: "GROOMER_FINISHED" }
   | { kind: "BATHING_IN_PROGRESS" }
@@ -73,6 +74,7 @@ export type StatusBadgeInfo =
 export function getStatusBadgeInfo(
   order: {
     status: OrderStatus;
+    orderType?: string;
     roomId: string | null;
     queueType: string | null;
     total: number;
@@ -85,6 +87,10 @@ export function getStatusBadgeInfo(
   // มีสลิปรอตรวจสอบอยู่ ให้ขึ้นก่อนเสมอไม่ว่าสถานะออเดอร์จะเป็นอะไร (ยกเว้นยกเลิกแล้ว) กันสับสนว่าลูกค้าจ่ายหรือยัง
   if (order.status !== "CANCELLED" && order.payments.some((p) => p.status === "SUBMITTED")) {
     return { kind: "SLIP_SUBMITTED" };
+  }
+  // บิลร้านอาหารไม่มีขั้นตอนอาบน้ำ/เช็คเอ้าท์ — สนใจแค่จ่ายเงินแล้วหรือยัง
+  if (order.orderType === "SHOP") {
+    return isOrderFullyPaid(order) ? { kind: "SHOP_PAID" } : { kind: "PLAIN", status: order.status };
   }
   if (order.status !== "IN_PROGRESS") {
     return { kind: "PLAIN", status: order.status };

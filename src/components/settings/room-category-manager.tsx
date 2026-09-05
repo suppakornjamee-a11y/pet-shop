@@ -7,6 +7,7 @@ import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
 import { upsertRoomCategory, deleteRoomCategory } from "@/app/actions/settings";
 import type { BillingUnit } from "@/generated/prisma/enums";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ const empty = {
 
 export function RoomCategoryManager({ categories }: { categories: RoomCategoryRow[] }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -87,8 +89,8 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.rooms.confirmDeleteCategory)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.rooms.confirmDeleteCategory, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteRoomCategory(id);
       if (!res.ok) {

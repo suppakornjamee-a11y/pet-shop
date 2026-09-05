@@ -372,13 +372,13 @@ export function RegisterForm({
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-4 sm:col-span-2">
               <MultiPhotoUpload
-                label={t.register.petPhotoLabel}
+                label={t.register.petPhotoLabel(MAX_PHOTOS)}
                 values={pet.photoUrls}
                 onChange={(v) => updatePet(i, { photoUrls: v })}
                 readOnly={readOnly}
               />
               <MultiPhotoUpload
-                label={t.register.vaccinePhotoLabel}
+                label={t.register.vaccinePhotoLabel(MAX_PHOTOS)}
                 values={pet.vaccinePhotoUrls}
                 onChange={(v) => updatePet(i, { vaccinePhotoUrls: v })}
                 readOnly={readOnly}

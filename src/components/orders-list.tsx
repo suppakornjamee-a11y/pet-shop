@@ -50,6 +50,7 @@ export async function OrdersList({
 
   const orders = await prisma.order.findMany({
     where: {
+      orderType: "SERVICE", // กันบิลร้านอาหารหลุดมาปนในลิสต์งานบริการ
       appointmentAt: { not: null },
       createdAt: { gte: start, lt: end },
       ...queueWhere,
@@ -125,7 +126,7 @@ export async function OrdersList({
                     </div>
                     <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                       {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate">{o.customer.name}</span>
+                      <span className="truncate">{o.customer?.name}</span>
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {t.orders.transactionDate}: {formatDateTime(o.createdAt)}

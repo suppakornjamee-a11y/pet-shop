@@ -75,7 +75,7 @@ async function notifyCustomerLine(orderId: string, text: string) {
     where: { id: orderId },
     select: { customer: { select: { lineUserId: true } } },
   });
-  const lineUserId = order?.customer.lineUserId;
+  const lineUserId = order?.customer?.lineUserId;
   if (!lineUserId) return;
   try {
     await sendLinePush(lineUserId, text);
@@ -261,7 +261,7 @@ export async function createBalancePayment(orderId: string): Promise<ActionResul
   if (link) {
     void notifyCustomerLine(
       orderId,
-      `แจ้งยอดคงเหลือที่ต้องชำระ ✅\nออเดอร์ ${order.code}\nยอดคงเหลือ ${formatBaht(remaining)}\nกดลิงก์นี้เพื่อชำระเงิน:\n${link}`
+      `ยอดชำระคงเหลือ ออเดอร์ ${order.code}\nยอดคงเหลือ ${formatBaht(remaining)}\nลิ้งค์ชำระเงิน ${link}`
     );
   }
 
@@ -513,7 +513,7 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   if (target === "COMPLETED") {
     void notifyCustomerLine(
       orderId,
-      `บริการเสร็จเรียบร้อยแล้วค่ะ 🎉\nออเดอร์ ${updated.code}\nสามารถมารับได้เลยค่ะ 🐾`
+      `บริการเสร็จเรียบร้อย ออเดอร์ ${updated.code}\nสามารถมารับได้เลยค่ะ`
     );
   }
 

@@ -60,7 +60,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
           orderId: o.id,
           roomId: o.roomId!,
           status: o.status,
-          customerName: o.customer.name,
+          customerName: o.customer?.name ?? "-",
           petName: o.pet?.name ?? null,
           petBreed: o.pet?.breed ?? null,
           petSpecies: o.pet?.species ?? null,
@@ -106,6 +106,7 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title={t.boarding.title}
+        description={t.boarding.description}
         action={
           <div className="flex items-center gap-1.5">
             <Button

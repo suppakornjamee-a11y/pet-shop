@@ -14,7 +14,6 @@ export default async function StockSettingsPage() {
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={t.settings.stock.title}
-        description={t.settings.stock.description}
         action={<ProductImportExport />}
       />
       <StockManager

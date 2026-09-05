@@ -14,6 +14,7 @@ import { formatBaht } from "@/lib/format";
 import { fileToDataUrl } from "@/lib/file";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
+import { TablePagination, useTablePagination } from "@/components/ui/table-pagination";
 
 type Product = {
   id: string;
@@ -47,6 +58,10 @@ type Product = {
   imageUrl: string | null;
 };
 
+// หมวดหมู่/หน่วยของสินค้าฝั่งคาเฟ่คน — เป็นค่าที่เก็บลงฐานข้อมูลจริง (ไม่ใช่ข้อความ UI) จึงไม่ผ่าน i18n
+const HUMAN_CATEGORIES = ["เครื่องดื่ม", "อาหาร", "ขนม"] as const;
+const HUMAN_UNITS = ["แก้ว", "จาน", "ชิ้น"] as const;
+
 const empty = {
   name: "",
   target: "PET" as ProductTarget,
@@ -60,6 +75,7 @@ const empty = {
 
 export function StockManager({ products }: { products: Product[] }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -68,6 +84,16 @@ export function StockManager({ products }: { products: Product[] }) {
 
   const [uploading, setUploading] = useState(false);
 
+  const sort = useTableSort<Product>(products, {
+    name: (p) => p.name,
+    category: (p) => p.category,
+    price: (p) => p.price,
+    // ของคนไม่นับสต็อก จัดไปท้ายตารางเสมอด้วยการคืนค่าว่าง
+    stockQty: (p) => (p.target === "HUMAN" ? null : p.stockQty),
+  });
+  const pagination = useTablePagination(sort.sorted);
+  const [imageError, setImageError] = useState("");
+
   const [adjustFor, setAdjustFor] = useState<Product | null>(null);
   const [adjustQty, setAdjustQty] = useState("");
   const [adjustType, setAdjustType] = useState<"IN" | "OUT" | "ADJUST">("IN");
@@ -75,6 +101,7 @@ export function StockManager({ products }: { products: Product[] }) {
   function openNew() {
     setEditing(null);
     setForm(empty);
+    setImageError("");
     setOpen(true);
   }
   function openEdit(p: Product) {
@@ -89,19 +116,40 @@ export function StockManager({ products }: { products: Product[] }) {
       stockQty: String(p.stockQty),
       imageUrl: p.imageUrl ?? "",
     });
+    setImageError("");
     setOpen(true);
+  }
+
+  const isHuman = form.target === "HUMAN";
+
+  /** สลับประเภทสินค้า — ถ้าค่าหมวดหมู่/หน่วยเดิมไม่มีในตัวเลือกของฝั่งคน ต้องดันให้เป็นตัวเลือกแรก
+   *  ไม่งั้น Select จะโชว์ค่าดิบที่ไม่มีในลิสต์ (พฤติกรรมของ base-ui) */
+  function changeTarget(target: ProductTarget) {
+    if (target !== "HUMAN") {
+      setForm((prev) => ({ ...prev, target }));
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      target,
+      category: (HUMAN_CATEGORIES as readonly string[]).includes(prev.category)
+        ? prev.category
+        : HUMAN_CATEGORIES[0],
+      unit: (HUMAN_UNITS as readonly string[]).includes(prev.unit) ? prev.unit : HUMAN_UNITS[0],
+    }));
   }
 
   async function handleImage(file: File | undefined) {
     if (!file) return;
     setUploading(true);
+    setImageError("");
     try {
       // จำกัด 1MB เพราะรูปถูกเก็บเป็น data URL ลงฐานข้อมูลโดยตรง (แนวเดียวกับรูปสัตว์เลี้ยง)
       setForm((prev) => ({ ...prev, imageUrl: "" }));
       const dataUrl = await fileToDataUrl(file, 1024 * 1024);
       setForm((prev) => ({ ...prev, imageUrl: dataUrl }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t.settings.stock.uploadFailed);
+      setImageError(e instanceof Error ? e.message : t.settings.stock.uploadFailed);
     } finally {
       setUploading(false);
     }
@@ -131,8 +179,8 @@ export function StockManager({ products }: { products: Product[] }) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.stock.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.stock.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteProduct(id);
       if (!res.ok) {
@@ -174,20 +222,30 @@ export function StockManager({ products }: { products: Product[] }) {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50 text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">{t.settings.stock.columnProduct}</th>
-                  <th className="px-4 py-2 text-left font-medium">{t.settings.stock.columnCategory}</th>
-                  <th className="px-4 py-2 text-right font-medium">{t.settings.stock.columnPrice}</th>
-                  <th className="px-4 py-2 text-center font-medium">{t.settings.stock.columnStock}</th>
-                  <th className="px-4 py-2 text-right font-medium">{t.settings.stock.columnActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {products.map((p) => (
-                  <tr key={p.id}>
-                    <td className="px-4 py-2">
+            <Table>
+              <TableHeader className="border-b bg-muted/50 text-muted-foreground">
+                <TableRow className="hover:bg-transparent">
+                  <SortableHead sortKey="name" sort={sort}>
+                    {t.settings.stock.columnProduct}
+                  </SortableHead>
+                  <SortableHead sortKey="category" sort={sort}>
+                    {t.settings.stock.columnCategory}
+                  </SortableHead>
+                  <SortableHead sortKey="price" sort={sort} className="text-center">
+                    {t.settings.stock.columnPrice}
+                  </SortableHead>
+                  <SortableHead sortKey="stockQty" sort={sort} className="text-center">
+                    {t.settings.stock.columnStock}
+                  </SortableHead>
+                  <TableHead className="px-4 text-center font-medium text-muted-foreground">
+                    {t.settings.stock.columnActions}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagination.paged.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {p.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -208,31 +266,39 @@ export function StockManager({ products }: { products: Product[] }) {
                           </Badge>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-2 text-muted-foreground">{p.category ?? "-"}</td>
-                    <td className="px-4 py-2 text-right">{formatBaht(p.price)}</td>
-                    <td className="px-4 py-2 text-center">
-                      <span
-                        className={cn(
-                          "font-medium",
-                          p.stockQty <= 5 && "text-rose-600"
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-muted-foreground">
+                      {p.category ?? "-"}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-center tabular-nums">
+                      {formatBaht(p.price)}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-center tabular-nums">
+                      {/* ของคน (คาเฟ่) ทำสดตามออเดอร์ ไม่นับสต็อก — ดู src/components/shop-menu.tsx */}
+                      {p.target === "HUMAN" ? (
+                        <span className="text-muted-foreground">-</span>
+                      ) : (
+                        <>
+                          <span className={cn("font-medium", p.stockQty <= 5 && "text-rose-600")}>
+                            {p.stockQty}
+                          </span>{" "}
+                          <span className="text-xs text-muted-foreground">{p.unit}</span>
+                        </>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <div className="flex justify-center gap-1">
+                        {p.target !== "HUMAN" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => setAdjustFor(p)}
+                            title={t.settings.stock.adjustStock}
+                          >
+                            <PackagePlus className="h-4 w-4" />
+                          </Button>
                         )}
-                      >
-                        {p.stockQty}
-                      </span>{" "}
-                      <span className="text-xs text-muted-foreground">{p.unit}</span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => setAdjustFor(p)}
-                          title={t.settings.stock.adjustStock}
-                        >
-                          <PackagePlus className="h-4 w-4" />
-                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -250,21 +316,23 @@ export function StockManager({ products }: { products: Product[] }) {
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {products.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-10 text-center text-muted-foreground">
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                       {t.settings.stock.empty}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
+
+      {products.length > 0 && <TablePagination state={pagination} />}
 
       {/* Add/Edit dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -272,50 +340,53 @@ export function StockManager({ products }: { products: Product[] }) {
           <DialogHeader>
             <DialogTitle>{editing ? t.settings.stock.editProduct : t.settings.stock.addProduct}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* รูปสินค้า — เก็บเป็น data URL เหมือนรูปสัตว์เลี้ยง แล้วไปโชว์บนการ์ดหน้าร้านอาหาร */}
-            <div className="space-y-2 sm:col-span-2">
-              <Label>{t.settings.stock.imageLabel}</Label>
-              <div className="flex items-center gap-3">
-                {form.imageUrl ? (
-                  <div className="relative w-fit">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={form.imageUrl}
-                      alt=""
-                      className="h-24 w-24 rounded-lg border object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, imageUrl: "" })}
-                      aria-label={t.common.delete}
-                      className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-destructive"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs text-muted-foreground transition-colors hover:bg-accent/50">
-                    {uploading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <ImagePlus className="h-5 w-5" />
-                        {t.settings.stock.uploadImage}
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => handleImage(e.target.files?.[0])}
-                    />
-                  </label>
-                )}
-                <p className="text-xs text-muted-foreground">{t.settings.stock.imageHint}</p>
-              </div>
+          {/* แถบรูปสินค้า — แยกเป็นส่วนของตัวเองแบบเดียวกับแถบปุ่มบันทึกด้านล่าง
+              (เก็บเป็น data URL เหมือนรูปสัตว์เลี้ยง แล้วไปโชว์บนการ์ดหน้าร้านอาหาร) */}
+          <div className="-mx-4 space-y-2 border-y bg-muted/50 px-4 py-4">
+            <Label>{t.settings.stock.imageLabel}</Label>
+            <div>
+              {form.imageUrl ? (
+                <div className="relative w-fit">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.imageUrl}
+                    alt=""
+                    className="h-24 w-24 rounded-lg border bg-background object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, imageUrl: "" })}
+                    aria-label={t.common.delete}
+                    className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-destructive"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed bg-background text-xs text-muted-foreground transition-colors hover:bg-accent/50">
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <ImagePlus className="h-5 w-5" />
+                      {t.settings.stock.uploadImage}
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => handleImage(e.target.files?.[0])}
+                  />
+                </label>
+              )}
             </div>
+            {/* ขึ้นเฉพาะตอนไฟล์ใหญ่เกิน/อ่านไม่ได้ ไม่ต้องมีคำอธิบายค้างไว้ตลอด */}
+            {imageError && <p className="text-xs text-destructive">{imageError}</p>}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label>{t.settings.stock.productNameLabel}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -324,7 +395,7 @@ export function StockManager({ products }: { products: Product[] }) {
               <Label>{t.settings.stock.targetLabel}</Label>
               <Select
                 value={form.target}
-                onValueChange={(v) => setForm({ ...form, target: v as ProductTarget })}
+                onValueChange={(v) => changeTarget(v as ProductTarget)}
                 items={{ PET: t.settings.stock.targetPet, HUMAN: t.settings.stock.targetHuman }}
               >
                 <SelectTrigger className="w-full">
@@ -338,10 +409,29 @@ export function StockManager({ products }: { products: Product[] }) {
             </div>
             <div className="space-y-2">
               <Label>{t.common.category}</Label>
-              <Input
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
+              {isHuman ? (
+                <Select
+                  value={form.category}
+                  onValueChange={(v) => setForm({ ...form, category: v ?? "" })}
+                  items={Object.fromEntries(HUMAN_CATEGORIES.map((c) => [c, c]))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HUMAN_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t.settings.stock.priceSellLabel}</Label>
@@ -361,7 +451,26 @@ export function StockManager({ products }: { products: Product[] }) {
             </div>
             <div className="space-y-2">
               <Label>{t.settings.stock.unitLabel}</Label>
-              <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+              {isHuman ? (
+                <Select
+                  value={form.unit}
+                  onValueChange={(v) => setForm({ ...form, unit: v ?? "" })}
+                  items={Object.fromEntries(HUMAN_UNITS.map((u) => [u, u]))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HUMAN_UNITS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+              )}
             </div>
             <div className="space-y-2">
               <Label>{t.settings.stock.stockQtyLabel}</Label>

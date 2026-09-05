@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead, useTableSort } from "@/components/ui/sortable-table";
+import { TablePagination, useTablePagination } from "@/components/ui/table-pagination";
 
 type Pet = { id: string; name: string; species: "DOG" | "CAT" };
 export type CustomerRow = {
@@ -41,6 +43,15 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
   const [species, setSpecies] = useState<NonNullable<CustomerFilter["species"]>>("ALL");
   const [rows, setRows] = useState<CustomerRow[]>(initial);
   const [isPending, startTransition] = useTransition();
+
+  const sort = useTableSort<CustomerRow>(rows, {
+    name: (c) => c.name,
+    pets: (c) => c.pets.map((p) => p.name).join(", "),
+    phone: (c) => c.phone,
+    visitCount: (c) => c.visitCount,
+    lastVisitAt: (c) => c.lastVisitAt,
+  });
+  const pagination = useTablePagination(sort.sorted);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -108,22 +119,24 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
           <Table>
             <TableHeader className="border-b bg-muted/50 text-muted-foreground">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                <SortableHead sortKey="name" sort={sort}>
                   {t.customers.columnCustomer}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="pets" sort={sort}>
                   {t.customers.columnPets}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="phone" sort={sort}>
                   {t.customers.columnPhone}
-                </TableHead>
-                <TableHead className="px-4 text-center font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="visitCount" sort={sort} className="text-center">
                   {t.customers.columnVisitCount}
-                </TableHead>
-                <TableHead className="px-4 font-medium text-muted-foreground">
+                </SortableHead>
+                <SortableHead sortKey="lastVisitAt" sort={sort} className="text-center">
                   {t.customers.columnLastVisit}
+                </SortableHead>
+                <TableHead className="w-24 px-4 text-center font-medium text-muted-foreground">
+                  {t.customers.columnDetail}
                 </TableHead>
-                <TableHead className="w-16 px-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,7 +154,7 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((c) => (
+                pagination.paged.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -177,10 +190,10 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
                     <TableCell className="px-4 py-3 text-center tabular-nums">
                       {c.visitCount}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-muted-foreground">
+                    <TableCell className="px-4 py-3 text-center text-muted-foreground">
                       {c.lastVisitAt ? formatDate(c.lastVisitAt) : "—"}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-right">
+                    <TableCell className="px-4 py-3 text-center">
                       <Button
                         render={<Link href={`/customers/${c.id}`} />}
                         nativeButton={false}
@@ -199,9 +212,7 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
         </CardContent>
       </Card>
 
-      {rows.length > 0 && (
-        <p className="text-xs text-muted-foreground">{t.customers.resultCount(rows.length)}</p>
-      )}
+      {rows.length > 0 && <TablePagination state={pagination} />}
     </div>
   );
 }

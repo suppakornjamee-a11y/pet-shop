@@ -214,7 +214,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
                       <span className="font-mono font-semibold tabular-nums">{slot}</span>
                       <span className="inline-flex items-center gap-1 text-muted-foreground">
                         {booked.pet && <SpeciesIcon species={booked.pet.species} className="h-3.5 w-3.5" />}
-                        {booked.customer.name}
+                        {booked.customer?.name}
                       </span>
                     </div>
                     <OrderStatusBadges info={getStatusBadgeInfo(booked, user)} t={t} size="xs" />
@@ -263,7 +263,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     {b.pet && <SpeciesIcon species={b.pet.species} className="h-3.5 w-3.5" />}
-                    {b.customer.name}
+                    {b.customer?.name}
                   </span>
                 </div>
                 <OrderStatusBadges info={getStatusBadgeInfo(b, user)} t={t} size="xs" />

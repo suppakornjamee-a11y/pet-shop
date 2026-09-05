@@ -18,7 +18,8 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
       items: true,
     },
   });
-  if (!order) notFound();
+  // บิลร้านอาหารไม่ผูกลูกค้า จึงไม่มีอะไรให้แก้ในฟอร์มนี้
+  if (!order || !order.customer) notFound();
 
   // แก้ไขได้เฉพาะออเดอร์ที่ยังรอชำระเงิน
   if (order.status !== "PENDING_PAYMENT") {

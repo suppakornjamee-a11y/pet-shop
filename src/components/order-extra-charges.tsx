@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 
 type ExtraCharge = {
   id: string;
@@ -32,6 +33,7 @@ export function OrderExtraCharges({
   canEdit: boolean;
 }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -75,8 +77,8 @@ export function OrderExtraCharges({
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.orders.extraCharges.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.orders.extraCharges.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteExtraCharge(id);
       if (!res.ok) {

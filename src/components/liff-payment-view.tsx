@@ -6,6 +6,7 @@ import { Loader2, CheckCircle2, XCircle, Clock, QrCode, PartyPopper, Paperclip }
 import { getLiffOrderPaymentStatus, liffSubmitPaymentSlip } from "@/app/actions/liff";
 import { formatBaht } from "@/lib/format";
 import { fileToDataUrl } from "@/lib/file";
+import { allergyText } from "@/lib/pet-notes";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
@@ -318,8 +319,10 @@ function OrderSummaryCard({ detail, total }: { detail: OrderDetail; total: numbe
           <div>
             <div className="text-xs text-muted-foreground">{t.orders.pet}</div>
             <div className="text-sm font-medium">{detail.pet.name}</div>
-            {detail.pet.allergies && (
-              <div className="text-xs text-rose-600">{t.orders.allergyWarning(detail.pet.allergies)}</div>
+            {allergyText(detail.pet.allergies) && (
+              <div className="text-xs text-rose-600">
+                {t.orders.allergyWarning(allergyText(detail.pet.allergies)!)}
+              </div>
             )}
           </div>
         )}

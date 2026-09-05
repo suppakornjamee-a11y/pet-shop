@@ -506,7 +506,7 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
       },
     },
   });
-  if (!order || order.customer.lineUserId !== identity.userId) {
+  if (!order || order.customer?.lineUserId !== identity.userId) {
     return { ok: false as const, error: "ไม่พบการจองนี้" };
   }
 
@@ -523,7 +523,7 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
     nights: order.nights,
     holidaySurcharge: order.holidaySurcharge,
     holidayLabel: order.holidayLabel,
-    ownerName: order.customer.name,
+    ownerName: order.customer?.name ?? "",
     pet: order.pet,
     room: order.room,
     items: order.items,
@@ -557,7 +557,7 @@ export async function liffSubmitPaymentSlip(
     where: { id: paymentId },
     include: { order: { select: { id: true, customer: { select: { lineUserId: true } } } } },
   });
-  if (!payment || payment.order.customer.lineUserId !== identity.userId) {
+  if (!payment || payment.order.customer?.lineUserId !== identity.userId) {
     return { ok: false, error: "ไม่พบรายการชำระเงินนี้" };
   }
   if (payment.status === "VERIFIED") {

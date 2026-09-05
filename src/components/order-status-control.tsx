@@ -8,6 +8,7 @@ import { updateOrderStatus, markGroomerFinished } from "@/app/actions/orders";
 import type { OrderStatus, Role } from "@/generated/prisma/enums";
 import { canStartOrder, canCheckoutOrder, type OrderKind, type StatusBadgeInfo } from "@/lib/order-kind";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export function OrderStatusControl({
   roomLabel,
   iHaveStartedNotFinished,
   badgeInfo,
+  isShopOrder = false,
 }: {
   orderId: string;
   status: OrderStatus;
@@ -36,6 +38,8 @@ export function OrderStatusControl({
   roomLabel: string | null;
   iHaveStartedNotFinished: boolean;
   badgeInfo: StatusBadgeInfo;
+  /** บิลร้านอาหารไม่มีขั้นตอนดำเนินการ/เช็คเอ้าท์ — เหลือแค่ยกเลิกบิล */
+  isShopOrder?: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -77,12 +81,13 @@ export function OrderStatusControl({
   // งานอาบน้ำ: ปุ่มเริ่มดำเนินการของ "ช่าง" ยังอยู่แม้สถานะเป็น IN_PROGRESS แล้ว เพื่อให้ช่างคนอื่นกดเพิ่ม log ได้อีก
   // แต่ถ้าช่างคนนี้กดเริ่มไปแล้วและยังไม่ได้กด "ทำรายการเสร็จสิ้น" ปุ่มนี้จะสลับเป็นปุ่มนั้นแทน (ดูด้านล่าง)
   const showStart =
+    !isShopOrder &&
     canStart &&
     (isGroomerBath
       ? (status === "PAID" || status === "DEPOSIT_PAID" || status === "IN_PROGRESS") && !iHaveStartedNotFinished
       : status === "PAID" || status === "DEPOSIT_PAID");
   const showFinishMyWork = isGroomerBath && status === "IN_PROGRESS" && iHaveStartedNotFinished;
-  const showCheckout = canCheckout && status === "IN_PROGRESS";
+  const showCheckout = !isShopOrder && canCheckout && status === "IN_PROGRESS";
   // badgeInfo มาจาก getStatusBadgeInfo ตัวเดียวกับที่ตัดสินใจ badge — เลยล็อกให้ปุ่มตรงกับ badge เสมอ
   const hideActionsForFinishedGroomer = badgeInfo.kind === "GROOMER_FINISHED";
   const checkoutBlocked = badgeInfo.kind === "AWAITING_PAYMENT";
@@ -115,18 +120,29 @@ export function OrderStatusControl({
             </Button>
           )}
           {showCheckout && (
-            <Button
+            <ConfirmButton
               className="bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => change("COMPLETED")}
+              title={t.orders.confirmFinishTitle}
+              description={t.orders.confirmFinishDescription}
+              confirmLabel={t.orders.finishWork}
+              onConfirm={() => change("COMPLETED")}
               disabled={isPending || checkoutBlocked}
             >
               {isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
               {t.orders.finishWork}
-            </Button>
+            </ConfirmButton>
           )}
-          <Button variant="outline" onClick={() => change("CANCELLED")} disabled={isPending}>
+          <ConfirmButton
+            variant="outline"
+            tone="danger"
+            title={t.orders.confirmCancelTitle}
+            description={t.orders.confirmCancelDescription}
+            confirmLabel={t.orders.cancelOrder}
+            onConfirm={() => change("CANCELLED")}
+            disabled={isPending}
+          >
             <Ban /> {t.orders.cancelOrder}
-          </Button>
+          </ConfirmButton>
         </div>
       )}
 

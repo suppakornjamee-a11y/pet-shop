@@ -7,6 +7,7 @@ import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
 import { upsertHoliday, deleteHoliday } from "@/app/actions/settings";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,7 @@ const empty = { date: "", title: "", extraCharge: "0" };
 
 export function HolidayManager({ holidays }: { holidays: Holiday[] }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -65,8 +67,8 @@ export function HolidayManager({ holidays }: { holidays: Holiday[] }) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm(t.settings.holidays.confirmDelete)) return;
+  async function remove(id: string) {
+    if (!(await confirm({ title: t.settings.holidays.confirmDelete, tone: "danger" }))) return;
     startTransition(async () => {
       const res = await deleteHoliday(id);
       if (!res.ok) {
