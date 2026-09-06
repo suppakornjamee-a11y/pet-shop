@@ -67,6 +67,7 @@ enum OrderType {
 }
 
 enum OrderStatus {
+  PENDING_APPROVAL // รอเช็คคิว — ลูกค้าจองเองผ่าน LINE แล้วรอพนักงานยืนยันว่าคิวว่างจริงก่อนถึงจะจ่ายเงินได้
   PENDING_PAYMENT // รอชำระเงิน
   DEPOSIT_PAID // มัดจำแล้ว รอชำระส่วนที่เหลือ
   PAID // ชำระแล้ว

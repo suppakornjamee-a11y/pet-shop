@@ -16,6 +16,8 @@ export type OrderForHold = {
 export function isSlotHolding(o: OrderForHold, now: Date = new Date()): boolean {
   if (o.status === "CANCELLED") return false;
   if (
+    // รอเช็คคิว = ลูกค้าจองไว้แล้วรอพนักงานยืนยัน ต้องกันคิวไว้ ไม่งั้นคนอื่นจองทับระหว่างรอ
+    o.status === "PENDING_APPROVAL" ||
     o.status === "PAID" ||
     o.status === "DEPOSIT_PAID" ||
     o.status === "IN_PROGRESS" ||

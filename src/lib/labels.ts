@@ -10,6 +10,8 @@ export function isFleaTickCheckStale(lastFleaTickAt: Date | null): boolean {
 
 // Tailwind classes for status badges
 export const orderStatusColor: Record<OrderStatus, string> = {
+  PENDING_APPROVAL:
+    "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-900",
   PENDING_PAYMENT: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
   DEPOSIT_PAID: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900",
   PAID: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-900",

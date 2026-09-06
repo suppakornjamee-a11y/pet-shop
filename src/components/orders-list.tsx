@@ -32,6 +32,7 @@ export async function OrdersList({
 
   const filters: { label: string; value: string }[] = [
     { label: t.orders.filterAll, value: "all" },
+    { label: t.orders.filterAwaitingApproval, value: "PENDING_APPROVAL" },
     { label: t.orders.filterPending, value: "PENDING_PAYMENT" },
     { label: t.orders.filterPaid, value: "PAID" },
     { label: t.orders.filterInProgress, value: "IN_PROGRESS" },

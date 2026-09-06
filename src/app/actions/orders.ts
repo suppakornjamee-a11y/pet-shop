@@ -70,6 +70,17 @@ function buildPaymentReceiptText(params: {
 }
 
 /** ส่งแจ้งเตือน LINE หาลูกค้า (เงียบๆ ไม่ throw ถ้าไม่ได้ผูกบัญชีหรือส่งไม่สำเร็จ) */
+/** รีเฟรชทุกหน้าที่แสดงออเดอร์นี้ — รายละเอียด + ลิสต์ทั้งสามประเภท + ปฏิทิน + แดชบอร์ด */
+function revalidateOrderViews(orderId: string) {
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
+  revalidatePath("/boarding");
+  revalidatePath("/calendar");
+  revalidatePath("/calendar-other");
+  revalidatePath("/");
+}
+
 async function notifyCustomerLine(orderId: string, text: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -282,6 +293,10 @@ export async function regeneratePayment(paymentId: string): Promise<ActionResult
   if (payment.order.status === "CANCELLED") {
     return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
   }
+  // ยังไม่ยืนยันคิว = ยังไม่รู้ว่ารับงานได้จริงไหม ห้ามออก QR ให้ลูกค้าจ่ายไปก่อน
+  if (payment.order.status === "PENDING_APPROVAL") {
+    return { ok: false, error: "ต้องยืนยันคิวก่อนจึงจะสร้าง QR ให้ลูกค้าชำระเงินได้" };
+  }
   const account = await defaultPromptPayAccount();
   const qrPayload =
     account?.promptpayId ? buildPromptPayPayload(account.promptpayId, payment.amount) : null;
@@ -437,6 +452,7 @@ export async function rejectPayment(paymentId: string, reason: string): Promise<
 }
 
 const statusSchema = z.enum([
+  "PENDING_APPROVAL",
   "PENDING_PAYMENT",
   "DEPOSIT_PAID",
   "PAID",
@@ -444,6 +460,83 @@ const statusSchema = z.enum([
   "COMPLETED",
   "CANCELLED",
 ]);
+
+/**
+ * อนุมัติคิวที่ลูกค้าจองเองผ่าน LINE — ปลดล็อกให้ไปหน้าชำระเงินได้
+ *
+ * ต้องมีขั้นนี้เพราะระบบเช็คได้แค่ว่า slot/ห้องว่างตามตาราง แต่หน้างานจริงยังมีเงื่อนไขที่ระบบไม่รู้
+ * (ช่างลาไหม สัตว์ตัวนี้เข้ากับตัวอื่นในคอกได้ไหม) พนักงานจึงต้องเป็นคนกดยืนยันเอง
+ */
+export async function approveOrderQueue(orderId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (user.role === "GROOMER") {
+    return { ok: false, error: "ยืนยันคิวได้เฉพาะพนักงานหรือผู้จัดการเท่านั้น" };
+  }
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.status !== "PENDING_APPROVAL") {
+    return { ok: false, error: "ออเดอร์นี้ยืนยันคิวไปแล้ว" };
+  }
+
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: orderId },
+      data: { status: "PENDING_PAYMENT", updatedById: user.id },
+    }),
+    prisma.orderActivityLog.create({
+      data: { orderId, action: "ยืนยันคิว", createdById: user.id },
+    }),
+  ]);
+
+  // ลูกค้าออกจากหน้าจอไปแล้วตั้งแต่ตอนจอง ต้องส่งลิงก์จ่ายเงินไปให้ ไม่งั้นไม่มีทางรู้ว่าคิวผ่านแล้ว
+  const link = buildLiffDeepLink(`/pay/${orderId}`);
+  void notifyCustomerLine(
+    orderId,
+    link
+      ? `ยืนยันคิวเรียบร้อย ออเดอร์ ${order.code}
+ชำระเงินได้ที่ลิ้งค์นี้ ${link}`
+      : `ยืนยันคิวเรียบร้อย ออเดอร์ ${order.code}`
+  );
+
+  revalidateOrderViews(orderId);
+  return { ok: true, message: "ยืนยันคิวแล้ว แจ้งลูกค้าให้ชำระเงินทาง LINE" };
+}
+
+/** ปฏิเสธคิวที่ลูกค้าจองมา — ยกเลิกออเดอร์และแจ้งเหตุผลกลับไปทาง LINE */
+export async function rejectOrderQueue(orderId: string, reason: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (user.role === "GROOMER") {
+    return { ok: false, error: "ยืนยันคิวได้เฉพาะพนักงานหรือผู้จัดการเท่านั้น" };
+  }
+
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.status !== "PENDING_APPROVAL") {
+    return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ระหว่างรอเช็คคิว" };
+  }
+
+  const note = reason.trim() || "คิวเต็ม";
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: orderId },
+      data: { status: "CANCELLED", updatedById: user.id },
+    }),
+    prisma.orderActivityLog.create({
+      data: { orderId, action: `ปฏิเสธคิว: ${note}`, createdById: user.id },
+    }),
+  ]);
+
+  void notifyCustomerLine(
+    orderId,
+    `ขออภัย คิวที่จองไว้ไม่ว่าง ออเดอร์ ${order.code}
+เหตุผล ${note}
+รบกวนติดต่อร้านเพื่อจองเวลาใหม่`
+  );
+
+  revalidateOrderViews(orderId);
+  return { ok: true, message: "ปฏิเสธคิวแล้ว แจ้งลูกค้าทาง LINE" };
+}
 
 export type UpdateOrderStatusResult = ActionResult & { cctvReminder?: boolean };
 

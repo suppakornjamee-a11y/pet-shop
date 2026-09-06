@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Save, Plus, Pencil, Trash2, Star } from "lucide-react";
 import { upsertBankAccount, deleteBankAccount } from "@/app/actions/settings";
 import type { AccountType } from "@/generated/prisma/enums";
+import { bankLogoFor, THAI_BANKS as BANK_LIST, THAI_BANK_NAMES } from "@/lib/bank-logos";
 import { useI18n } from "@/components/i18n-provider";
 import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
@@ -29,24 +30,8 @@ import {
 } from "@/components/ui/select";
 
 // เรียงตามหลักพจนานุกรมไทย ก-ฮ (Intl.Collator("th"))
-const THAI_BANKS = [
-  "กรุงเทพ",
-  "กรุงไทย",
-  "กรุงศรีอยุธยา",
-  "กสิกรไทย",
-  "เกียรตินาคินภัทร",
-  "ซีไอเอ็มบี ไทย",
-  "ทหารไทยธนชาต (ttb)",
-  "ไทยพาณิชย์",
-  "เพื่อการเกษตรและสหกรณ์การเกษตร (ธ.ก.ส.)",
-  "ยูโอบี",
-  "แลนด์ แอนด์ เฮ้าส์",
-  "ออมสิน",
-  "อาคารสงเคราะห์",
-  "อิสลามแห่งประเทศไทย",
-  "ไอซีบีซี (ไทย)",
-] satisfies readonly string[] as readonly string[];
 const BANK_OTHER = "OTHER";
+const THAI_BANKS = THAI_BANK_NAMES;
 
 function BankTypeIcon({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
@@ -155,7 +140,15 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                 <div className="flex items-center gap-2">
                   {a.type === "PROMPTPAY" ? (
                     <PromptPayTypeIcon className="h-10 w-10 shrink-0 rounded-md" />
+                  ) : bankLogoFor(a.bankName) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={bankLogoFor(a.bankName)!}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded-md object-contain"
+                    />
                   ) : (
+                    // ธนาคารที่พิมพ์ชื่อเอง (ตัวเลือก "อื่นๆ") ไม่มีโลโก้ ใช้ไอคอนกลางแทน
                     <BankTypeIcon className="h-10 w-10 shrink-0 rounded-md" />
                   )}
                   <div>
@@ -260,9 +253,11 @@ export function BankManager({ accounts }: { accounts: Account[] }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
-                  {THAI_BANKS.map((b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
+                  {BANK_LIST.map((b) => (
+                    <SelectItem key={b.name} value={b.name}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={b.logo} alt="" className="h-5 w-5 shrink-0 object-contain" />
+                      {b.name}
                     </SelectItem>
                   ))}
                   <SelectItem value={BANK_OTHER}>{t.settings.bankAccounts.bankNameOther}</SelectItem>

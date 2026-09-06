@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Banknote, ImageIcon, Loader2, Minus, Plus, QrCode, ReceiptText, Search } from "lucide-react";
+import { ImageIcon, Loader2, Minus, Plus, ReceiptText, Search, X } from "lucide-react";
 import { createShopOrder } from "@/app/actions/shop";
 import type { Dictionary } from "@/i18n/dictionaries/th";
 import { formatBaht } from "@/lib/format";
@@ -160,6 +160,13 @@ const UNCATEGORIZED = "__none__";
 
 /** จำนวนการ์ดสูงสุดที่วาดพร้อมกัน — กันหน้าหน่วงตอนสินค้ามีหลักพันรายการ */
 const VISIBLE_LIMIT = 60;
+
+/** แท็บหมวดใหญ่หน้าตาแบบการ์ด — เขียนทับคลาสพื้นฐานของ TabsTrigger ที่ตั้งไว้เป็นปุ่มเตี้ยแถวเดียว */
+const CARD_TAB =
+  "h-auto flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 " +
+  "text-foreground transition-colors hover:bg-accent/40 " +
+  "data-active:border-primary data-active:bg-primary/5 data-active:text-foreground data-active:shadow-none " +
+  "dark:data-active:border-primary dark:data-active:bg-primary/10";
 
 /** ลำดับหมวดที่ร้านอยากให้เรียง (เรียงตามการใช้งานจริง ไม่ใช่ตามตัวอักษร)
  *  หมวดที่ไม่อยู่ในลิสต์นี้ต่อท้ายเรียงตามตัวอักษรไทย และ "อื่นๆ" อยู่ท้ายสุดเสมอ */
@@ -320,6 +327,11 @@ export function ShopMenu({
   // ของคนไม่นับสต็อก จึงกดเพิ่มได้ไม่จำกัด ส่วนของสัตว์กดได้ไม่เกินจำนวนคงเหลือ
   const stockTracked = useMemo(() => new Set(petProducts.map((p) => p.id)), [petProducts]);
 
+  /** เอาออกจากรายการที่เลือกทั้งตัว — เร็วกว่ากดลบทีละชิ้นตอนสั่งไว้หลายชิ้น */
+  function removeLine(id: string) {
+    setQty((prev) => ({ ...prev, [id]: 0 }));
+  }
+
   function step(p: ShopProduct, delta: number) {
     setQty((prev) => {
       const raw = Math.max((prev[p.id] ?? 0) + delta, 0);
@@ -355,9 +367,31 @@ export function ShopMenu({
     <>
       {/* 2 หมวด: คาเฟ่คน (สินค้าสำหรับคน) และคาเฟ่สัตว์ (สินค้าสำหรับสัตว์เลี้ยง) */}
       <Tabs defaultValue="human">
-        <TabsList>
-          <TabsTrigger value="human">{t.shop.tabCafe}</TabsTrigger>
-          <TabsTrigger value="pet">{t.shop.tabShop}</TabsTrigger>
+        {/* เลือกหมวดใหญ่เป็นการ์ด — พนักงานกดบ่อยที่สุดและกดบนแท็บเล็ต ปุ่มเล็กๆ กดพลาดง่าย
+            การ์ดใหญ่พร้อมรูปแยกคน/สัตว์ได้ในแวบเดียวโดยไม่ต้องอ่าน */}
+        <TabsList className="mb-4 grid w-full grid-cols-2 gap-3 bg-transparent p-0 group-data-horizontal/tabs:h-auto">
+          <TabsTrigger
+            value="human"
+            className={CARD_TAB}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/icons/cafe-human.png" alt="" className="h-14 w-14" />
+            <span className="sr-only">{t.shop.tabCafe}</span>
+            <span className="text-xs text-muted-foreground">
+              {t.shop.itemCount(humanProducts.length)}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="pet"
+            className={CARD_TAB}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/icons/cafe-pet.png" alt="" className="h-14 w-14" />
+            <span className="sr-only">{t.shop.tabShop}</span>
+            <span className="text-xs text-muted-foreground">
+              {t.shop.itemCount(petProducts.length)}
+            </span>
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="human" className="mt-4">
           <MenuSection
@@ -389,17 +423,47 @@ export function ShopMenu({
             <CardContent className="space-y-2 py-3">
               <div className="max-h-44 space-y-1 overflow-y-auto text-sm">
                 {selectedLines.map((l) => (
-                  <div key={l.product.id} className="flex items-baseline justify-between gap-3">
-                    <span className="min-w-0 truncate">
-                      {productName(l.product, locale)}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        x{l.quantity} {l.product.unit}
-                      </span>
+                  <div key={l.product.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{productName(l.product, locale)}</span>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        size="icon-sm"
+                        variant="outline"
+                        className="rounded-full"
+                        aria-label={t.shop.decrease}
+                        onClick={() => step(l.product, -1)}
+                      >
+                        <Minus />
+                      </Button>
+                      <span className="w-6 text-center tabular-nums">{l.quantity}</span>
+                      <Button
+                        size="icon-sm"
+                        variant="outline"
+                        className="rounded-full"
+                        aria-label={t.shop.increase}
+                        disabled={stockTracked.has(l.product.id) && l.quantity >= l.product.stockQty}
+                        onClick={() => step(l.product, 1)}
+                      >
+                        <Plus />
+                      </Button>
+                    </div>
+
+                    <span className="hidden w-12 shrink-0 text-xs text-muted-foreground sm:block">
+                      {l.product.unit}
                     </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                    <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">
                       {formatBaht(l.product.price * l.quantity)}
                     </span>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="shrink-0 rounded-full text-muted-foreground hover:text-destructive"
+                      aria-label={t.shop.removeItem}
+                      onClick={() => removeLine(l.product.id)}
+                    >
+                      <X />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -429,7 +493,7 @@ export function ShopMenu({
       <Dialog open={billOpen} onOpenChange={setBillOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t.shop.openBill}</DialogTitle>
+            <DialogTitle>{t.shop.billTitle}</DialogTitle>
           </DialogHeader>
 
           <div className="max-h-64 space-y-1.5 overflow-y-auto text-sm">
@@ -455,16 +519,12 @@ export function ShopMenu({
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={isPending}
-              onClick={() => openBill("PROMPTPAY")}
-            >
-              {isPending ? <Loader2 className="animate-spin" /> : <QrCode />}
+            <Button variant="outline" disabled={isPending} onClick={() => openBill("PROMPTPAY")}>
+              {isPending && <Loader2 className="animate-spin" />}
               {t.shop.payPromptpay}
             </Button>
             <Button disabled={isPending} onClick={() => openBill("CASH")}>
-              {isPending ? <Loader2 className="animate-spin" /> : <Banknote />}
+              {isPending && <Loader2 className="animate-spin" />}
               {t.shop.payCash}
             </Button>
           </DialogFooter>

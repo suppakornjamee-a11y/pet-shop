@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, Clock, QrCode, PartyPopper, Paperclip } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Clock3,
+  QrCode,
+  PartyPopper,
+  Paperclip,
+} from "lucide-react";
 import { getLiffOrderPaymentStatus, liffSubmitPaymentSlip } from "@/app/actions/liff";
 import { formatBaht } from "@/lib/format";
 import { fileToDataUrl } from "@/lib/file";
@@ -22,7 +31,14 @@ type PaymentRow = {
   expiresAt: string | null;
   bankAccount: { bankName: string; accountName: string; accountNumber: string } | null;
 };
-type OrderStatusVal = "PENDING_PAYMENT" | "DEPOSIT_PAID" | "PAID" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+type OrderStatusVal =
+  | "PENDING_APPROVAL"
+  | "PENDING_PAYMENT"
+  | "DEPOSIT_PAID"
+  | "PAID"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
 type OrderItemRow = { id: string; name: string; quantity: number; unitPrice: number; subtotal: number };
 type ExtraChargeRow = { id: string; description: string; amount: number };
 type OrderDetail = {
@@ -475,7 +491,19 @@ function PaymentBody({ orderId }: { orderId: string }) {
 
       {detail && <OrderSummaryCard detail={detail} total={total} />}
 
-      {activePayment ? (
+      {/* รอเช็คคิว — พนักงานยังไม่ยืนยันว่าคิวว่างจริง ยังไม่ปล่อย QR ให้จ่าย
+          (ถ้าปล่อยแล้วคิวเต็มทีหลังจะต้องมาไล่คืนเงินกันภายหลัง) */}
+      {status === "PENDING_APPROVAL" ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-violet-50 p-8 text-center dark:bg-violet-950/40">
+          <Clock3 className="h-10 w-10 text-violet-600 dark:text-violet-400" />
+          <div className="font-medium text-violet-700 dark:text-violet-300">
+            {t.liff.awaitingApprovalTitle}
+          </div>
+          <div className="text-sm text-violet-700/80 dark:text-violet-400/80">
+            {t.liff.awaitingApprovalHint}
+          </div>
+        </div>
+      ) : activePayment ? (
         <QrBlock payment={activePayment} orderStatus={status} />
       ) : fullyPaid ? (
         <div className="flex flex-col items-center gap-3 rounded-lg bg-emerald-50 p-8 text-center dark:bg-emerald-950/40">

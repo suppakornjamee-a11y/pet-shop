@@ -3,8 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, PlayCircle, CheckCircle2, Ban } from "lucide-react";
-import { updateOrderStatus, markGroomerFinished } from "@/app/actions/orders";
+import { Loader2, PlayCircle, CheckCircle2, Ban, CalendarCheck } from "lucide-react";
+import {
+  updateOrderStatus,
+  markGroomerFinished,
+  approveOrderQueue,
+  rejectOrderQueue,
+} from "@/app/actions/orders";
 import type { OrderStatus, Role } from "@/generated/prisma/enums";
 import { canStartOrder, canCheckoutOrder, type OrderKind, type StatusBadgeInfo } from "@/lib/order-kind";
 import { Button } from "@/components/ui/button";
@@ -58,6 +63,28 @@ export function OrderStatusControl({
     });
   }
 
+  function approveQueue() {
+    startTransition(async () => {
+      const res = await approveOrderQueue(orderId);
+      if (!res.ok) toast.error(res.error);
+      else {
+        toast.success(res.message);
+        router.refresh();
+      }
+    });
+  }
+
+  function rejectQueue() {
+    startTransition(async () => {
+      const res = await rejectOrderQueue(orderId, "");
+      if (!res.ok) toast.error(res.error);
+      else {
+        toast.success(res.message);
+        router.refresh();
+      }
+    });
+  }
+
   function finishMyWork() {
     startTransition(async () => {
       const res = await markGroomerFinished(orderId);
@@ -73,6 +100,9 @@ export function OrderStatusControl({
     return null;
   }
 
+  // รอเช็คคิว = ยังไม่ผ่านการยืนยัน ห้ามข้ามไปเริ่มงาน/เช็คเอ้าท์ ต้องกดยืนยันคิวก่อนเท่านั้น
+  const awaitingApproval = status === "PENDING_APPROVAL";
+
   const canStart = canStartOrder(orderKind, role);
   const canCheckout = canCheckoutOrder(orderKind, role);
 
@@ -81,13 +111,14 @@ export function OrderStatusControl({
   // งานอาบน้ำ: ปุ่มเริ่มดำเนินการของ "ช่าง" ยังอยู่แม้สถานะเป็น IN_PROGRESS แล้ว เพื่อให้ช่างคนอื่นกดเพิ่ม log ได้อีก
   // แต่ถ้าช่างคนนี้กดเริ่มไปแล้วและยังไม่ได้กด "ทำรายการเสร็จสิ้น" ปุ่มนี้จะสลับเป็นปุ่มนั้นแทน (ดูด้านล่าง)
   const showStart =
+    !awaitingApproval &&
     !isShopOrder &&
     canStart &&
     (isGroomerBath
       ? (status === "PAID" || status === "DEPOSIT_PAID" || status === "IN_PROGRESS") && !iHaveStartedNotFinished
       : status === "PAID" || status === "DEPOSIT_PAID");
   const showFinishMyWork = isGroomerBath && status === "IN_PROGRESS" && iHaveStartedNotFinished;
-  const showCheckout = !isShopOrder && canCheckout && status === "IN_PROGRESS";
+  const showCheckout = !awaitingApproval && !isShopOrder && canCheckout && status === "IN_PROGRESS";
   // badgeInfo มาจาก getStatusBadgeInfo ตัวเดียวกับที่ตัดสินใจ badge — เลยล็อกให้ปุ่มตรงกับ badge เสมอ
   const hideActionsForFinishedGroomer = badgeInfo.kind === "GROOMER_FINISHED";
   const checkoutBlocked = badgeInfo.kind === "AWAITING_PAYMENT";
@@ -98,6 +129,32 @@ export function OrderStatusControl({
     <>
       {!hideActionsForFinishedGroomer && (
         <div className="flex flex-wrap items-start justify-end gap-2">
+          {/* ลูกค้าจองเองผ่าน LINE — ต้องกดยืนยันคิวก่อน ลูกค้าถึงจะเข้าหน้าชำระเงินได้ */}
+          {awaitingApproval && role !== "GROOMER" && (
+            <>
+              <ConfirmButton
+                variant="outline"
+                tone="danger"
+                title={t.orders.confirmRejectQueueTitle}
+                description={t.orders.confirmRejectQueueDescription}
+                confirmLabel={t.orders.rejectQueue}
+                onConfirm={rejectQueue}
+                disabled={isPending}
+              >
+                <Ban /> {t.orders.rejectQueue}
+              </ConfirmButton>
+              <ConfirmButton
+                title={t.orders.confirmApproveQueueTitle}
+                description={t.orders.confirmApproveQueueDescription}
+                confirmLabel={t.orders.approveQueue}
+                onConfirm={approveQueue}
+                disabled={isPending}
+              >
+                {isPending ? <Loader2 className="animate-spin" /> : <CalendarCheck />}
+                {t.orders.approveQueue}
+              </ConfirmButton>
+            </>
+          )}
           {showStart && (
             <div>
               <Button onClick={() => change("IN_PROGRESS")} disabled={isPending || startBlocked}>
@@ -132,6 +189,7 @@ export function OrderStatusControl({
               {t.orders.finishWork}
             </ConfirmButton>
           )}
+          {!awaitingApproval && (
           <ConfirmButton
             variant="outline"
             tone="danger"
@@ -143,6 +201,7 @@ export function OrderStatusControl({
           >
             <Ban /> {t.orders.cancelOrder}
           </ConfirmButton>
+          )}
         </div>
       )}
 

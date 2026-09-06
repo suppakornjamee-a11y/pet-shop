@@ -102,7 +102,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               <ArrowLeft /> {t.common.back}
             </Button>
             {/* หน้าแก้ไขออเดอร์เป็นฟอร์มลูกค้า+สัตว์เลี้ยง บิลร้านอาหารไม่มีข้อมูลพวกนี้ จึงไม่มีปุ่ม */}
-            {!isShopOrder && order.status === "PENDING_PAYMENT" && !isGroomer && (
+            {!isShopOrder &&
+              (order.status === "PENDING_PAYMENT" || order.status === "PENDING_APPROVAL") &&
+              !isGroomer && (
               <Button
                 render={<Link href={`/orders/${order.id}/edit`} />}
                 nativeButton={false}

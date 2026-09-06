@@ -22,7 +22,8 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
   if (!order || !order.customer) notFound();
 
   // แก้ไขได้เฉพาะออเดอร์ที่ยังรอชำระเงิน
-  if (order.status !== "PENDING_PAYMENT") {
+  // แก้ไขได้ทั้งตอนรอเช็คคิวและรอชำระเงิน — สองสถานะนี้ยังไม่มีเงินเข้ามาเกี่ยวข้อง
+  if (order.status !== "PENDING_PAYMENT" && order.status !== "PENDING_APPROVAL") {
     redirect(`/orders/${id}`);
   }
 

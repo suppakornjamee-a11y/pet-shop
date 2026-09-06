@@ -401,12 +401,17 @@ export async function liffCreateOrder(idToken: string, input: unknown): Promise<
   const result = await persistOrder(plan, planInput, { createdById: null, createdVia: "LIFF" });
   if (!result.ok) return result;
 
+  // ลูกค้าจองเองต้องให้พนักงานยืนยันคิวก่อนถึงจะจ่ายเงินได้ — คิวส่วนกลาง/ห้องพักมีเงื่อนไขหน้างาน
+  // (ช่างว่างจริงไหม สัตว์เข้ากับตัวอื่นได้ไหม) ที่ระบบเช็คแทนไม่ได้ทั้งหมด
+  await prisma.order.update({ where: { id: result.id }, data: { status: "PENDING_APPROVAL" } });
+
+  // สร้างรายการชำระเงินไว้เลย แต่ยังไม่ออก QR — ตอนอนุมัติค่อยปล่อยให้จ่าย
   await createInitialPayments(result.id, result.total, plan.depositAmount);
 
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
   revalidatePath("/boarding");
-  return { ok: true, id: result.id, message: "สร้างการจองเรียบร้อย" };
+  return { ok: true, id: result.id, message: "ส่งคำขอจองแล้ว รอเจ้าหน้าที่ยืนยันคิว" };
 }
 
 /** รายการออเดอร์ทั้งหมดของลูกค้าคนนี้ (จาก lineUserId ที่ยืนยันแล้วเท่านั้น) — ใช้แสดงหน้า "การจองของฉัน"
@@ -555,13 +560,19 @@ export async function liffSubmitPaymentSlip(
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { order: { select: { id: true, customer: { select: { lineUserId: true } } } } },
+    include: {
+      order: { select: { id: true, status: true, customer: { select: { lineUserId: true } } } },
+    },
   });
   if (!payment || payment.order.customer?.lineUserId !== identity.userId) {
     return { ok: false, error: "ไม่พบรายการชำระเงินนี้" };
   }
   if (payment.status === "VERIFIED") {
     return { ok: false, error: "รายการนี้ยืนยันแล้ว ไม่ต้องส่งสลิปซ้ำ" };
+  }
+  // กันเคสที่ลูกค้ายังค้างหน้าเก่าไว้แล้วส่งสลิปมาก่อนพนักงานยืนยันคิว
+  if (payment.order.status === "PENDING_APPROVAL") {
+    return { ok: false, error: "การจองนี้ยังรอเจ้าหน้าที่ยืนยันคิว กรุณารอลิงก์ชำระเงินทาง LINE" };
   }
 
   await prisma.payment.update({
