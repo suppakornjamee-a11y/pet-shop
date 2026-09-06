@@ -28,6 +28,7 @@ import {
   LogoutImageIcon,
   ShopInfoImageIcon,
 } from "@/components/nav-icons";
+import { NotificationBell } from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
@@ -263,6 +264,7 @@ export function AppShell({
 
           <LanguageToggle />
           <ThemeToggle />
+          {user.role !== "GROOMER" && <NotificationBell />}
 
           <div className="ml-1 h-8 w-px bg-border" />
           <TopbarProfile user={user} />

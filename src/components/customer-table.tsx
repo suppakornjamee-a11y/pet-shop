@@ -162,7 +162,7 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
                         {c.createdVia === "LIFF" && (
                           <Badge
                             variant="outline"
-                            className="gap-1 text-[10px] text-sky-700 dark:text-sky-400"
+                            className="gap-1 border-green-300 text-[10px] text-green-700 dark:border-green-900 dark:text-green-400"
                           >
                             <Smartphone className="h-3 w-3" /> Line
                           </Badge>

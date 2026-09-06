@@ -743,6 +743,13 @@ const th = {
     description: "สรุปยอดขายและภาพรวมของร้าน",
     comingSoon: "กำลังพัฒนา — ยังไม่มีรายงานให้ดูตอนนี้",
   },
+  notifications: {
+    title: "คิวใหม่รอยืนยัน",
+    empty: "ยังไม่มีคิวใหม่รอยืนยัน",
+    enableDesktop: "เปิดแจ้งเตือนบนเดสก์ท็อป",
+    newBookingTitle: "มีคิวใหม่จากลูกค้า",
+    newBookingBody: (n: number) => `มีคิวใหม่ ${n} รายการรอยืนยัน`,
+  },
   print: {
     receiptTitle: "ใบเสร็จรับเงิน",
     customerLabel: "ลูกค้า",

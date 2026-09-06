@@ -134,7 +134,10 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 <div className="flex flex-wrap items-center gap-1.5">
                   <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
                   {order.createdVia === "LIFF" && (
-                    <Badge variant="outline" className="gap-1 text-sky-700 dark:text-sky-400">
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-green-300 text-green-700 dark:border-green-900 dark:text-green-400"
+                    >
                       <Smartphone className="h-3 w-3" /> {t.orders.bookedViaLiff}
                     </Badge>
                   )}
