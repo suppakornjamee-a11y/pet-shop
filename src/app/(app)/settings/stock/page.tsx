@@ -20,6 +20,7 @@ export default async function StockSettingsPage() {
         products={products.map((p) => ({
           id: p.id,
           name: p.name,
+          nameEn: p.nameEn,
           target: p.target,
           category: p.category,
           price: p.price,

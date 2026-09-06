@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { OrderStatusBadges } from "@/components/order-status-badges";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
 import { requireStaffUser } from "@/lib/auth-helpers";
 
@@ -61,6 +62,31 @@ export default async function DashboardPage(props: PageProps<"/">) {
   const selectedDateStr = toDateStr(startOfDay);
   const isToday = selectedDateStr === toDateStr(new Date());
 
+  // กดการ์ดสถิติด้านบนเพื่อกรองรายการออเดอร์ด้านล่าง — เก็บไว้ใน query string จะได้แชร์/รีเฟรชแล้วไม่หาย
+  const dayRange = { gte: startOfDay, lt: endOfDay };
+  const notCancelled = { not: "CANCELLED" as const };
+  const STAT_FILTERS = {
+    checkin: { checkInAt: dayRange, status: notCancelled },
+    checkout: { checkOutAt: dayRange, status: notCancelled },
+    grooming: {
+      appointmentAt: dayRange,
+      queueType: { not: "OTHER" as const },
+      status: notCancelled,
+    },
+    cafe: { orderType: "SHOP" as const, createdAt: dayRange, status: notCancelled },
+  };
+  const rawFilter = typeof searchParams.f === "string" ? searchParams.f : undefined;
+  const activeFilter = (
+    rawFilter && rawFilter in STAT_FILTERS ? rawFilter : null
+  ) as keyof typeof STAT_FILTERS | null;
+
+  /** ลิงก์ของการ์ดแต่ละใบ — กดใบที่เลือกอยู่ซ้ำเพื่อยกเลิกตัวกรอง */
+  function filterHref(key: keyof typeof STAT_FILTERS) {
+    const params = new URLSearchParams({ date: selectedDateStr });
+    if (activeFilter !== key) params.set("f", key);
+    return `/?${params.toString()}`;
+  }
+
   const [
     // dayOrders,
     // paidDay,
@@ -83,8 +109,9 @@ export default async function DashboardPage(props: PageProps<"/">) {
     // prisma.order.count({ where: { status: "PENDING_PAYMENT" } }),
     // prisma.customer.count(),
     prisma.order.findMany({
-      where: { createdAt: { gte: startOfDay, lt: endOfDay } },
-      take: 10,
+      where: activeFilter ? STAT_FILTERS[activeFilter] : { createdAt: dayRange },
+      // กรองอยู่แล้วอยากเห็นครบ ไม่ใช่แค่ 10 รายการล่าสุดเหมือนตอนดูรวม
+      take: activeFilter ? 50 : 10,
       orderBy: { createdAt: "desc" },
       include: {
         customer: true,
@@ -152,24 +179,28 @@ export default async function DashboardPage(props: PageProps<"/">) {
     {
       label: t.dashboard.statCheckInsToday,
       value: checkInsToday.toString(),
+      key: "checkin" as const,
       icon: CheckInStatIcon,
       chip: "bg-teal-100 dark:bg-teal-950",
     },
     {
       label: t.dashboard.statCheckOutsToday,
       value: checkOutsToday.toString(),
+      key: "checkout" as const,
       icon: CheckOutStatIcon,
       chip: "bg-red-100 dark:bg-red-950",
     },
     {
       label: t.dashboard.statGroomingQueueToday,
       value: groomingQueueToday.toString(),
+      key: "grooming" as const,
       icon: GroomingQueueStatIcon,
       chip: "bg-amber-100 dark:bg-amber-950",
     },
     {
       label: t.dashboard.statCafeToday,
       value: cafeBillsToday.toString(),
+      key: "cafe" as const,
       icon: CafeStatIcon,
       chip: "bg-sky-100 dark:bg-sky-950",
     },
@@ -187,8 +218,16 @@ export default async function DashboardPage(props: PageProps<"/">) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => {
           const Icon = s.icon;
+          const active = activeFilter === s.key;
           return (
-            <Card key={s.label} className="w-full">
+            // ทั้งใบเป็นลิงก์ กดแล้วกรองรายการด้านล่าง กดใบเดิมซ้ำเพื่อยกเลิกตัวกรอง
+            <Link key={s.label} href={filterHref(s.key)} aria-pressed={active} className="block">
+            <Card
+              className={cn(
+                "w-full transition-colors hover:bg-accent/40",
+                active && "border-primary bg-primary/5 ring-1 ring-primary"
+              )}
+            >
               <CardContent className="flex items-center gap-4 py-3.5">
                 <div
                   className={cn(
@@ -209,15 +248,32 @@ export default async function DashboardPage(props: PageProps<"/">) {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           );
         })}
       </div>
 
       <Card className="mt-6">
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-3">
           <CardTitle className="text-base">
             {isToday ? t.dashboard.ordersToday(dateLabel) : t.dashboard.ordersOn(dateLabel)}
           </CardTitle>
+          {/* บอกว่ากรองอะไรอยู่ + ทางออกให้กลับไปดูรวม โดยไม่ต้องเดาว่าต้องกดการ์ดเดิมซ้ำ */}
+          {activeFilter && (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-primary text-primary">
+                {stats.find((x) => x.key === activeFilter)?.label}
+              </Badge>
+              <Button
+                render={<Link href={`/?date=${selectedDateStr}`} />}
+                nativeButton={false}
+                variant="ghost"
+                size="sm"
+              >
+                {t.dashboard.clearFilter}
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {dayOrderList.length === 0 ? (

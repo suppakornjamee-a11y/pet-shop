@@ -3,14 +3,16 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Banknote, ImageIcon, Loader2, Minus, Plus, QrCode, ReceiptText } from "lucide-react";
+import { Banknote, ImageIcon, Loader2, Minus, Plus, QrCode, ReceiptText, Search } from "lucide-react";
 import { createShopOrder } from "@/app/actions/shop";
 import type { Dictionary } from "@/i18n/dictionaries/th";
 import { formatBaht } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export type ShopProduct = {
   id: string;
   name: string;
+  nameEn: string | null;
   category: string | null;
   price: number;
   unit: string;
@@ -36,9 +39,11 @@ function ProductCard({
   showStock,
   onStep,
   t,
+  locale,
 }: {
   product: ShopProduct;
   qty: number;
+  locale: string;
   /** คาเฟ่คนทำสดตามออเดอร์ ไม่ต้องนับสต็อก — ซ่อนป้ายคงเหลือและไม่จำกัดจำนวนที่กดได้ */
   showStock: boolean;
   onStep: (product: ShopProduct, delta: number) => void;
@@ -51,7 +56,7 @@ function ProductCard({
       <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted/60">
         {p.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+          <img src={p.imageUrl} alt={productName(p, locale)} className="h-full w-full object-cover" />
         ) : (
           <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
         )}
@@ -60,7 +65,7 @@ function ProductCard({
       <CardContent className="space-y-2 p-3">
         <div>
           <div className="line-clamp-2 min-h-[2.5rem] text-sm leading-tight font-medium">
-            {p.name}
+            {productName(p, locale)}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1">
             {p.category && (
@@ -120,12 +125,14 @@ function ProductGrid({
   showStock,
   onStep,
   t,
+  locale,
 }: {
   products: ShopProduct[];
   qty: Record<string, number>;
   showStock: boolean;
   onStep: (product: ShopProduct, delta: number) => void;
   t: Dictionary;
+  locale: string;
 }) {
   if (products.length === 0) {
     return <p className="py-10 text-center text-sm text-muted-foreground">{t.shop.empty}</p>;
@@ -140,9 +147,147 @@ function ProductGrid({
           showStock={showStock}
           onStep={onStep}
           t={t}
+          locale={locale}
         />
       ))}
     </div>
+  );
+}
+
+/** ค่าที่ใช้แทน "หมวดอื่นๆ" ภายในคอมโพเนนต์ — สินค้าที่ไม่ได้ระบุหมวดจะถูกจัดไว้ตรงนี้
+ *  ไม่งั้นจะหาไม่เจอเลยเมื่อเลือกหมวดใดหมวดหนึ่ง */
+const UNCATEGORIZED = "__none__";
+
+/** จำนวนการ์ดสูงสุดที่วาดพร้อมกัน — กันหน้าหน่วงตอนสินค้ามีหลักพันรายการ */
+const VISIBLE_LIMIT = 60;
+
+/** ลำดับหมวดที่ร้านอยากให้เรียง (เรียงตามการใช้งานจริง ไม่ใช่ตามตัวอักษร)
+ *  หมวดที่ไม่อยู่ในลิสต์นี้ต่อท้ายเรียงตามตัวอักษรไทย และ "อื่นๆ" อยู่ท้ายสุดเสมอ */
+const CATEGORY_ORDER = [
+  "อาหารมื้อหลัก",
+  "เบเกอรี่",
+  "อาหารทานเล่น",
+  "เครื่องดื่มเย็น",
+  "เครื่องดื่มปั่น",
+  "เครื่องดื่มร้อน",
+  "เมนูคริสต์มาส",
+];
+
+/** ชื่อสินค้าตามภาษาที่ผู้ใช้เลือก — ยังไม่ได้ตั้งชื่ออังกฤษก็ใช้ชื่อไทยไปก่อน */
+function productName(p: ShopProduct, locale: string) {
+  return locale === "en" && p.nameEn ? p.nameEn : p.name;
+}
+
+function CategoryChips({
+  categories,
+  active,
+  onChange,
+  t,
+}: {
+  categories: string[];
+  active: string | null;
+  onChange: (value: string | null) => void;
+  t: Dictionary;
+}) {
+  const chip = (isActive: boolean) =>
+    cn(
+      "shrink-0 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+      isActive
+        ? "border-primary bg-primary text-primary-foreground"
+        : "border-border bg-background text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+    );
+
+  return (
+    <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
+      <button type="button" className={chip(active === null)} onClick={() => onChange(null)}>
+        {t.shop.allCategories}
+      </button>
+      {categories.map((c) => (
+        <button key={c} type="button" className={chip(active === c)} onClick={() => onChange(c)}>
+          {c === UNCATEGORIZED ? t.shop.otherCategory : c}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** เมนูหนึ่งหมวดใหญ่ (คาเฟ่คน หรือ คาเฟ่สัตว์) — เลือกหมวดย่อยด้านบน แล้วโชว์เฉพาะของในหมวดนั้น
+ *  เก็บหมวดที่เลือกไว้แยกกันของใครของมัน สลับแท็บไปมาแล้วไม่รีเซ็ตของอีกฝั่ง */
+function MenuSection({
+  products,
+  qty,
+  showStock,
+  onStep,
+  t,
+  locale,
+}: {
+  products: ShopProduct[];
+  qty: Record<string, number>;
+  showStock: boolean;
+  onStep: (product: ShopProduct, delta: number) => void;
+  t: Dictionary;
+  locale: string;
+}) {
+  const [active, setActive] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const categories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const p of products) seen.add(p.category?.trim() || UNCATEGORIZED);
+    const rank = (c: string) => {
+      const i = CATEGORY_ORDER.indexOf(c);
+      return i === -1 ? CATEGORY_ORDER.length : i;
+    };
+    return [...seen].sort((a, b) => {
+      if (a === UNCATEGORIZED) return 1;
+      if (b === UNCATEGORIZED) return -1;
+      return rank(a) - rank(b) || a.localeCompare(b, "th");
+    });
+  }, [products]);
+
+  const matched = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return products.filter((p) => {
+      if (active !== null && (p.category?.trim() || UNCATEGORIZED) !== active) return false;
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q) || (p.nameEn ?? "").toLowerCase().includes(q);
+    });
+  }, [products, active, query]);
+
+  // ร้านมีสินค้าหลักพันรายการ วาดการ์ดทั้งหมดพร้อมกันจะหน่วงและเลื่อนหาไม่เจออยู่ดี
+  // จึงตัดให้เหลือชุดแรกแล้วบอกยอดจริงไว้ ให้พนักงานค้นหา/เลือกหมวดแทนการไล่ดู
+  const shown = matched.slice(0, VISIBLE_LIMIT);
+
+  return (
+    <>
+      <div className="relative mb-3">
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t.shop.searchPlaceholder}
+          className="pl-9"
+        />
+      </div>
+
+      {/* มีหมวดเดียวก็ไม่ต้องโชว์แถบให้เลือก ไม่มีอะไรให้กรอง */}
+      {categories.length > 1 && (
+        <CategoryChips categories={categories} active={active} onChange={setActive} t={t} />
+      )}
+      <ProductGrid
+        products={shown}
+        qty={qty}
+        showStock={showStock}
+        onStep={onStep}
+        t={t}
+        locale={locale}
+      />
+      {matched.length > shown.length && (
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {t.shop.showingCount(shown.length, matched.length)}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -155,7 +300,7 @@ export function ShopMenu({
   humanProducts: ShopProduct[];
   petProducts: ShopProduct[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [qty, setQty] = useState<Record<string, number>>({});
   const [billOpen, setBillOpen] = useState(false);
@@ -215,10 +360,24 @@ export function ShopMenu({
           <TabsTrigger value="pet">{t.shop.tabShop}</TabsTrigger>
         </TabsList>
         <TabsContent value="human" className="mt-4">
-          <ProductGrid products={humanProducts} qty={qty} showStock={false} onStep={step} t={t} />
+          <MenuSection
+            products={humanProducts}
+            qty={qty}
+            showStock={false}
+            onStep={step}
+            t={t}
+            locale={locale}
+          />
         </TabsContent>
         <TabsContent value="pet" className="mt-4">
-          <ProductGrid products={petProducts} qty={qty} showStock onStep={step} t={t} />
+          <MenuSection
+            products={petProducts}
+            qty={qty}
+            showStock
+            onStep={step}
+            t={t}
+            locale={locale}
+          />
         </TabsContent>
       </Tabs>
 
@@ -232,7 +391,7 @@ export function ShopMenu({
                 {selectedLines.map((l) => (
                   <div key={l.product.id} className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate">
-                      {l.product.name}
+                      {productName(l.product, locale)}
                       <span className="text-muted-foreground">
                         {" "}
                         x{l.quantity} {l.product.unit}
@@ -277,7 +436,7 @@ export function ShopMenu({
             {selectedLines.map((l) => (
               <div key={l.product.id} className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 truncate">
-                  {l.product.name}
+                  {productName(l.product, locale)}
                   <span className="text-muted-foreground">
                     {" "}
                     x{l.quantity} {l.product.unit}

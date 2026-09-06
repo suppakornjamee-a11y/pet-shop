@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save, Plus, Pencil, Trash2, PackagePlus, ImagePlus, X } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, PackagePlus, ImagePlus, X, Search } from "lucide-react";
 import {
   upsertProduct,
   deleteProduct,
@@ -48,6 +48,7 @@ import { TablePagination, useTablePagination } from "@/components/ui/table-pagin
 type Product = {
   id: string;
   name: string;
+  nameEn: string | null;
   target: ProductTarget;
   category: string | null;
   price: number;
@@ -59,11 +60,20 @@ type Product = {
 };
 
 // หมวดหมู่/หน่วยของสินค้าฝั่งคาเฟ่คน — เป็นค่าที่เก็บลงฐานข้อมูลจริง (ไม่ใช่ข้อความ UI) จึงไม่ผ่าน i18n
-const HUMAN_CATEGORIES = ["เครื่องดื่ม", "อาหาร", "ขนม"] as const;
+const HUMAN_CATEGORIES = [
+  "เครื่องดื่มร้อน",
+  "เครื่องดื่มเย็น",
+  "เครื่องดื่มปั่น",
+  "เบเกอรี่",
+  "อาหารมื้อหลัก",
+  "อาหารทานเล่น",
+  "เมนูคริสต์มาส",
+] as const;
 const HUMAN_UNITS = ["แก้ว", "จาน", "ชิ้น"] as const;
 
 const empty = {
   name: "",
+  nameEn: "",
   target: "PET" as ProductTarget,
   category: "",
   price: "",
@@ -84,7 +94,21 @@ export function StockManager({ products }: { products: Product[] }) {
 
   const [uploading, setUploading] = useState(false);
 
-  const sort = useTableSort<Product>(products, {
+  const [query, setQuery] = useState("");
+
+  // ร้านมีสินค้าหลักพันรายการ ไล่ดูทีละหน้าไม่ไหว ต้องค้นได้ทั้งชื่อไทย/อังกฤษ/หมวด
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.nameEn ?? "").toLowerCase().includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q)
+    );
+  }, [products, query]);
+
+  const sort = useTableSort<Product>(filtered, {
     name: (p) => p.name,
     category: (p) => p.category,
     price: (p) => p.price,
@@ -108,6 +132,7 @@ export function StockManager({ products }: { products: Product[] }) {
     setEditing(p);
     setForm({
       name: p.name,
+      nameEn: p.nameEn ?? "",
       target: p.target,
       category: p.category ?? "",
       price: String(p.price),
@@ -160,6 +185,7 @@ export function StockManager({ products }: { products: Product[] }) {
       const res = await upsertProduct({
         id: editing?.id,
         name: form.name,
+        nameEn: form.nameEn || undefined,
         target: form.target,
         category: form.category || undefined,
         price: Number(form.price || 0),
@@ -213,7 +239,16 @@ export function StockManager({ products }: { products: Product[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t.settings.stock.searchPlaceholder}
+            className="pl-9"
+          />
+        </div>
         <Button onClick={openNew}>
           <Plus /> {t.settings.stock.addProduct}
         </Button>
@@ -261,9 +296,19 @@ export function StockManager({ products }: { products: Product[] }) {
                         )}
                         <div>
                           <div className="font-medium">{p.name}</div>
-                          <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                            {t.labels.productTarget[p.target]}
-                          </Badge>
+                          {p.nameEn && (
+                            <div className="text-xs text-muted-foreground">{p.nameEn}</div>
+                          )}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {t.labels.productTarget[p.target]}
+                            </Badge>
+                            {!p.active && (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                {t.settings.stock.inactiveBadge}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
@@ -332,7 +377,7 @@ export function StockManager({ products }: { products: Product[] }) {
         </CardContent>
       </Card>
 
-      {products.length > 0 && <TablePagination state={pagination} />}
+      {filtered.length > 0 && <TablePagination state={pagination} />}
 
       {/* Add/Edit dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -387,9 +432,16 @@ export function StockManager({ products }: { products: Product[] }) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label>{t.settings.stock.productNameLabel}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t.settings.stock.productNameEnLabel}</Label>
+              <Input
+                value={form.nameEn}
+                onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t.settings.stock.targetLabel}</Label>

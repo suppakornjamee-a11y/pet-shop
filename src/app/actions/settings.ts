@@ -14,6 +14,7 @@ import type { ActionResult } from "./customers";
 const productSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "กรุณากรอกชื่อสินค้า"),
+  nameEn: z.string().trim().optional(),
   target: z.enum(["PET", "HUMAN"]).default("PET"),
   category: z.string().optional(),
   price: z.coerce.number().int().min(0),

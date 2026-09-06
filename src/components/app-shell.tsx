@@ -140,9 +140,22 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b">
+      {/* โลโก้สลับตามธีม — สลับด้วย CSS ไม่ใช่ JS จะได้ไม่กระพริบผิดสีตอนโหลดหน้าแรก
+          (ธีมถูกตัดสินที่ฝั่งเบราว์เซอร์ ถ้ารอ JS อ่านค่าก่อนค่อยเลือกรูปจะเห็นรูปผิดแวบนึง) */}
+      <div className="border-b px-6 py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/logo.png" alt={t.nav.brand} className="block h-auto w-full object-cover" />
+        <img
+          src="/images/logo-light.png"
+          alt={t.nav.brand}
+          className="block h-auto w-full dark:hidden"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logo-dark.png"
+          alt=""
+          aria-hidden
+          className="hidden h-auto w-full dark:block"
+        />
       </div>
 
       <nav className="flex-1 space-y-7 overflow-y-auto px-3.5 py-5">

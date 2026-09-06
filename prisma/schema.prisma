@@ -283,7 +283,8 @@ model Room {
 
 model Product {
   id          String        @id @default(cuid())
-  name        String
+  name        String // ชื่อไทย (ชื่อหลักที่ใช้อ้างอิงทุกที่ เช่น ใบเสร็จ/รายการในออเดอร์)
+  nameEn      String? // ชื่ออังกฤษ — ใช้แสดงบนหน้าเมนูเมื่อผู้ใช้สลับเป็นภาษาอังกฤษ
   sku         String?       @unique
   target      ProductTarget @default(PET)
   category    String? // เช่น ขนม, อาหารเปียก, อาหารเม็ด

@@ -16,6 +16,7 @@ export default async function ShopPage() {
   const toMenuItem = (p: (typeof products)[number]) => ({
     id: p.id,
     name: p.name,
+    nameEn: p.nameEn,
     category: p.category,
     price: p.price,
     unit: p.unit,
