@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, BellRing } from "lucide-react";
-import { getPendingApprovals, type PendingApprovalItem } from "@/app/actions/notifications";
-import { formatDateTime } from "@/lib/format";
+import { Bell, BellRing, CalendarClock, Receipt } from "lucide-react";
+import { getStaffAlerts, type StaffAlert } from "@/app/actions/notifications";
+import { formatBaht, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const POLL_MS = 30_000;
 export function NotificationBell() {
   const { t } = useI18n();
   const [count, setCount] = useState(0);
-  const [items, setItems] = useState<PendingApprovalItem[]>([]);
+  const [items, setItems] = useState<StaffAlert[]>([]);
   const [canNotify, setCanNotify] = useState(false);
 
   // จำยอดครั้งก่อนไว้ เพื่อเด้งแจ้งเตือนเฉพาะตอน "มีของใหม่เพิ่มเข้ามา" ไม่ใช่ทุกรอบที่ถาม
@@ -29,7 +29,7 @@ export function NotificationBell() {
 
   const load = useCallback(async () => {
     try {
-      const res = await getPendingApprovals();
+      const res = await getStaffAlerts();
       setCount(res.count);
       setItems(res.items);
       if (typeof Notification !== "undefined") setCanNotify(Notification.permission === "granted");
@@ -98,23 +98,38 @@ export function NotificationBell() {
             {t.notifications.empty}
           </p>
         ) : (
-          items.map((it) => (
-            <DropdownMenuItem
-              key={it.id}
-              render={<Link href={`/orders/${it.id}`} />}
-              className="flex-col items-start gap-0.5 py-2"
-            >
-              <span className="text-sm font-medium">
-                {it.customerName}
-                {it.petName && <span className="text-muted-foreground"> · {it.petName}</span>}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {it.appointmentAt || it.checkInAt
-                  ? formatDateTime(new Date(it.appointmentAt ?? it.checkInAt!))
-                  : it.code}
-              </span>
-            </DropdownMenuItem>
-          ))
+          items.map((it) => {
+            const isSlip = it.kind === "SLIP";
+            const RowIcon = isSlip ? Receipt : CalendarClock;
+            return (
+              <DropdownMenuItem
+                key={it.key}
+                render={<Link href={`/orders/${it.orderId}`} />}
+                className="items-start gap-2 py-2"
+              >
+                <RowIcon
+                  className={cn(
+                    "mt-0.5 h-4 w-4 shrink-0",
+                    isSlip ? "text-emerald-600" : "text-primary"
+                  )}
+                />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {isSlip ? t.notifications.slipLabel : t.notifications.queueLabel}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {it.customerName}
+                    {it.petName && <span className="text-muted-foreground"> · {it.petName}</span>}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {it.code}
+                    {it.amount !== null && ` · ${formatBaht(it.amount)}`} ·{" "}
+                    {formatDateTime(new Date(it.at))}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            );
+          })
         )}
 
         {!canNotify && typeof Notification !== "undefined" && (

@@ -731,11 +731,13 @@ const en: Dictionary = {
     comingSoon: "Coming soon — no reports available yet",
   },
   notifications: {
-    title: "New bookings to confirm",
-    empty: "No bookings waiting for confirmation",
+    title: "Notifications",
+    empty: "No notifications",
+    queueLabel: "New booking to confirm",
+    slipLabel: "Slip to verify",
     enableDesktop: "Enable desktop notifications",
-    newBookingTitle: "New booking from a customer",
-    newBookingBody: (n: number) => `${n} new booking(s) waiting for confirmation`,
+    newBookingTitle: "New item needs your attention",
+    newBookingBody: (n: number) => `${n} new booking(s) or slip(s) waiting for you`,
   },
   print: {
     receiptTitle: "Receipt",

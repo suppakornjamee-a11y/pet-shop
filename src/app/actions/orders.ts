@@ -494,9 +494,8 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
   void notifyCustomerLine(
     orderId,
     link
-      ? `ยืนยันคิวเรียบร้อย ออเดอร์ ${order.code}
-ชำระเงินได้ที่ลิ้งค์นี้ ${link}`
-      : `ยืนยันคิวเรียบร้อย ออเดอร์ ${order.code}`
+      ? `✅ ยืนยันการจองเรียบร้อย\nเลขจอง : ${order.code}\nลิ้งค์ชำระเงิน : ${link}`
+      : `✅ ยืนยันการจองเรียบร้อย\nเลขจอง : ${order.code}`
   );
 
   revalidateOrderViews(orderId);

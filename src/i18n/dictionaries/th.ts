@@ -744,11 +744,13 @@ const th = {
     comingSoon: "กำลังพัฒนา — ยังไม่มีรายงานให้ดูตอนนี้",
   },
   notifications: {
-    title: "คิวใหม่รอยืนยัน",
-    empty: "ยังไม่มีคิวใหม่รอยืนยัน",
+    title: "การแจ้งเตือน",
+    empty: "ยังไม่มีการแจ้งเตือน",
+    queueLabel: "คิวใหม่รอยืนยัน",
+    slipLabel: "สลิปรอตรวจสอบ",
     enableDesktop: "เปิดแจ้งเตือนบนเดสก์ท็อป",
-    newBookingTitle: "มีคิวใหม่จากลูกค้า",
-    newBookingBody: (n: number) => `มีคิวใหม่ ${n} รายการรอยืนยัน`,
+    newBookingTitle: "มีรายการใหม่รอจัดการ",
+    newBookingBody: (n: number) => `มีคิวจอง/สลิปใหม่ ${n} รายการรอคุณตรวจสอบ`,
   },
   print: {
     receiptTitle: "ใบเสร็จรับเงิน",
