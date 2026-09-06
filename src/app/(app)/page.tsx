@@ -1,6 +1,6 @@
 import Link from "next/link";
 // import { ClipboardPlus, PawPrint, ReceiptText, Clock, TrendingUp } from "lucide-react";
-import { OrdersImageIcon } from "@/components/nav-icons";
+import { ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { formatDate, formatBaht, formatTime } from "@/lib/format";
@@ -278,7 +278,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
         <CardContent>
           {dayOrderList.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <OrdersImageIcon className="h-12 w-12 opacity-40" />
+              <ReceiptText className="h-10 w-10 opacity-40 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {isToday ? t.dashboard.noOrdersToday : t.dashboard.noOrdersOn(dateLabel)}
               </p>

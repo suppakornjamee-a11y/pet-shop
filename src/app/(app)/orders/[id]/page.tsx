@@ -32,9 +32,25 @@ import { OrderItemsRows } from "@/components/order-items-rows";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
+/** ไอคอนใบเสร็จ — ต้นฉบับเป็นเส้นสีเข้มสีเดียว ถ้าวางเป็น <img> ตรงๆ จะจมหายไปในธีมมืด
+ *  จึงใช้เป็น mask แล้วเทสีตามสีตัวหนังสือของปุ่ม ทำให้เห็นชัดทั้งสองธีม */
 function PrintIcon({ className }: { className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/images/icons/print.png" alt="" className={className} />;
+  return (
+    <span
+      aria-hidden
+      className={cn("inline-block shrink-0 bg-current", className)}
+      style={{
+        maskImage: "url(/images/icons/receipt.png)",
+        WebkitMaskImage: "url(/images/icons/receipt.png)",
+        maskSize: "contain",
+        WebkitMaskSize: "contain",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
 }
 
 export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) {

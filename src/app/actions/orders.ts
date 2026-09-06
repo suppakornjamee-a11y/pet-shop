@@ -547,7 +547,7 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { payments: true, extraCharges: true },
+    include: { payments: true, extraCharges: true, pet: { select: { name: true } } },
   });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
 
@@ -605,7 +605,9 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   if (target === "COMPLETED") {
     void notifyCustomerLine(
       orderId,
-      `บริการเสร็จเรียบร้อย ออเดอร์ ${updated.code}\nสามารถมารับได้เลยค่ะ`
+      `✅ บริการเสร็จเรียบร้อย\nเลขจอง : ${updated.code}\n${
+        order.pet ? `สามารถมารับน้อง${order.pet.name} ได้เลยค่ะ` : "สามารถมารับได้เลยค่ะ"
+      }`
     );
   }
 
