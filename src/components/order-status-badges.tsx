@@ -43,7 +43,7 @@ export function OrderStatusBadges({
   if (info.kind === "GROOMER_FINISHED") {
     return (
       <Badge variant="outline" className={cn(textSize, orderStatusColor.COMPLETED)}>
-        {t.orders.finishMyWork}
+        {t.orders.myWorkDoneBadge}
       </Badge>
     );
   }

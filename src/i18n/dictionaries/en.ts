@@ -363,6 +363,7 @@ const en: Dictionary = {
     startWork: "Start",
     finishWork: "Check Out",
     finishMyWork: "Mark My Part Done",
+    myWorkDoneBadge: "Completed",
     cancelOrder: "Cancel",
     approveQueue: "Approve Queue",
     rejectQueue: "Reject Queue",
