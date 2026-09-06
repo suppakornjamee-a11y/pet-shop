@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 const FIELD =
   "h-12 rounded-full border-[#e4d9c9] bg-white pr-4 pl-11 text-sm text-[#2f2a24] " +
   "shadow-[0_1px_2px_rgba(47,42,36,0.05)] placeholder:text-[#a79a8a] " +
-  "focus-visible:border-[#0f6e72] focus-visible:ring-[#0f6e72]/20 " +
+  "focus-visible:border-[#ba4775] focus-visible:ring-[#ba4775]/20 " +
   "dark:border-[#e4d9c9] dark:bg-white dark:text-[#2f2a24]";
 
 // ช่องที่กรอกไม่ครบ — ขอบและวงโฟกัสเป็นสีแดงให้เห็นชัดว่าต้องแก้ตรงไหน
@@ -141,7 +141,7 @@ export function LoginForm() {
       <Button
         type="submit"
         disabled={isPending}
-        className="mt-5 h-12 w-full rounded-full bg-[#0f6e72] text-[0.95rem] font-medium text-white shadow-[0_6px_18px_rgba(15,110,114,0.25)] hover:bg-[#0b5457]"
+        className="mt-5 h-12 w-full rounded-full bg-[#ba4775] text-[0.95rem] font-medium text-white shadow-[0_6px_18px_rgba(186,71,117,0.25)] hover:bg-[#99355f]"
       >
         {isPending ? <Loader2 className="animate-spin" /> : null}
         {t.login.submit}

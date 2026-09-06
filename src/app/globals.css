@@ -49,72 +49,77 @@
 }
 
 :root {
-  --background: oklch(0.991 0.006 170);
-  --foreground: oklch(0.23 0.024 190);
+  /* ธีมสว่าง = ชมพู (แบรนด์ #F7B6CB) — hue 358
+     สีปุ่ม/ข้อความหลักต้องเข้มกว่า #F7B6CB เพราะชมพูอ่อนขนาดนั้นเป็นพื้นปุ่มแล้วอ่านตัวหนังสือไม่ออก
+     ตัว #F7B6CB เองใช้เป็นสี accent (พื้นตอน hover/ไฮไลต์) ซึ่งเป็นชมพูที่เห็นเด่นสุดในหน้าจอ */
+  --background: oklch(0.992 0.006 358);
+  --foreground: oklch(0.23 0.025 350);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.23 0.024 190);
+  --card-foreground: oklch(0.23 0.025 350);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.024 190);
-  --primary: oklch(0.55 0.108 190);
-  --primary-foreground: oklch(0.99 0.012 190);
-  --secondary: oklch(0.955 0.017 175);
-  --secondary-foreground: oklch(0.33 0.04 190);
-  --muted: oklch(0.965 0.012 172);
-  --muted-foreground: oklch(0.53 0.028 185);
-  --accent: oklch(0.93 0.035 188);
-  --accent-foreground: oklch(0.34 0.06 192);
+  --popover-foreground: oklch(0.23 0.025 350);
+  --primary: oklch(0.565 0.155 358);
+  --primary-foreground: oklch(0.99 0.008 358);
+  --secondary: oklch(0.955 0.022 358);
+  --secondary-foreground: oklch(0.33 0.05 358);
+  --muted: oklch(0.965 0.014 358);
+  --muted-foreground: oklch(0.53 0.03 355);
+  --accent: oklch(0.842 0.08 358);
+  --accent-foreground: oklch(0.33 0.07 358);
   --destructive: oklch(0.585 0.2 25);
-  --border: oklch(0.905 0.014 175);
-  --input: oklch(0.905 0.014 175);
-  --ring: oklch(0.55 0.108 190);
-  --chart-1: oklch(0.6 0.12 190);
+  --border: oklch(0.905 0.016 358);
+  --input: oklch(0.905 0.016 358);
+  --ring: oklch(0.565 0.155 358);
+  --chart-1: oklch(0.6 0.15 358);
   --chart-2: oklch(0.72 0.15 65);
   --chart-3: oklch(0.55 0.16 300);
   --chart-4: oklch(0.63 0.19 20);
   --chart-5: oklch(0.65 0.13 235);
   --radius: 0.55rem;
-  --sidebar: oklch(0.986 0.009 172);
-  --sidebar-foreground: oklch(0.27 0.025 188);
-  --sidebar-primary: oklch(0.55 0.108 190);
-  --sidebar-primary-foreground: oklch(0.99 0.012 190);
-  --sidebar-accent: oklch(0.93 0.035 188);
-  --sidebar-accent-foreground: oklch(0.34 0.06 192);
-  --sidebar-border: oklch(0.905 0.014 175);
-  --sidebar-ring: oklch(0.55 0.108 190);
+  --sidebar: oklch(0.986 0.01 358);
+  --sidebar-foreground: oklch(0.27 0.026 352);
+  --sidebar-primary: oklch(0.565 0.155 358);
+  --sidebar-primary-foreground: oklch(0.99 0.008 358);
+  --sidebar-accent: oklch(0.842 0.08 358);
+  --sidebar-accent-foreground: oklch(0.33 0.07 358);
+  --sidebar-border: oklch(0.905 0.016 358);
+  --sidebar-ring: oklch(0.565 0.155 358);
 }
 
 .dark {
-  --background: oklch(0.195 0.017 195);
-  --foreground: oklch(0.95 0.012 175);
-  --card: oklch(0.235 0.021 193);
-  --card-foreground: oklch(0.95 0.012 175);
-  --popover: oklch(0.235 0.021 193);
-  --popover-foreground: oklch(0.95 0.012 175);
-  --primary: oklch(0.72 0.12 187);
-  --primary-foreground: oklch(0.18 0.03 195);
-  --secondary: oklch(0.285 0.022 193);
-  --secondary-foreground: oklch(0.95 0.012 175);
-  --muted: oklch(0.285 0.022 193);
-  --muted-foreground: oklch(0.7 0.024 182);
-  --accent: oklch(0.33 0.045 190);
-  --accent-foreground: oklch(0.95 0.02 180);
+  /* ธีมมืด = เขียว (แบรนด์ #66A093) — hue 178.5 ใช้ค่าตรงตามที่ให้มาได้เลย
+     เพราะบนพื้นมืดสีนี้สว่างพอทั้งตอนเป็นพื้นปุ่มและตอนเป็นตัวหนังสือ */
+  --background: oklch(0.195 0.015 180);
+  --foreground: oklch(0.95 0.012 178);
+  --card: oklch(0.235 0.018 180);
+  --card-foreground: oklch(0.95 0.012 178);
+  --popover: oklch(0.235 0.018 180);
+  --popover-foreground: oklch(0.95 0.012 178);
+  --primary: oklch(0.662 0.064 178.5);
+  --primary-foreground: oklch(0.18 0.03 178);
+  --secondary: oklch(0.285 0.02 179);
+  --secondary-foreground: oklch(0.95 0.012 178);
+  --muted: oklch(0.285 0.02 179);
+  --muted-foreground: oklch(0.7 0.024 178);
+  --accent: oklch(0.33 0.04 178);
+  --accent-foreground: oklch(0.95 0.02 178);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 11%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.72 0.12 187);
-  --chart-1: oklch(0.72 0.12 187);
+  --ring: oklch(0.662 0.064 178.5);
+  --chart-1: oklch(0.662 0.064 178.5);
   --chart-2: oklch(0.75 0.15 68);
   --chart-3: oklch(0.66 0.16 300);
   --chart-4: oklch(0.68 0.18 22);
   --chart-5: oklch(0.7 0.13 235);
-  --sidebar: oklch(0.21 0.019 195);
-  --sidebar-foreground: oklch(0.95 0.012 175);
-  --sidebar-primary: oklch(0.72 0.12 187);
-  --sidebar-primary-foreground: oklch(0.18 0.03 195);
-  --sidebar-accent: oklch(0.33 0.045 190);
-  --sidebar-accent-foreground: oklch(0.95 0.02 180);
+  --sidebar: oklch(0.21 0.017 180);
+  --sidebar-foreground: oklch(0.95 0.012 178);
+  --sidebar-primary: oklch(0.662 0.064 178.5);
+  --sidebar-primary-foreground: oklch(0.18 0.03 178);
+  --sidebar-accent: oklch(0.33 0.04 178);
+  --sidebar-accent-foreground: oklch(0.95 0.02 178);
   --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.72 0.12 187);
+  --sidebar-ring: oklch(0.662 0.064 178.5);
 }
 
 @layer base {
