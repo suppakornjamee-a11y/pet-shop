@@ -122,6 +122,31 @@
   --sidebar-ring: oklch(0.662 0.064 178.5);
 }
 
+/* หน้าจอฝั่งลูกค้าที่เปิดจากแอป LINE (/liff/*) — ตรึงเป็นชุดสีชมพูเสมอ ไม่สลับไปเขียวตามธีมมืด
+   ของฝั่งพนักงาน เพราะลูกค้าไม่มีปุ่มสลับธีมให้กดกลับ และแบรนด์ที่ลูกค้าเห็นควรเป็นชมพูอย่างเดียว
+   ประกาศทับ token ทั้งชุดที่ระดับ wrapper ทำให้ .dark ที่ <html> ไม่มีผลกับอะไรที่อยู่ข้างใน */
+.liff-theme {
+  --background: oklch(0.975 0.009 358);
+  --foreground: oklch(0.23 0.025 350);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.23 0.025 350);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.025 350);
+  --primary: oklch(0.565 0.155 358);
+  --primary-foreground: oklch(0.99 0.008 358);
+  --secondary: oklch(0.955 0.022 358);
+  --secondary-foreground: oklch(0.33 0.05 358);
+  --muted: oklch(0.965 0.014 358);
+  --muted-foreground: oklch(0.53 0.03 355);
+  --accent: oklch(0.842 0.08 358);
+  --accent-foreground: oklch(0.33 0.07 358);
+  --destructive: oklch(0.585 0.2 25);
+  --border: oklch(0.905 0.016 358);
+  --input: oklch(0.905 0.016 358);
+  --ring: oklch(0.565 0.155 358);
+  color-scheme: light;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

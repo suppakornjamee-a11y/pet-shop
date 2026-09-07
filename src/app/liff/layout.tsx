@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
   return (
     <LiffProvider>
-      <div className="mx-auto min-h-dvh w-full max-w-md bg-background px-4 py-6">{children}</div>
+      {/* liff-theme ตรึงชุดสีชมพูไว้ (ดู globals.css) — ฝั่งลูกค้าไม่สลับตามธีมมืดของฝั่งพนักงาน */}
+      <div className="liff-theme mx-auto min-h-dvh w-full max-w-md bg-background px-4 py-6 text-foreground">
+        {children}
+      </div>
     </LiffProvider>
   );
 }

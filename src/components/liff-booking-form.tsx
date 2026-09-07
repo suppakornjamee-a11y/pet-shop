@@ -1,9 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, ClipboardCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bath,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Home,
+  Loader2,
+  Scissors,
+  Sunrise,
+  Sun,
+  Sunset,
+} from "lucide-react";
 import {
   liffBootstrap,
   getBookableServices,
@@ -12,18 +26,15 @@ import {
   getOpenSlots,
   liffCreateOrder,
 } from "@/app/actions/liff";
-import { formatBaht } from "@/lib/format";
-import { toThaiDateStr, addDaysThai, daysBetween } from "@/lib/slots";
+import { formatBaht, formatDateLong } from "@/lib/format";
+import { toThaiDateStr, addDaysThai, daysBetween, thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { SpeciesIcon } from "@/components/species-icon";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -56,6 +67,18 @@ type Room = {
 };
 type Kind = "BATH" | "OTHER" | "BOARDING";
 
+/** สรุปการจองที่สร้างสำเร็จแล้ว — เก็บจาก state ฝั่งนี้ตอนกดยืนยัน ไม่ต้องยิงถามเซิร์ฟเวอร์ซ้ำ
+ * เพราะทุกค่าที่หน้าสรุปต้องใช้ ผู้ใช้เพิ่งกรอกเองมาทั้งหมด */
+type BookingDone = {
+  kind: Kind;
+  serviceLabel: string;
+  petName: string;
+  total: number;
+  date: string;
+  time: string;
+  checkOutDate: string | null;
+};
+
 const todayStr = () => toThaiDateStr(new Date());
 const NANNY_REGULAR_RATE = 300;
 const NANNY_VIP_RATE = 400;
@@ -72,7 +95,8 @@ function exclusiveKey(s: Service): string | null {
 // ตัวเลือกวัน/เวลาแบบ <select> ล้วนๆ แทน <input type="date"/"time"> ของเบราว์เซอร์ —
 // input วันที่/เวลาแบบ native เรนเดอร์ไม่นิ่งในหลาย webview (ทับกันเอง/ล้นขอบจอ/แตะเลือกไม่ติด
 // โดยเฉพาะ webview ในแอป LINE) เปลี่ยนมาใช้ select ธรรมดาซึ่งขนาดคงที่ ควบคุมได้ ไม่พังข้ามอุปกรณ์
-const SELECT_CLASS = "h-9 w-full min-w-0 rounded-md border bg-transparent px-1.5 text-center text-sm";
+const SELECT_CLASS =
+  "h-10 w-full min-w-0 rounded-xl border bg-card px-1.5 text-center text-sm";
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -193,123 +217,229 @@ function TimeSelect({
 
 type SlotOption = { time: string; available: boolean };
 
-/** เวลาสิ้นสุดของช่วง 30 นาที เช่น "10:00" -> "10:30" — ใช้แสดงผลเป็นช่วงเท่านั้น
- * ระบบยังเก็บแค่เวลาเริ่ม (time) เป็นค่านัดหมายจริงเหมือนเดิม ไม่ได้เพิ่มฟิลด์ใหม่ */
-function slotEndLabel(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  const total = h * 60 + m + 30;
-  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+/* ---------- ปฏิทินรายเดือน ---------- */
+
+// เรียงวันแบบเริ่มวันจันทร์ (ไม่ใช่อาทิตย์เหมือนปฏิทินฝั่งพนักงาน) ตามแบบที่ออกแบบไว้ให้ลูกค้า
+const WEEKDAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+
+/** ช่องว่างนำหน้าวันที่ 1 ของเดือน เมื่อสัปดาห์เริ่มที่วันจันทร์ (getDay(): 0=อาทิตย์) */
+function leadingBlanks(year: number, month: number): number {
+  return (new Date(year, month - 1, 1).getDay() + 6) % 7;
 }
 
-const WHEEL_ITEM_HEIGHT = 40;
-const WHEEL_VISIBLE_ITEMS = 5;
-
-/** ตัวเลือกช่วงเวลาแบบเลื่อนวน (wheel) — เลื่อนแล้วช่วงที่อยู่กลางกรอบไฮไลต์คือช่วงที่เลือก
- * ช่วงที่เต็มแล้วเลื่อนผ่านได้แต่กดเลือก/ปล่อยเลื่อนค้างไว้ไม่ได้ จะสะกิดไปช่วงว่างที่ใกล้ที่สุดให้แทน */
-function TimeWheelPicker({
-  slots,
+function MonthCalendar({
   value,
+  min,
   onChange,
 }: {
-  slots: SlotOption[];
   value: string;
-  onChange: (time: string) => void;
+  min: string;
+  onChange: (v: string) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selected = parseDateStr(value);
+  const [view, setView] = useState({ y: selected.y, m: selected.m });
+  const today = todayStr();
 
-  const selectedIndex = value
-    ? Math.max(0, slots.findIndex((s) => s.time === value))
-    : Math.max(0, slots.findIndex((s) => s.available));
+  const total = daysInMonth(view.y, view.m);
+  const blanks = leadingBlanks(view.y, view.m);
+  const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(
+    new Date(view.y, view.m - 1, 1)
+  );
 
-  // เลื่อนไปตำแหน่งที่ควรเลือกทุกครั้งที่รายการช่วงเวลาเปลี่ยน (เช่น เปลี่ยนวันที่) และ sync
-  // ค่าเริ่มต้นกลับขึ้นไปให้ฟอร์มหลักรู้ด้วยถ้ายังไม่เคยเลือกอะไรมาก่อน
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || slots.length === 0) return;
-    el.scrollTop = selectedIndex * WHEEL_ITEM_HEIGHT;
-    if (!value && slots[selectedIndex]?.available) onChange(slots[selectedIndex].time);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots]);
+  // เดือนก่อนหน้ากดถอยได้แค่ถึงเดือนของวันที่เร็วที่สุดที่จองได้ ไม่ปล่อยให้ถอยไปเรื่อยๆ จนหลง
+  const minParts = parseDateStr(min);
+  const canGoBack = view.y > minParts.y || (view.y === minParts.y && view.m > minParts.m);
 
-  function selectIndex(idx: number) {
-    const clamped = Math.max(0, Math.min(slots.length - 1, idx));
-    const slot = slots[clamped];
-    if (slot?.available) onChange(slot.time);
-    containerRef.current?.scrollTo({ top: clamped * WHEEL_ITEM_HEIGHT, behavior: "smooth" });
+  function shiftMonth(delta: number) {
+    const next = new Date(view.y, view.m - 1 + delta, 1);
+    setView({ y: next.getFullYear(), m: next.getMonth() + 1 });
   }
-
-  function handleScrollSettled() {
-    const el = containerRef.current;
-    if (!el) return;
-    const idx = Math.round(el.scrollTop / WHEEL_ITEM_HEIGHT);
-    const clamped = Math.max(0, Math.min(slots.length - 1, idx));
-    if (slots[clamped]?.available) {
-      selectIndex(clamped);
-      return;
-    }
-    let nearest = -1;
-    let bestDist = Infinity;
-    slots.forEach((s, i) => {
-      if (!s.available) return;
-      const dist = Math.abs(i - clamped);
-      if (dist < bestDist) {
-        bestDist = dist;
-        nearest = i;
-      }
-    });
-    selectIndex(nearest >= 0 ? nearest : clamped);
-  }
-
-  function onScroll() {
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(handleScrollSettled, 120);
-  }
-
-  const padding = ((WHEEL_VISIBLE_ITEMS - 1) / 2) * WHEEL_ITEM_HEIGHT;
 
   return (
-    <div className="relative" style={{ height: WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ITEMS }}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-md border-y-2 border-primary/50 bg-primary/5"
-        style={{ height: WHEEL_ITEM_HEIGHT }}
-      />
-      <div
-        ref={containerRef}
-        onScroll={onScroll}
-        className="h-full snap-y snap-mandatory overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <div style={{ height: padding }} />
-        {slots.map((s, i) => {
-          const isSelected = i === selectedIndex;
+    <div className="rounded-2xl border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-semibold">{monthLabel}</span>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            disabled={!canGoBack}
+            aria-label="เดือนก่อนหน้า"
+            className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            aria-label="เดือนถัดไป"
+            className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={w} className="py-1">
+            {w}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: blanks }, (_, i) => (
+          <div key={`blank-${i}`} />
+        ))}
+        {Array.from({ length: total }, (_, i) => i + 1).map((day) => {
+          const dateStr = formatDateStr(view.y, view.m, day);
+          const isPast = dateStr < min;
+          const isSelected = dateStr === value;
+          const isToday = dateStr === today;
           return (
-            <div
-              key={s.time}
-              onClick={() => selectIndex(i)}
-              style={{ height: WHEEL_ITEM_HEIGHT }}
+            <button
+              key={day}
+              type="button"
+              disabled={isPast}
+              onClick={() => onChange(dateStr)}
               className={cn(
-                "flex snap-center items-center justify-center text-sm transition-all",
-                !s.available && "text-muted-foreground/40 line-through",
-                s.available && isSelected && "text-base font-semibold text-foreground",
-                s.available && !isSelected && "cursor-pointer text-muted-foreground"
+                "relative flex h-10 items-center justify-center rounded-xl text-sm transition-colors",
+                isPast && "text-muted-foreground/35",
+                !isPast && !isSelected && "hover:bg-muted",
+                isSelected && "bg-primary font-semibold text-primary-foreground"
               )}
             >
-              {s.time} - {slotEndLabel(s.time)}
-            </div>
+              {day}
+              {isToday && !isSelected && (
+                <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-primary" />
+              )}
+            </button>
           );
         })}
-        <div style={{ height: padding }} />
       </div>
     </div>
   );
 }
+
+/* ---------- ช่วงเวลา แบ่งเป็นเช้า/บ่าย/เย็น ---------- */
+
+type SlotGroup = { key: "MORNING" | "AFTERNOON" | "EVENING"; label: string; icon: typeof Sunrise; slots: SlotOption[] };
+
+function hourOf(time: string): number {
+  return Number(time.split(":")[0]);
+}
+
+/** ป้ายช่วงเวลาจริงของกลุ่ม (เช่น "10:00 – 11:30") คำนวณจากช่วงที่มีอยู่จริง ไม่ฮาร์ดโค้ด
+ * เพราะรายการช่วงเวลาที่เปิดให้จอง (LIFF_TIME_SLOTS) ปรับได้จากฝั่งเซิร์ฟเวอร์ */
+function groupRangeLabel(slots: SlotOption[]): string {
+  if (slots.length === 0) return "";
+  return `${slots[0].time} – ${slots[slots.length - 1].time}`;
+}
+
+function TimeSlotGroups({
+  slots,
+  value,
+  onChange,
+  t,
+}: {
+  slots: SlotOption[];
+  value: string;
+  onChange: (time: string) => void;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  const groups: SlotGroup[] = [
+    { key: "MORNING", label: t.liff.morningLabel, icon: Sunrise, slots: slots.filter((s) => hourOf(s.time) < 12) },
+    {
+      key: "AFTERNOON",
+      label: t.liff.afternoonLabel,
+      icon: Sun,
+      slots: slots.filter((s) => hourOf(s.time) >= 12 && hourOf(s.time) < 16),
+    },
+    { key: "EVENING", label: t.liff.eveningLabel, icon: Sunset, slots: slots.filter((s) => hourOf(s.time) >= 16) },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {groups
+        .filter((g) => g.slots.length > 0)
+        .map((g) => {
+          const hasOpen = g.slots.some((s) => s.available);
+          return (
+            <div key={g.key} className="space-y-2">
+              <div className="flex items-center gap-2 text-xs">
+                <g.icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="font-medium">{g.label}</span>
+                <span className="text-muted-foreground">{groupRangeLabel(g.slots)}</span>
+                <span className={cn("ml-auto", hasOpen ? "text-primary" : "text-muted-foreground")}>
+                  {hasOpen ? t.liff.slotGroupOpen : t.liff.slotGroupFull}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {g.slots.map((s) => {
+                  const isSelected = s.time === value;
+                  return (
+                    <button
+                      key={s.time}
+                      type="button"
+                      disabled={!s.available}
+                      onClick={() => onChange(s.time)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-sm transition-colors",
+                        !s.available && "border-transparent bg-muted text-muted-foreground/50 line-through",
+                        s.available && !isSelected && "bg-card hover:border-primary/50",
+                        isSelected && "border-primary bg-primary font-semibold text-primary-foreground"
+                      )}
+                    >
+                      {s.available && !isSelected && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      )}
+                      {s.time}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+    </div>
+  );
+}
+
+/* ---------- ส่วนหัวของแต่ละขั้น ---------- */
+
+function StepDots({ step }: { step: 1 | 2 | 3 }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {[1, 2, 3].map((n) => (
+        <span
+          key={n}
+          className={cn(
+            "h-1.5 rounded-full transition-all",
+            n === step ? "w-5 bg-primary" : n < step ? "w-1.5 bg-primary" : "w-1.5 bg-border"
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+const KIND_ICONS: Record<Kind, typeof Home> = {
+  BOARDING: Home,
+  OTHER: Scissors,
+  BATH: Bath,
+};
+
+/* ---------- ตัวฟอร์มหลัก ---------- */
 
 function BookingBody() {
   const { t } = useI18n();
   const router = useRouter();
   const { idToken } = useLiff();
   const [isPending, startTransition] = useTransition();
+
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [done, setDone] = useState<BookingDone | null>(null);
 
   const [loadingCustomer, setLoadingCustomer] = useState(true);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -320,13 +450,12 @@ function BookingBody() {
   const [serviceIds, setServiceIds] = useState<Set<string>>(new Set());
 
   const [date, setDate] = useState(todayStr());
-  const [slots, setSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [slots, setSlots] = useState<SlotOption[]>([]);
   const [time, setTime] = useState("");
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomId, setRoomId] = useState("");
-  const [checkInDate, setCheckInDate] = useState(todayStr());
   const [checkInTime, setCheckInTime] = useState("13:00");
   const [checkOutDate, setCheckOutDate] = useState(addDaysThai(todayStr(), 1));
   const [checkOutTime, setCheckOutTime] = useState("11:00");
@@ -336,6 +465,9 @@ function BookingBody() {
   const [cctvRequested, setCctvRequested] = useState(false);
 
   const [note, setNote] = useState("");
+
+  // โรงแรมใช้ปฏิทินเดียวกันเป็นวันเช็คอิน เพื่อไม่ต้องมีตัวเลือกวันสองชุดคนละหน้าตาในหน้าเดียวกัน
+  const checkInDate = date;
 
   // โหลดข้อมูลลูกค้า+สัตว์เลี้ยงสดใหม่ทุกครั้งที่เข้าหน้านี้ (ไม่พึ่ง state ข้ามหน้า)
   useEffect(() => {
@@ -466,8 +598,9 @@ function BookingBody() {
     if (checkOutDate <= checkInDate) setCheckOutDate(addDaysThai(checkInDate, 1));
   }
 
-  function onCheckInDateChange(v: string) {
-    setCheckInDate(v);
+  function onDateChange(v: string) {
+    setDate(v);
+    if (kind !== "BOARDING") return;
     const suggested = addOneHour(checkInTime);
     const suggestedHour = Number(suggested.split(":")[0]);
     setCheckOutTime(suggestedHour > 20 ? "20:00" : suggested);
@@ -494,13 +627,14 @@ function BookingBody() {
     return () => clearTimeout(timeoutId);
   }, [kind, roomId, checkInDate, checkInTime, checkOutDate, checkOutTime]);
 
-  const nannyFee = kind !== "BOARDING" || !selectedRoom
-    ? 0
-    : nannyType === "REGULAR"
-      ? NANNY_REGULAR_RATE * (nights > 0 ? nights : 1)
-      : nannyType === "VIP"
-        ? NANNY_VIP_RATE
-        : 0;
+  const nannyFee =
+    kind !== "BOARDING" || !selectedRoom
+      ? 0
+      : nannyType === "REGULAR"
+        ? NANNY_REGULAR_RATE * (nights > 0 ? nights : 1)
+        : nannyType === "VIP"
+          ? NANNY_VIP_RATE
+          : 0;
   const cctvFee = kind === "BOARDING" && selectedRoom && cctvRequested ? CCTV_ROOM_RATE : 0;
 
   const total = useMemo(() => {
@@ -512,10 +646,17 @@ function BookingBody() {
 
   const depositAmount = kind === "BATH" ? Math.min(BATH_DEPOSIT_AMOUNT, total) : 0;
 
+  const kindLabel =
+    kind === "BATH" ? t.liff.bookingTypeBath : kind === "OTHER" ? t.liff.bookingTypeOther : t.liff.bookingTypeBoarding;
+  const kindSubtitle =
+    kind === "BATH"
+      ? t.liff.kindBathSubtitle
+      : kind === "OTHER"
+        ? t.liff.kindOtherSubtitle
+        : t.liff.kindBoardingSubtitle;
+
   const canSubmit =
-    !!petId &&
-    total > 0 &&
-    (kind === "BOARDING" ? !!roomId && roomAvailable === true : !!time);
+    !!petId && total > 0 && (kind === "BOARDING" ? !!roomId && roomAvailable === true : !!time);
 
   function submit() {
     if (!idToken || !petId) return;
@@ -551,7 +692,16 @@ function BookingBody() {
         toast.error(res.error);
         return;
       }
-      router.push(`/liff/pay/${res.id}`);
+      setDone({
+        kind,
+        serviceLabel: kindLabel,
+        petName: selectedPet?.name ?? "",
+        total,
+        date: kind === "BOARDING" ? checkInDate : date,
+        time: kind === "BOARDING" ? checkInTime : time,
+        checkOutDate: kind === "BOARDING" ? checkOutDate : null,
+      });
+      setStep(3);
     });
   }
 
@@ -572,74 +722,226 @@ function BookingBody() {
     );
   }
 
-  return (
-    <div className="space-y-5 pb-24">
-      <PageHeader title={t.liff.bookPageTitle} />
+  /* ---------- ขั้นที่ 3: ยืนยันแล้ว ---------- */
+  if (step === 3 && done) {
+    return (
+      <div className="space-y-6 py-4">
+        <div className="flex justify-end">
+          <StepDots step={3} />
+        </div>
 
-      {/* สัตว์เลี้ยง */}
-      <div className="space-y-2">
-        <Label>{t.liff.petSectionTitle}</Label>
-        <Select
-          value={petId}
-          onValueChange={(v) => setPetId(v ?? "")}
-          items={pets.map((p) => ({
-            value: p.id,
-            label: (
-              <span className="flex items-center gap-1.5">
-                <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
-              </span>
-            ),
-          }))}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t.liff.selectPetPlaceholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {pets.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                <span className="flex items-center gap-1.5">
-                  <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+        <div className="flex flex-col items-center gap-4 pt-6 text-center">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/40">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary">
+              <Check className="h-8 w-8 text-primary-foreground" strokeWidth={3} />
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">{t.liff.bookingDoneTitle}</h1>
+        </div>
+
+        <div className="rounded-2xl border bg-card p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
+              {(() => {
+                const Icon = KIND_ICONS[done.kind];
+                return <Icon className="h-5 w-5 text-primary" />;
+              })()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">{done.serviceLabel}</div>
+              {done.petName && <div className="text-xs text-muted-foreground">{done.petName}</div>}
+            </div>
+            <div className="font-semibold text-primary">{formatBaht(done.total)}</div>
+          </div>
+
+          <div className="my-4 border-t border-dashed" />
+
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryDateLabel}</dt>
+              <dd className="text-right font-medium">{formatDateLong(thaiDayRange(done.date).start)}</dd>
+            </div>
+            {done.checkOutDate && (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">{t.liff.summaryCheckOutLabel}</dt>
+                <dd className="text-right font-medium">
+                  {formatDateLong(thaiDayRange(done.checkOutDate).start)}
+                </dd>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryTimeLabel}</dt>
+              <dd className="text-right font-medium">
+                {done.time} {t.liff.timeUnitSuffix}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryStatusLabel}</dt>
+              {/* ยังไม่มีเลขที่การจองให้ลูกค้าดูในขั้นนี้ — ออเดอร์ยังรอพนักงานเช็คคิวก่อน
+                  ถ้าคิวว่างจริง ระบบจะส่งเลขที่การจอง + ลิงก์ชำระเงินตามไปทาง LINE ให้เอง */}
+              <dd className="text-right font-medium text-primary">{t.liff.awaitingQueueConfirm}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- ขั้นที่ 1: เลือกบริการ ---------- */
+  if (step === 1) {
+    return (
+      <div className="space-y-5 pb-28">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="h-9 w-auto" />
+
+        {pets.length > 1 && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">{t.liff.petSectionTitle}</Label>
+            <Select
+              value={petId}
+              onValueChange={(v) => setPetId(v ?? "")}
+              items={pets.map((p) => ({
+                value: p.id,
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+                  </span>
+                ),
+              }))}
+            >
+              <SelectTrigger className="h-12 w-full rounded-2xl bg-card">
+                <SelectValue placeholder={t.liff.selectPetPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {pets.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-1.5">
+                      <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">{t.liff.chooseServiceTitle}</p>
+          {(["BOARDING", "OTHER", "BATH"] as const).map((k) => {
+            const Icon = KIND_ICONS[k];
+            const active = kind === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl border-2 bg-card p-3 text-left transition-colors",
+                  active ? "border-primary" : "border-transparent"
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-colors",
+                    active ? "bg-primary text-primary-foreground" : "bg-accent/40 text-primary"
+                  )}
+                >
+                  <Icon className="h-6 w-6" />
                 </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">
+                    {k === "BATH"
+                      ? t.liff.bookingTypeBath
+                      : k === "OTHER"
+                        ? t.liff.bookingTypeOther
+                        : t.liff.bookingTypeBoarding}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {k === "BATH"
+                      ? t.liff.kindBathSubtitle
+                      : k === "OTHER"
+                        ? t.liff.kindOtherSubtitle
+                        : t.liff.kindBoardingSubtitle}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md">
+          <Button className="h-14 w-full rounded-2xl text-base" onClick={() => setStep(2)}>
+            {t.liff.nextStepButton}
+            <ArrowRight />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- ขั้นที่ 2: เลือกวันและเวลา ---------- */
+  return (
+    <div className="space-y-4 pb-28">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setStep(1)}
+          aria-label={t.liff.backButton}
+          className="flex h-10 w-10 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <StepDots step={2} />
       </div>
 
-      {/* ประเภทการจอง */}
-      <Tabs value={kind} onValueChange={(v) => v && setKind(v as Kind)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="BATH" className="flex-1">{t.liff.bookingTypeBath}</TabsTrigger>
-          <TabsTrigger value="BOARDING" className="flex-1">{t.liff.bookingTypeBoarding}</TabsTrigger>
-          <TabsTrigger value="OTHER" className="flex-1">{t.liff.bookingTypeOther}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* บริการที่เลือกไว้ + ปุ่มย้อนไปเปลี่ยน */}
+      <div className="flex items-center gap-3 rounded-2xl border bg-card p-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
+          {(() => {
+            const Icon = KIND_ICONS[kind];
+            return <Icon className="h-5 w-5 text-primary" />;
+          })()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{kindLabel}</div>
+          <div className="text-xs text-muted-foreground">{kindSubtitle}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setStep(1)}
+          className="shrink-0 rounded-full bg-accent/40 px-3.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-accent/60"
+        >
+          {t.liff.changeSelectionButton}
+        </button>
+      </div>
+
+      <MonthCalendar value={date} min={todayStr()} onChange={onDateChange} />
 
       {kind !== "BOARDING" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.liff.selectDateLabel}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <DateSelect value={date} min={todayStr()} onChange={setDate} />
-            <Label className="text-base font-medium">{t.liff.selectSlotLabel}</Label>
-            {loadingSlots ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : slots.every((s) => !s.available) ? (
-              <p className="py-2 text-center text-sm text-muted-foreground">{t.liff.noSlotsAvailable}</p>
-            ) : (
-              <TimeWheelPicker slots={slots} value={time} onChange={setTime} />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">{t.liff.selectSlotLabel}</span>
+            {time && (
+              <span className="ml-auto rounded-full bg-accent/40 px-3 py-1 text-xs font-medium text-primary">
+                ✓ {time} {t.liff.timeUnitSuffix}
+              </span>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          {loadingSlots ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : slots.every((s) => !s.available) ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">{t.liff.noSlotsAvailable}</p>
+          ) : (
+            <TimeSlotGroups slots={slots} value={time} onChange={setTime} t={t} />
+          )}
+        </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.liff.selectRoomLabel}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="space-y-4 rounded-2xl border bg-card p-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">{t.liff.selectRoomLabel}</Label>
             <Select
               value={roomId}
               onValueChange={(v) => onRoomChange(v ?? "")}
@@ -648,7 +950,7 @@ function BookingBody() {
                 label: `${r.category.name} · ${r.name} · ${formatBaht(r.pricePerNight)}`,
               }))}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-11 w-full rounded-xl">
                 <SelectValue placeholder={t.liff.selectRoomLabel} />
               </SelectTrigger>
               <SelectContent>
@@ -658,98 +960,117 @@ function BookingBody() {
                     {roomsInCat.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
                         {r.name} · {formatBaht(r.pricePerNight)}/
-                        {r.category.billingUnit === "PER_NIGHT" ? t.orders.form.perNightUnit : t.orders.form.perVisitUnit}
+                        {r.category.billingUnit === "PER_NIGHT"
+                          ? t.orders.form.perNightUnit
+                          : t.orders.form.perVisitUnit}
                       </SelectItem>
                     ))}
                   </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
+          </div>
 
-            {selectedRoom && (
-              <>
-                <div className="grid gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">{t.orders.form.checkInLabel}</Label>
-                    <div className="space-y-2">
-                      <DateSelect value={checkInDate} min={todayStr()} onChange={onCheckInDateChange} />
-                      <TimeSelect value={checkInTime} onChange={setCheckInTime} minHour={9} maxHour={20} />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">{t.orders.form.checkOutLabel}</Label>
-                    <div className="space-y-2">
-                      <DateSelect value={checkOutDate} min={checkInDate} onChange={setCheckOutDate} />
-                      <TimeSelect value={checkOutTime} onChange={setCheckOutTime} minHour={9} maxHour={20} />
-                    </div>
-                  </div>
+          {selectedRoom && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t.orders.form.checkInLabel}</Label>
+                <TimeSelect value={checkInTime} onChange={setCheckInTime} minHour={9} maxHour={20} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t.orders.form.checkOutLabel}</Label>
+                <div className="space-y-2">
+                  <DateSelect value={checkOutDate} min={checkInDate} onChange={setCheckOutDate} />
+                  <TimeSelect value={checkOutTime} onChange={setCheckOutTime} minHour={9} maxHour={20} />
                 </div>
-                {nights > 0 && (
-                  <p className="text-xs text-muted-foreground">{t.orders.form.nightsCount(nights)}</p>
-                )}
+              </div>
+              {nights > 0 && (
+                <p className="text-xs text-muted-foreground">{t.orders.form.nightsCount(nights)}</p>
+              )}
 
-                {checkingRoom ? (
-                  <p className="text-xs text-muted-foreground">{t.liff.checkingAvailability}</p>
-                ) : roomAvailable === false ? (
-                  <p className="text-xs font-medium text-destructive">{t.liff.roomUnavailable}</p>
-                ) : null}
+              {checkingRoom ? (
+                <p className="text-xs text-muted-foreground">{t.liff.checkingAvailability}</p>
+              ) : roomAvailable === false ? (
+                <p className="text-xs font-medium text-destructive">{t.liff.roomUnavailable}</p>
+              ) : null}
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">{t.liff.nannyLabel}</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(["NONE", "REGULAR", "VIP"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setNannyType(opt)}
-                        className={cn(
-                          "rounded-lg border p-2.5 text-center text-xs transition-colors",
-                          nannyType === opt ? "border-primary bg-primary/10 font-medium" : "hover:bg-accent"
-                        )}
-                      >
-                        <div>
-                          {opt === "NONE"
-                            ? t.orders.form.nannyNone
-                            : opt === "REGULAR"
-                              ? t.orders.form.nannyRegular
-                              : t.orders.form.nannyVip}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{t.liff.nannyLabel}</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["NONE", "REGULAR", "VIP"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setNannyType(opt)}
+                      className={cn(
+                        "rounded-xl border p-2.5 text-center text-xs transition-colors",
+                        nannyType === opt ? "border-primary bg-accent/40 font-medium" : "hover:bg-muted"
+                      )}
+                    >
+                      <div>
+                        {opt === "NONE"
+                          ? t.orders.form.nannyNone
+                          : opt === "REGULAR"
+                            ? t.orders.form.nannyRegular
+                            : t.orders.form.nannyVip}
+                      </div>
+                      {opt !== "NONE" && (
+                        <div className="text-muted-foreground">
+                          {formatBaht(opt === "REGULAR" ? NANNY_REGULAR_RATE : NANNY_VIP_RATE)}
+                          {opt === "REGULAR" ? t.orders.form.perNightUnitSuffix : t.liff.nannyVipSuffix}
                         </div>
-                        {opt !== "NONE" && (
-                          <div className="text-muted-foreground">
-                            {formatBaht(opt === "REGULAR" ? NANNY_REGULAR_RATE : NANNY_VIP_RATE)}
-                            {opt === "REGULAR" ? t.orders.form.perNightUnitSuffix : t.liff.nannyVipSuffix}
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                      )}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={cctvRequested}
-                    onChange={(e) => setCctvRequested(e.target.checked)}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  {t.liff.cctvLabel} ({formatBaht(CCTV_ROOM_RATE)})
-                </label>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={cctvRequested}
+                  onChange={(e) => setCctvRequested(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                {t.liff.cctvLabel} ({formatBaht(CCTV_ROOM_RATE)})
+              </label>
+            </>
+          )}
+        </div>
       )}
 
       {/* บริการเสริม */}
       {(pickableServices.length > 0 || defaultOnServices.length > 0) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.liff.servicesSectionTitle}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {pickableServices.length > 0 && (
+        <div className="space-y-3 rounded-2xl border bg-card p-4">
+          <p className="text-sm font-semibold">{t.liff.servicesSectionTitle}</p>
+          {pickableServices.length > 0 && (
+            <div className="grid gap-2">
+              {pickableServices.map((s) => {
+                const active = serviceIds.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleService(s.id)}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border p-3 text-left text-sm transition-colors",
+                      active ? "border-primary bg-accent/40" : "hover:bg-muted"
+                    )}
+                  >
+                    <span className={cn(active && "font-medium")}>{s.name}</span>
+                    <span className="text-muted-foreground">{formatBaht(s.price)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {defaultOnServices.length > 0 && (
+            <div>
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                {t.liff.defaultServicesTitle}
+              </div>
               <div className="grid gap-2">
-                {pickableServices.map((s) => {
+                {defaultOnServices.map((s) => {
                   const active = serviceIds.has(s.id);
                   return (
                     <button
@@ -757,8 +1078,8 @@ function BookingBody() {
                       type="button"
                       onClick={() => toggleService(s.id)}
                       className={cn(
-                        "flex items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors",
-                        active ? "border-primary bg-primary/10" : "hover:bg-accent"
+                        "flex items-center justify-between rounded-xl border p-3 text-left text-sm transition-colors",
+                        active ? "border-primary bg-accent/40" : "hover:bg-muted"
                       )}
                     >
                       <span className={cn(active && "font-medium")}>{s.name}</span>
@@ -767,45 +1088,19 @@ function BookingBody() {
                   );
                 })}
               </div>
-            )}
-            {defaultOnServices.length > 0 && (
-              <div>
-                <div className="mb-2 text-xs font-medium text-muted-foreground">
-                  {t.liff.defaultServicesTitle}
-                </div>
-                <div className="grid gap-2">
-                  {defaultOnServices.map((s) => {
-                    const active = serviceIds.has(s.id);
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => toggleService(s.id)}
-                        className={cn(
-                          "flex items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors",
-                          active ? "border-primary bg-primary/10" : "hover:bg-accent"
-                        )}
-                      >
-                        <span className={cn(active && "font-medium")}>{s.name}</span>
-                        <span className="text-muted-foreground">{formatBaht(s.price)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="space-y-1.5">
-        <Label className="text-xs">{t.orders.form.noteLabel}</Label>
-        <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="bg-background" />
+        <Label className="text-xs text-muted-foreground">{t.orders.form.noteLabel}</Label>
+        <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="rounded-xl bg-card" />
       </div>
 
-      {/* สรุป + ปุ่มยืนยัน แปะด้านล่างจอเสมอ */}
-      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-xl border bg-background p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.08)]">
-        <div className="mb-2 flex items-center justify-between text-sm">
+      {/* สรุปยอด + ปุ่มยืนยัน แปะด้านล่างจอเสมอ */}
+      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+        <div className="mb-2 flex items-center justify-between px-1 text-sm">
           <span className="text-muted-foreground">
             {kind === "BATH" && depositAmount > 0 ? t.orders.form.depositLabel : t.orders.form.grandTotal}
           </span>
@@ -813,9 +1108,14 @@ function BookingBody() {
             {formatBaht(kind === "BATH" && depositAmount > 0 ? depositAmount : total)}
           </span>
         </div>
-        <Button className="w-full" size="lg" onClick={submit} disabled={isPending || !canSubmit}>
-          {isPending ? <Loader2 className="animate-spin" /> : <ClipboardCheck />}
-          {t.liff.confirmBookingButton}
+        <Button
+          className="h-14 w-full rounded-2xl text-base"
+          onClick={submit}
+          disabled={isPending || !canSubmit}
+        >
+          {isPending ? <Loader2 className="animate-spin" /> : null}
+          {kind !== "BOARDING" && time ? t.liff.confirmWithTime(time) : t.liff.confirmBookingButton}
+          {!isPending && <ArrowRight />}
         </Button>
       </div>
     </div>
