@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -371,9 +371,8 @@ function TimeSlotGroups({
                 <g.icon className="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span className="font-medium">{g.label}</span>
                 <span className="text-muted-foreground">{groupRangeLabel(g.slots)}</span>
-                <span className={cn("ml-auto", hasOpen ? "text-primary" : "text-muted-foreground")}>
-                  {hasOpen ? t.liff.slotGroupOpen : t.liff.slotGroupFull}
-                </span>
+                {/* บอกเฉพาะตอนเต็มทั้งช่วง — ตอนว่างไม่ต้องบอก เพราะปุ่มที่กดได้ก็บอกอยู่แล้ว */}
+                {!hasOpen && <span className="ml-auto text-muted-foreground">{t.liff.slotGroupFull}</span>}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {g.slots.map((s) => {
@@ -408,18 +407,51 @@ function TimeSlotGroups({
 
 /* ---------- ส่วนหัวของแต่ละขั้น ---------- */
 
-function StepDots({ step }: { step: 1 | 2 | 3 }) {
+/** แถบบอกขั้นตอน — วงกลมต่อกันด้วยเส้นประ ขั้นที่ผ่านแล้วขึ้นเครื่องหมายถูก ขั้นปัจจุบันเป็นวงทึบ
+ * ใช้ชุดเดียวกันทั้งสามหน้า ลูกค้าจะได้รู้ตลอดว่าอยู่ตรงไหนและเหลืออีกกี่ขั้น */
+function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["t"] }) {
+  const labels = [t.liff.stepChooseService, t.liff.stepBookQueue, t.liff.stepAwaitReview];
   return (
-    <div className="flex items-center gap-1.5">
-      {[1, 2, 3].map((n) => (
-        <span
-          key={n}
-          className={cn(
-            "h-1.5 rounded-full transition-all",
-            n === step ? "w-5 bg-primary" : n < step ? "w-1.5 bg-primary" : "w-1.5 bg-border"
-          )}
-        />
-      ))}
+    <div className="flex items-start">
+      {labels.map((label, i) => {
+        const n = i + 1;
+        const passed = n < step;
+        const current = n === step;
+        return (
+          <Fragment key={label}>
+            <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+              <span
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors",
+                  passed || current ? "border-primary bg-primary" : "border-border bg-card"
+                )}
+              >
+                {passed ? (
+                  <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />
+                ) : current ? (
+                  <span className="h-2 w-2 rounded-full bg-primary-foreground" />
+                ) : null}
+              </span>
+              <span
+                className={cn(
+                  "text-center text-[10px] leading-tight",
+                  passed || current ? "font-medium text-primary" : "text-muted-foreground"
+                )}
+              >
+                {label}
+              </span>
+            </div>
+            {i < labels.length - 1 && (
+              <div
+                className={cn(
+                  "mt-3 flex-1 border-t-2 border-dashed",
+                  passed ? "border-primary" : "border-border"
+                )}
+              />
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -447,6 +479,8 @@ function BookingBody() {
 
   const [kind, setKind] = useState<Kind>("BATH");
   const [services, setServices] = useState<Service[]>([]);
+  // นับรอบการโหลดรายการบริการ — ใช้เป็นสัญญาณว่า "ต้องติ๊กบริการฟรีใหม่" (ดูบล็อกด้านล่าง)
+  const [servicesVersion, setServicesVersion] = useState(0);
   const [serviceIds, setServiceIds] = useState<Set<string>>(new Set());
 
   const [date, setDate] = useState(todayStr());
@@ -503,6 +537,7 @@ function BookingBody() {
       getBookableServices(kind).then((list) => {
         setServices(list);
         setServiceIds(new Set());
+        setServicesVersion((v) => v + 1);
       });
     }, 0);
     return () => clearTimeout(timeoutId);
@@ -522,16 +557,22 @@ function BookingBody() {
     [speciesFilteredServices]
   );
 
-  // จองอาบน้ำ: ติ๊กรายการที่รวมอยู่แล้ว (ไถเท้า/ไถท้อง ฯลฯ) ให้อัตโนมัติตามชนิดสัตว์ — ถอนออกเองได้
+  // ติ๊ก "บริการฟรี" (รายการที่รวมอยู่ในราคาแล้ว) ให้อัตโนมัติทุกประเภทการจอง — ลูกค้าถอนออกเองได้
+  // ผูกกับ servicesVersion ด้วย เพื่อให้ติ๊กใหม่ทุกครั้งที่รายการโหลดมาใหม่ ไม่ใช่แค่ครั้งแรก
+  // (ไม่งั้นถอยกลับไปเปลี่ยนบริการแล้ววนกลับมาอันเดิม รายการที่เพิ่งถูกล้างจะไม่ถูกติ๊กคืน)
   // ปรับ state ระหว่าง render โดยตรง (ไม่ใช้ useEffect) เพื่อเลี่ยง cascading render ตาม React docs
   // "You Might Not Need an Effect" — เทียบค่าล่าสุดที่เคย apply ไปแล้วก่อนค่อยตัดสินใจ setState
-  const defaultOnKey = kind === "BATH" ? defaultOnServices.map((s) => s.id).join(",") : "";
+  const defaultOnKey = `${servicesVersion}|${defaultOnServices.map((s) => s.id).join(",")}`;
   const [appliedDefaultOnKey, setAppliedDefaultOnKey] = useState("");
-  if (defaultOnKey && defaultOnKey !== appliedDefaultOnKey) {
+  if (services.length > 0 && defaultOnKey !== appliedDefaultOnKey) {
     setAppliedDefaultOnKey(defaultOnKey);
+    // ถอนบริการฟรีของชนิดสัตว์เดิมออกก่อนเสมอ ไม่งั้นสลับหมา↔แมวแล้วจะเหลือรายการของอีกชนิดค้างไว้
+    // แล้วโดนคิดเงินจริงตอนเซิร์ฟเวอร์คำนวณราคาซ้ำ
+    const everyDefaultId = new Set(services.filter((s) => s.defaultOn).map((s) => s.id));
+    const wantedIds = defaultOnServices.map((s) => s.id);
     setServiceIds((prev) => {
-      const next = new Set(prev);
-      for (const id of defaultOnKey.split(",")) next.add(id);
+      const next = new Set([...prev].filter((id) => !everyDefaultId.has(id)));
+      for (const id of wantedIds) next.add(id);
       return next;
     });
   }
@@ -726,9 +767,7 @@ function BookingBody() {
   if (step === 3 && done) {
     return (
       <div className="space-y-6 py-4">
-        <div className="flex justify-end">
-          <StepDots step={3} />
-        </div>
+        <Stepper step={3} t={t} />
 
         <div className="flex flex-col items-center gap-4 pt-6 text-center">
           <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/40">
@@ -792,7 +831,13 @@ function BookingBody() {
     return (
       <div className="space-y-5 pb-28">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="h-9 w-auto" />
+        <img
+          src="/images/logo-light.png"
+          alt={t.liff.bookPageTitle}
+          className="mx-auto h-20 w-auto"
+        />
+
+        <Stepper step={1} t={t} />
 
         {pets.length > 1 && (
           <div className="space-y-2">
@@ -882,16 +927,18 @@ function BookingBody() {
   /* ---------- ขั้นที่ 2: เลือกวันและเวลา ---------- */
   return (
     <div className="space-y-4 pb-28">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start gap-3">
         <button
           type="button"
           onClick={() => setStep(1)}
           aria-label={t.liff.backButton}
-          className="flex h-10 w-10 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <StepDots step={2} />
+        <div className="min-w-0 flex-1">
+          <Stepper step={2} t={t} />
+        </div>
       </div>
 
       {/* บริการที่เลือกไว้ + ปุ่มย้อนไปเปลี่ยน */}

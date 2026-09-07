@@ -333,6 +333,11 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
     if (payment.status === "VERIFIED") {
       return { ok: false as const, error: "ชำระเงินนี้ยืนยันไปแล้ว" };
     }
+    // ยังไม่ยืนยันคิว = ลูกค้ายังเปิดหน้าชำระเงินไม่ได้ ยังไงก็ยังไม่มีเงินเข้ามาให้ยืนยัน
+    // (ฝั่ง UI ซ่อนปุ่มไว้แล้ว ด่านนี้กันกรณีหน้าจอค้างอยู่ตั้งแต่ก่อนกดยืนยันคิวแล้วเผลอกด)
+    if (payment.order.status === "PENDING_APPROVAL") {
+      return { ok: false as const, error: "ต้องยืนยันคิวก่อนจึงจะยืนยันการชำระเงินได้" };
+    }
 
     await tx.payment.update({
       where: { id: paymentId },

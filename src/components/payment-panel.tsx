@@ -259,6 +259,10 @@ function ActivePaymentPanel({
   }, [payment.qrPayload]);
 
   const isCancelled = orderStatus === "CANCELLED";
+  // รอเช็คคิว = ลูกค้ายังเปิดหน้าชำระเงินไม่ได้เลย (liffSubmitPaymentSlip ปฏิเสธไว้) จึงยังไม่มีเงิน
+  // เข้ามาให้ตรวจ — ซ่อน QR / ขอ QR ใหม่ / ปุ่มยืนยันการชำระเงิน แล้วบอกให้ไปกดยืนยันคิวก่อนแทน
+  // ไม่งั้นพนักงานจะเผลอกด "ยืนยัน" ทั้งที่ยังไม่ได้รับเงินจริง แล้วออเดอร์จะกลายเป็นจ่ายครบทันที
+  const awaitingApproval = orderStatus === "PENDING_APPROVAL";
   const isExpired =
     isCancelled === false &&
     payment.status !== "SUBMITTED" &&
@@ -300,9 +304,20 @@ function ActivePaymentPanel({
         </div>
       )}
 
+      {awaitingApproval && (
+        <div className="space-y-1 rounded-lg border border-violet-300 bg-violet-50 p-3 text-center dark:border-violet-900 dark:bg-violet-950/40">
+          <p className="text-sm font-medium text-violet-800 dark:text-violet-300">
+            {t.orders.payment.awaitingQueueTitle}
+          </p>
+          <p className="text-xs leading-snug text-violet-700/80 dark:text-violet-400/80">
+            {t.orders.payment.awaitingQueueHint}
+          </p>
+        </div>
+      )}
+
       {/* QR แบบ Thai QR Payment / PromptPay — ลูกค้าแนบสลิปมาแล้ว (SUBMITTED) ไม่ต้องโชว์อีก
           เพราะรอพนักงานตรวจสลิปด้านล่างแทน ไม่ใช่รอให้จ่ายเพิ่ม */}
-      {payment.status !== "SUBMITTED" && (
+      {payment.status !== "SUBMITTED" && !awaitingApproval && (
         <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
           <div className="overflow-hidden rounded-3xl bg-white">
             <div className="flex items-center justify-center gap-2.5 bg-[#0b2f6b] px-6 py-3 text-white">
@@ -374,7 +389,7 @@ function ActivePaymentPanel({
       )}
 
       {/* Countdown */}
-      {!isUnusable && payment.expiresAt && payment.status !== "SUBMITTED" && (
+      {!isUnusable && !awaitingApproval && payment.expiresAt && payment.status !== "SUBMITTED" && (
         <div className="flex items-center justify-center gap-1.5 text-sm">
           <Clock className="h-4 w-4 text-amber-600" />
           <span className="text-muted-foreground">{t.orders.payment.timeRemaining}</span>
@@ -384,7 +399,7 @@ function ActivePaymentPanel({
         </div>
       )}
 
-      {!isCancelled && payment.status !== "SUBMITTED" && (
+      {!isCancelled && !awaitingApproval && payment.status !== "SUBMITTED" && (
         <Button
           variant="outline"
           className="w-full"
@@ -417,7 +432,7 @@ function ActivePaymentPanel({
       )}
 
       {/* Admin actions — แสดงได้ตราบใดที่มี payment ค้างอยู่และออเดอร์ยังไม่ถูกยกเลิก (แม้งานจะเสร็จ/เช็คเอาท์ไปแล้วก็ยืนยันยอดคงเหลือย้อนหลังได้) */}
-      {orderStatus !== "CANCELLED" && (
+      {orderStatus !== "CANCELLED" && !awaitingApproval && (
         <div className="space-y-2 border-t pt-3">
           <div className="text-xs font-medium text-muted-foreground">
             {t.orders.payment.adminVerification}
