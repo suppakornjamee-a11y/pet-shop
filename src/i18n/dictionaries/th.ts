@@ -713,7 +713,7 @@ const th = {
     confirmBookingTitle: "ยืนยันการจองคิวนี้?",
     cancelBookingButton: "ยกเลิกการจองคิว",
     confirmCancelBookingTitle: "ยกเลิกการจองคิวนี้?",
-    confirmCancelBookingDescription: "คำขอจองจะถูกยกเลิก ถ้าต้องการจองใหม่ต้องเลือกวันและเวลาอีกครั้ง",
+    selectedItemsLabel: "รายการที่เลือก",
     summaryDateLabel: "วันที่",
     summaryTimeLabel: "เวลา",
     summaryCheckOutLabel: "เช็คเอาท์",

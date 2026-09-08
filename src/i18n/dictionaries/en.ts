@@ -699,7 +699,7 @@ const en: Dictionary = {
     confirmBookingTitle: "Send this booking request?",
     cancelBookingButton: "Cancel this booking",
     confirmCancelBookingTitle: "Cancel this booking?",
-    confirmCancelBookingDescription: "The request will be withdrawn. Booking again means picking a date and time from the start.",
+    selectedItemsLabel: "Selected",
     summaryDateLabel: "Date",
     summaryTimeLabel: "Time",
     summaryCheckOutLabel: "Check out",

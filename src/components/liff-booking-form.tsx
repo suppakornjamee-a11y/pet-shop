@@ -77,6 +77,8 @@ type BookingDone = {
   kind: Kind;
   serviceLabel: string;
   petName: string;
+  /** ชื่อรายการที่ลูกค้าเลือกไว้ (ห้องพัก + บริการที่ติ๊ก) — โชว์ตัวเล็กในหน้าสรุป */
+  items: string[];
   total: number;
   date: string;
   time: string;
@@ -752,6 +754,14 @@ function BookingBody() {
   const canSubmit =
     !!petId && total > 0 && (kind === "BOARDING" ? !!roomId && roomAvailable === true : !!time);
 
+  /** ชื่อรายการที่เลือกไว้ตอนนี้ เรียงตามที่ลูกค้าเห็นในฟอร์ม — ห้องพักก่อน แล้วค่อยบริการที่ติ๊ก */
+  const selectedItemNames = [
+    ...(kind === "BOARDING" && selectedRoom
+      ? [`${selectedRoom.category.name} · ${selectedRoom.name}`]
+      : []),
+    ...speciesFilteredServices.filter((s) => serviceIds.has(s.id)).map((s) => s.name),
+  ];
+
   async function submit() {
     if (!idToken || !petId) return;
     // ถามยืนยันก่อนส่งจริง — กดแล้วออเดอร์ถูกสร้างในระบบทันทีและแก้ไขเองต่อไม่ได้
@@ -801,6 +811,7 @@ function BookingBody() {
         kind,
         serviceLabel: kindLabel,
         petName: selectedPet?.name ?? "",
+        items: selectedItemNames,
         total,
         date: kind === "BOARDING" ? checkInDate : date,
         time: kind === "BOARDING" ? checkInTime : time,
@@ -813,10 +824,10 @@ function BookingBody() {
   /** ยกเลิกคำขอจองที่เพิ่งส่งไป แล้วพากลับไปเริ่มใหม่ที่ขั้นแรก */
   async function cancelBooking() {
     if (!idToken || !done) return;
+    // เหลือแค่สองปุ่มเหมือนกล่องยืนยันการจอง (srTitle ไว้ให้ screen reader อ่าน)
     const ok = await confirm({
-      title: t.liff.confirmCancelBookingTitle,
-      description: t.liff.confirmCancelBookingDescription,
       confirmLabel: t.liff.cancelBookingButton,
+      srTitle: t.liff.confirmCancelBookingTitle,
       tone: "danger",
     });
     if (!ok) return;
@@ -883,6 +894,15 @@ function BookingBody() {
           </div>
 
           <div className="my-4 border-t border-dashed" />
+
+          {/* รายการที่เลือกไว้ ตัวเล็กเหนือบรรทัดวันที่/เวลา — ลูกค้าจะได้เห็นว่าจองอะไรไปบ้าง
+              ไม่ใช่แค่ชื่อประเภทบริการรวมๆ ด้านบน */}
+          {done.items.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[11px] text-muted-foreground">{t.liff.selectedItemsLabel}</div>
+              <div className="mt-0.5 text-xs leading-relaxed">{done.items.join(" · ")}</div>
+            </div>
+          )}
 
           <dl className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between gap-3">
