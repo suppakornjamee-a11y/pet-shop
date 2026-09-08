@@ -697,7 +697,6 @@ const en: Dictionary = {
     confirmWithTime: (time: string) => `Confirm · ${time}`,
     checkingQueueTitle: "Checking your slot",
     confirmBookingTitle: "Send this booking request?",
-    confirmBookingDescription: "The shop will check the slot. You will not be able to edit it after this.",
     cancelBookingButton: "Cancel this booking",
     confirmCancelBookingTitle: "Cancel this booking?",
     confirmCancelBookingDescription: "The request will be withdrawn. Booking again means picking a date and time from the start.",

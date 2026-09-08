@@ -711,7 +711,6 @@ const th = {
     confirmWithTime: (time: string) => `ยืนยัน · ${time} น.`,
     checkingQueueTitle: "กำลังเช็คคิวให้ค่ะ",
     confirmBookingTitle: "ยืนยันการจองคิวนี้?",
-    confirmBookingDescription: "ส่งคำขอจองให้ร้านตรวจสอบคิว หลังจากนี้จะแก้ไขเองไม่ได้",
     cancelBookingButton: "ยกเลิกการจองคิว",
     confirmCancelBookingTitle: "ยกเลิกการจองคิวนี้?",
     confirmCancelBookingDescription: "คำขอจองจะถูกยกเลิก ถ้าต้องการจองใหม่ต้องเลือกวันและเวลาอีกครั้ง",

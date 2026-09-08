@@ -755,10 +755,10 @@ function BookingBody() {
   async function submit() {
     if (!idToken || !petId) return;
     // ถามยืนยันก่อนส่งจริง — กดแล้วออเดอร์ถูกสร้างในระบบทันทีและแก้ไขเองต่อไม่ได้
+    // กล่องนี้เอาข้อความออกหมดตามที่ร้านสั่ง เหลือแค่สองปุ่ม (srTitle ไว้ให้ screen reader อ่าน)
     const ok = await confirm({
-      title: t.liff.confirmBookingTitle,
-      description: t.liff.confirmBookingDescription,
       confirmLabel: t.liff.confirmBookingButton,
+      srTitle: t.liff.confirmBookingTitle,
     });
     if (!ok) return;
 
