@@ -409,6 +409,33 @@ function TimeSlotGroups({
 
 /** แถบบอกขั้นตอน — วงกลมต่อกันด้วยเส้นประ ขั้นที่ผ่านแล้วขึ้นเครื่องหมายถูก ขั้นปัจจุบันเป็นวงทึบ
  * ใช้ชุดเดียวกันทั้งสามหน้า ลูกค้าจะได้รู้ตลอดว่าอยู่ตรงไหนและเหลืออีกกี่ขั้น */
+const STEP_ICONS = [
+  "/images/icons/step-service.png",
+  "/images/icons/step-booking.png",
+  "/images/icons/step-review.png",
+];
+
+/** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
+ * ทำให้ไอคอนเปลี่ยนสีตามสถานะของขั้นตอนได้ (ขาวบนพื้นชมพู / ชมพู / เทาจาง) โดยใช้ไฟล์เดียว */
+function StepIcon({ src, className }: { src: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("bg-current", className)}
+      style={{
+        maskImage: `url(${src})`,
+        WebkitMaskImage: `url(${src})`,
+        maskSize: "contain",
+        WebkitMaskSize: "contain",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
+
 function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["t"] }) {
   const labels = [t.liff.stepChooseService, t.liff.stepBookQueue, t.liff.stepAwaitReview];
   return (
@@ -422,15 +449,15 @@ function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["
             <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
               <span
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors",
-                  passed || current ? "border-primary bg-primary" : "border-border bg-card"
+                  "flex h-11 w-11 items-center justify-center rounded-full border-2 transition-colors",
+                  passed && "border-primary bg-primary text-primary-foreground",
+                  // ขั้นที่กำลังทำอยู่เป็นพื้นอ่อน ไม่ใช่พื้นทึบ — ลายเส้นในไอคอนจะได้ยังอ่านออก
+                  // ในขั้นที่ลูกค้ากำลังมองอยู่จริงๆ
+                  current && "border-primary bg-accent/40 text-primary",
+                  !passed && !current && "border-border bg-card text-muted-foreground/40"
                 )}
               >
-                {passed ? (
-                  <Check className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={3} />
-                ) : current ? (
-                  <span className="h-2 w-2 rounded-full bg-primary-foreground" />
-                ) : null}
+                <StepIcon src={STEP_ICONS[i]} className="h-6 w-6" />
               </span>
               <span
                 className={cn(
@@ -444,7 +471,7 @@ function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["
             {i < labels.length - 1 && (
               <div
                 className={cn(
-                  "mt-3 flex-1 border-t-2 border-dashed",
+                  "mt-5 flex-1 border-t-2 border-dashed",
                   passed ? "border-primary" : "border-border"
                 )}
               />
