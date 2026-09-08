@@ -2,8 +2,11 @@
 
 // ไฟล์นี้เรียกได้โดยไม่ต้องล็อกอิน (เข้าถึงผ่าน LINE LIFF mini-app เท่านั้น) — ห้าม import
 // requireUser/requireStaffUser มาใช้ที่นี่ ทุกฟังก์ชันต้องยืนยันตัวตนด้วย verifyLiffIdToken() ก่อนเสมอ
-// และห้ามเพิ่มฟังก์ชันแก้ไข/ยืนยัน/ปฏิเสธ/เปลี่ยนสถานะออเดอร์-การชำระเงินที่มีอยู่แล้ว
-// — ไฟล์นี้ทำได้แค่ "สร้างใหม่" เท่านั้น ตามขอบเขต v1 (ดูแผนงาน lexical-coalescing-crystal.md)
+//
+// ขอบเขตที่ลูกค้าทำเองได้: "สร้างการจองใหม่" และ "ยกเลิกการจองของตัวเองที่ยังไม่ผ่านการเช็คคิว"
+// เท่านั้น (เดิม v1 อนุญาตแค่สร้างใหม่ — เปิดให้ยกเลิกเพิ่มตามที่ร้านสั่ง) ห้ามเพิ่มฟังก์ชัน
+// ยืนยัน/ปฏิเสธการชำระเงิน หรือเปลี่ยนสถานะออเดอร์เป็นอย่างอื่นเด็ดขาด — ของพวกนั้นอยู่ใน
+// actions/orders.ts ที่บังคับล็อกอินพนักงานเท่านั้น (ดูแผนงาน lexical-coalescing-crystal.md)
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -581,4 +584,46 @@ export async function liffSubmitPaymentSlip(
   });
   revalidatePath(`/orders/${payment.order.id}`);
   return { ok: true, message: "ส่งสลิปเรียบร้อย รอร้านตรวจสอบ" };
+}
+
+/**
+ * ลูกค้ายกเลิกการจองของตัวเอง — ทำได้เฉพาะตอนที่ยังเป็น "รอเช็คคิว" เท่านั้น
+ *
+ * จงใจไม่ให้ยกเลิกหลังพนักงานยืนยันคิวแล้ว เพราะจากจุดนั้นไปมีทั้งเงินมัดจำและคิวที่ร้านกันไว้
+ * ให้แล้ว ต้องคุยกับร้านเป็นรายกรณี (กฎการคืนเงิน/แจ้งล่วงหน้ายังไม่มีในระบบ) — ปล่อยให้กดเองไม่ได้
+ */
+export async function liffCancelOrder(idToken: string, orderId: string): Promise<ActionResult> {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, code: true, status: true, customer: { select: { lineUserId: true } } },
+  });
+  // ตอบข้อความเดียวกันทั้งกรณีไม่มีออเดอร์และกรณีเป็นของคนอื่น จะได้ไม่กลายเป็นเครื่องมือเดาว่า
+  // เลขออเดอร์ไหนมีอยู่จริงบ้าง
+  if (!order || order.customer?.lineUserId !== identity.userId) {
+    return { ok: false, error: "ไม่พบการจองนี้" };
+  }
+  if (order.status === "CANCELLED") {
+    return { ok: false, error: "การจองนี้ถูกยกเลิกไปแล้ว" };
+  }
+  if (order.status !== "PENDING_APPROVAL") {
+    return { ok: false, error: "การจองนี้ผ่านการเช็คคิวแล้ว กรุณาติดต่อร้านเพื่อยกเลิก" };
+  }
+
+  await prisma.$transaction([
+    prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } }),
+    prisma.orderActivityLog.create({
+      data: { orderId, action: "ลูกค้ายกเลิกการจองเองผ่าน LINE" },
+    }),
+  ]);
+
+  // ล้างหน้าฝั่งพนักงานให้ตรงกับความจริงทันที รวมถึงกระดิ่งแจ้งเตือนที่นับคิวรอยืนยันอยู่
+  for (const p of ["/orders/" + orderId, "/orders/bath", "/orders/other", "/boarding", "/calendar", "/calendar-other", "/"]) {
+    revalidatePath(p);
+  }
+  return { ok: true, message: "ยกเลิกการจองเรียบร้อย" };
 }

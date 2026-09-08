@@ -17,6 +17,7 @@ import {
   Sunrise,
   Sun,
   Sunset,
+  XCircle,
 } from "lucide-react";
 import {
   liffBootstrap,
@@ -25,6 +26,7 @@ import {
   checkRoomAvailability,
   getOpenSlots,
   liffCreateOrder,
+  liffCancelOrder,
 } from "@/app/actions/liff";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { toThaiDateStr, addDaysThai, daysBetween, thaiDayRange } from "@/lib/slots";
@@ -32,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { SpeciesIcon } from "@/components/species-icon";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -70,6 +73,7 @@ type Kind = "BATH" | "OTHER" | "BOARDING";
 /** สรุปการจองที่สร้างสำเร็จแล้ว — เก็บจาก state ฝั่งนี้ตอนกดยืนยัน ไม่ต้องยิงถามเซิร์ฟเวอร์ซ้ำ
  * เพราะทุกค่าที่หน้าสรุปต้องใช้ ผู้ใช้เพิ่งกรอกเองมาทั้งหมด */
 type BookingDone = {
+  orderId: string;
   kind: Kind;
   serviceLabel: string;
   petName: string;
@@ -436,29 +440,50 @@ function StepIcon({ src, className }: { src: string; className?: string }) {
   );
 }
 
-function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["t"] }) {
+/**
+ * แถบบอกขั้นตอน — ไอคอนเปล่าๆ ไม่มีวงกลมครอบ ทุกอันขนาดเท่ากัน (ไฟล์ PNG ถูก trim + ใส่ขอบ
+ * ให้เนื้อไอคอนกินพื้นที่เท่ากันทุกใบแล้ว จึงดูสมดุลกันจริงแม้รูปทรงจะต่างกัน)
+ *
+ * onJump มีเฉพาะตอนที่ยังแก้ไขการจองได้ — กดย้อนไปขั้นก่อนหน้าได้ แต่กดข้ามไปข้างหน้าไม่ได้
+ * และพอส่งคำขอจองไปแล้ว (ขั้น 3) จะกดไม่ได้ทั้งแถบ เพราะออเดอร์ถูกสร้างในระบบไปแล้ว
+ * ย้อนกลับไปแก้แล้วกดยืนยันซ้ำจะกลายเป็นจองซ้ำสองใบ
+ */
+function Stepper({
+  step,
+  t,
+  onJump,
+}: {
+  step: 1 | 2 | 3;
+  t: ReturnType<typeof useI18n>["t"];
+  onJump?: (step: 1 | 2 | 3) => void;
+}) {
   const labels = [t.liff.stepChooseService, t.liff.stepBookQueue, t.liff.stepAwaitReview];
   return (
     <div className="flex items-start">
       {labels.map((label, i) => {
-        const n = i + 1;
+        const n = (i + 1) as 1 | 2 | 3;
         const passed = n < step;
         const current = n === step;
+        const canJump = !!onJump && passed;
         return (
           <Fragment key={label}>
-            <div className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-              <span
+            <button
+              type="button"
+              disabled={!canJump}
+              onClick={canJump ? () => onJump(n) : undefined}
+              className={cn(
+                "flex w-16 shrink-0 flex-col items-center gap-1.5 rounded-xl py-1 transition-colors",
+                canJump && "cursor-pointer hover:bg-accent/30",
+                !canJump && "cursor-default"
+              )}
+            >
+              <StepIcon
+                src={STEP_ICONS[i]}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full border-2 transition-colors",
-                  passed && "border-primary bg-primary text-primary-foreground",
-                  // ขั้นที่กำลังทำอยู่เป็นพื้นอ่อน ไม่ใช่พื้นทึบ — ลายเส้นในไอคอนจะได้ยังอ่านออก
-                  // ในขั้นที่ลูกค้ากำลังมองอยู่จริงๆ
-                  current && "border-primary bg-accent/40 text-primary",
-                  !passed && !current && "border-border bg-card text-muted-foreground/40"
+                  "h-10 w-10 transition-colors",
+                  passed || current ? "text-primary" : "text-muted-foreground/35"
                 )}
-              >
-                <StepIcon src={STEP_ICONS[i]} className="h-6 w-6" />
-              </span>
+              />
               <span
                 className={cn(
                   "text-center text-[10px] leading-tight",
@@ -467,11 +492,11 @@ function Stepper({ step, t }: { step: 1 | 2 | 3; t: ReturnType<typeof useI18n>["
               >
                 {label}
               </span>
-            </div>
+            </button>
             {i < labels.length - 1 && (
               <div
                 className={cn(
-                  "mt-5 flex-1 border-t-2 border-dashed",
+                  "mt-6 flex-1 border-t-2 border-dashed",
                   passed ? "border-primary" : "border-border"
                 )}
               />
@@ -495,6 +520,7 @@ function BookingBody() {
   const { t } = useI18n();
   const router = useRouter();
   const { idToken } = useLiff();
+  const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -726,8 +752,16 @@ function BookingBody() {
   const canSubmit =
     !!petId && total > 0 && (kind === "BOARDING" ? !!roomId && roomAvailable === true : !!time);
 
-  function submit() {
+  async function submit() {
     if (!idToken || !petId) return;
+    // ถามยืนยันก่อนส่งจริง — กดแล้วออเดอร์ถูกสร้างในระบบทันทีและแก้ไขเองต่อไม่ได้
+    const ok = await confirm({
+      title: t.liff.confirmBookingTitle,
+      description: t.liff.confirmBookingDescription,
+      confirmLabel: t.liff.confirmBookingButton,
+    });
+    if (!ok) return;
+
     const payload =
       kind === "BOARDING"
         ? {
@@ -761,6 +795,9 @@ function BookingBody() {
         return;
       }
       setDone({
+        // ไม่มี id กลับมาแปลว่าเราไม่รู้ว่าจะยกเลิกออเดอร์ไหน — ปุ่มยกเลิกจะซ่อนไปเอง
+        // (ดีกว่าโชว์ปุ่มที่กดแล้วพัง) ส่วนตัวการจองสร้างสำเร็จแล้วจึงยังพาไปหน้าสรุปตามปกติ
+        orderId: res.id ?? "",
         kind,
         serviceLabel: kindLabel,
         petName: selectedPet?.name ?? "",
@@ -770,6 +807,31 @@ function BookingBody() {
         checkOutDate: kind === "BOARDING" ? checkOutDate : null,
       });
       setStep(3);
+    });
+  }
+
+  /** ยกเลิกคำขอจองที่เพิ่งส่งไป แล้วพากลับไปเริ่มใหม่ที่ขั้นแรก */
+  async function cancelBooking() {
+    if (!idToken || !done) return;
+    const ok = await confirm({
+      title: t.liff.confirmCancelBookingTitle,
+      description: t.liff.confirmCancelBookingDescription,
+      confirmLabel: t.liff.cancelBookingButton,
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    startTransition(async () => {
+      const res = await liffCancelOrder(idToken, done.orderId);
+      if (!res.ok) {
+        handleLiffAuthExpiry(res);
+        toast.error(res.error);
+        return;
+      }
+      toast.success(res.message);
+      setDone(null);
+      setTime("");
+      setStep(1);
     });
   }
 
@@ -796,13 +858,13 @@ function BookingBody() {
       <div className="space-y-6 py-4">
         <Stepper step={3} t={t} />
 
-        <div className="flex flex-col items-center gap-4 pt-6 text-center">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/40">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary">
-              <Check className="h-8 w-8 text-primary-foreground" strokeWidth={3} />
+        <div className="flex flex-col items-center gap-3 pt-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/40">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary">
+              <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">{t.liff.bookingDoneTitle}</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t.liff.checkingQueueTitle}</h1>
         </div>
 
         <div className="rounded-2xl border bg-card p-4">
@@ -841,14 +903,22 @@ function BookingBody() {
                 {done.time} {t.liff.timeUnitSuffix}
               </dd>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liff.summaryStatusLabel}</dt>
-              {/* ยังไม่มีเลขที่การจองให้ลูกค้าดูในขั้นนี้ — ออเดอร์ยังรอพนักงานเช็คคิวก่อน
-                  ถ้าคิวว่างจริง ระบบจะส่งเลขที่การจอง + ลิงก์ชำระเงินตามไปทาง LINE ให้เอง */}
-              <dd className="text-right font-medium text-primary">{t.liff.awaitingQueueConfirm}</dd>
-            </div>
           </dl>
         </div>
+
+        {/* ยกเลิกเองได้เฉพาะตอนนี้ — พอพนักงานเช็คคิวผ่านแล้วจะมีเรื่องมัดจำกับคิวที่กันไว้ให้
+            เข้ามาเกี่ยว ต้องคุยกับร้านเป็นรายกรณี ปุ่มนี้เลยหายไปเองเมื่อออเดอร์เดินหน้าต่อ */}
+        {done.orderId && (
+          <Button
+            variant="outline"
+            className="h-12 w-full rounded-2xl text-destructive"
+            disabled={isPending}
+            onClick={cancelBooking}
+          >
+            {isPending ? <Loader2 className="animate-spin" /> : <XCircle />}
+            {t.liff.cancelBookingButton}
+          </Button>
+        )}
       </div>
     );
   }
@@ -864,7 +934,7 @@ function BookingBody() {
           className="mx-auto h-20 w-auto"
         />
 
-        <Stepper step={1} t={t} />
+        <Stepper step={1} t={t} onJump={setStep} />
 
         {pets.length > 1 && (
           <div className="space-y-2">
@@ -964,7 +1034,7 @@ function BookingBody() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <Stepper step={2} t={t} />
+          <Stepper step={2} t={t} onJump={setStep} />
         </div>
       </div>
 
