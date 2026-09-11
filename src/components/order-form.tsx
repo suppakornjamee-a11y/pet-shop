@@ -16,11 +16,12 @@ import {
   X,
   ClipboardCheck,
   Video,
+  CalendarClock,
 } from "lucide-react";
 import { searchCustomers } from "@/app/actions/customers";
 import { createOrder, updateOrder } from "@/app/actions/orders";
 import { formatBaht } from "@/lib/format";
-import { toThaiDateStr, addDaysThai, daysBetween } from "@/lib/slots";
+import { toThaiDateStr, addDaysThai, daysBetween, todayThaiStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,11 @@ export function OrderForm({
   const isEdit = mode === "edit";
   const isQueueBooking = Boolean(appointmentDate && appointmentTime);
   const isBathQueueBooking = isQueueBooking && queueType === "BATH";
+
+  // วัน/เวลาคิวที่มาจากปฏิทินเป็นแค่ค่าตั้งต้น — พนักงานแก้ในฟอร์มได้เลย ไม่ต้องถอยกลับไปเลือกใหม่
+  // (เซิร์ฟเวอร์เช็คคิวว่างซ้ำให้อยู่แล้วตอนกดยืนยัน จึงปลอดภัยที่จะให้แก้ตรงนี้)
+  const [queueDate, setQueueDate] = useState(appointmentDate ?? "");
+  const [queueTime, setQueueTime] = useState(appointmentTime ?? "");
 
   const [customer, setCustomer] = useState<CustomerWithPets | null>(preselected);
   const [query, setQuery] = useState("");
@@ -335,8 +341,8 @@ export function OrderForm({
       serviceIds: [...serviceIds],
       productLines,
       note,
-      appointmentDate,
-      appointmentTime,
+      appointmentDate: isQueueBooking ? queueDate : appointmentDate,
+      appointmentTime: isQueueBooking ? queueTime : appointmentTime,
       queueType,
     };
 
@@ -363,7 +369,10 @@ export function OrderForm({
   );
 
   const defaultOnServices = useMemo(
-    () => speciesFilteredServices.filter((s) => s.defaultOn),
+    () =>
+      speciesFilteredServices
+        .filter((s) => s.defaultOn)
+        .sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, "th")),
     [speciesFilteredServices]
   );
 
@@ -373,6 +382,11 @@ export function OrderForm({
       if (s.defaultOn) continue;
       const key = s.category === "BATH" && s.group ? s.group : s.category;
       (map[key] ??= []).push(s);
+    }
+    // เรียงรายการในแต่ละหมวดตามราคาจากน้อยไปมาก (ราคาเท่ากันเรียงตามชื่อ) — ลำดับของหมวด
+    // ยังเป็น GROUP_ORDER เหมือนเดิม
+    for (const list of Object.values(map)) {
+      list.sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, "th"));
     }
     return Object.fromEntries(
       GROUP_ORDER.filter((k) => map[k]?.length).map((k) => [k, map[k]])
@@ -390,6 +404,34 @@ export function OrderForm({
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
+        {/* วันและเวลาคิว — แก้ได้ ไม่ใช่แค่โชว์ค่าที่มาจากปฏิทิน */}
+        {isQueueBooking && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarClock className="h-4 w-4" /> {t.orders.form.queueSectionTitle}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-[1fr_auto] gap-2 sm:max-w-sm">
+                <Input
+                  type="date"
+                  className="min-w-0"
+                  value={queueDate}
+                  min={isEdit ? undefined : todayThaiStr()}
+                  onChange={(e) => setQueueDate(e.target.value)}
+                />
+                <Input
+                  type="time"
+                  value={queueTime}
+                  onChange={(e) => setQueueTime(e.target.value)}
+                  className="w-32"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 1. ลูกค้า */}
         <Card className="overflow-visible">
           <CardHeader>
@@ -551,7 +593,7 @@ export function OrderForm({
                         type="time"
                         value={checkInTime}
                         onChange={(e) => setCheckInTime(e.target.value)}
-                        className="w-24"
+                        className="w-32"
                       />
                     </div>
                   </div>
@@ -570,7 +612,7 @@ export function OrderForm({
                         type="time"
                         value={checkOutTime}
                         onChange={(e) => setCheckOutTime(e.target.value)}
-                        className="w-24"
+                        className="w-32"
                       />
                     </div>
                   </div>

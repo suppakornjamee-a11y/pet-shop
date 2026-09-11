@@ -22,7 +22,6 @@ export default async function RoomsSettingsPage() {
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={t.settings.rooms.title}
-        description={t.settings.rooms.description}
       />
 
       <Tabs defaultValue="rooms">

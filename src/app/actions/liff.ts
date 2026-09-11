@@ -509,6 +509,7 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
           status: true,
           qrPayload: true,
           expiresAt: true,
+          rejectReason: true,
           bankAccount: { select: { bankName: true, accountName: true, accountNumber: true } },
         },
       },
@@ -543,6 +544,7 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
       status: p.status,
       qrPayload: p.qrPayload,
       expiresAt: p.expiresAt?.toISOString() ?? null,
+      rejectReason: p.rejectReason,
       bankAccount: p.bankAccount,
     })),
   };
@@ -582,6 +584,7 @@ export async function liffSubmitPaymentSlip(
     where: { id: paymentId },
     data: { slipUrl, status: "SUBMITTED", submittedAt: new Date() },
   });
+
   revalidatePath(`/orders/${payment.order.id}`);
   return { ok: true, message: "ส่งสลิปเรียบร้อย รอร้านตรวจสอบ" };
 }

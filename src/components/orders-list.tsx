@@ -21,7 +21,7 @@ export async function OrdersList({
   status,
   date,
 }: {
-  queueType: "BATH" | "OTHER";
+  queueType: "BATH" | "OTHER" | "BOARDING";
   basePath: string;
   status: string;
   /** วันที่ที่เลือก (YYYY-MM-DD) — ไม่ส่งมา = วันนี้ */
@@ -44,17 +44,23 @@ export async function OrdersList({
   const selectedDate = date && isValidDateStr(date) ? date : todayThaiStr();
   const { start, end } = thaiDayRange(selectedDate);
 
-  const queueWhere =
-    queueType === "BATH"
-      ? { OR: [{ queueType: "BATH" as const }, { queueType: null }] }
-      : { queueType: "OTHER" as const };
+  // โรงแรมแยกด้วยการมีห้องพัก ไม่ใช่พูลคิว (ออเดอร์โรงแรมไม่มี appointmentAt แต่ใช้ checkInAt/checkOutAt)
+  const kindWhere =
+    queueType === "BOARDING"
+      ? { roomId: { not: null } }
+      : {
+          roomId: null,
+          appointmentAt: { not: null },
+          ...(queueType === "BATH"
+            ? { OR: [{ queueType: "BATH" as const }, { queueType: null }] }
+            : { queueType: "OTHER" as const }),
+        };
 
   const orders = await prisma.order.findMany({
     where: {
       orderType: "SERVICE", // กันบิลร้านอาหารหลุดมาปนในลิสต์งานบริการ
-      appointmentAt: { not: null },
       createdAt: { gte: start, lt: end },
-      ...queueWhere,
+      ...kindWhere,
       ...(status !== "all" ? { status: status as OrderStatus } : {}),
     },
     include: {
@@ -68,13 +74,17 @@ export async function OrdersList({
     take: 100,
   });
 
-  const title = queueType === "BATH" ? t.orders.titleBath : t.orders.titleOther;
+  const title =
+    queueType === "BATH"
+      ? t.orders.titleBath
+      : queueType === "OTHER"
+        ? t.orders.titleOther
+        : t.orders.titleBoarding;
 
   return (
     <div>
       <PageHeader
         title={title}
-        description={t.orders.description}
         action={
           <DateFilter
             value={selectedDate}

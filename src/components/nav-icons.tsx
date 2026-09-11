@@ -78,32 +78,10 @@ export function StockFlatIcon({ className }: IconProps) {
   );
 }
 
-/** ไอคอนปฏิทิน — สไตล์ flat สีน้ำตาล/แดงอิฐ (variant: day = คิวเดี่ยว, range = ช่วงหลายวัน) */
-export function CalendarFlatIcon({
-  className,
-  variant = "day",
-}: IconProps & { variant?: "day" | "range" }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <rect x="3" y="5" width="18" height="16" rx="2.5" fill="#E9DDC2" />
-      <path d="M3 7.5C3 6.12 4.12 5 5.5 5H18.5C19.88 5 21 6.12 21 7.5V9.8H3V7.5Z" fill="#D2685F" />
-      <rect x="6.8" y="2.5" width="2" height="4.4" rx="1" fill="#48566B" />
-      <rect x="15.2" y="2.5" width="2" height="4.4" rx="1" fill="#48566B" />
-      {variant === "range" ? (
-        <rect x="6" y="13.2" width="12" height="3.2" rx="1.6" fill="#B98F55" />
-      ) : (
-        <circle cx="12" cy="14.8" r="2.4" fill="#48566B" />
-      )}
-    </svg>
-  );
-}
-
-export function CalendarDayFlatIcon({ className }: IconProps) {
-  return <CalendarFlatIcon className={className} variant="day" />;
-}
-
-export function CalendarRangeFlatIcon({ className }: IconProps) {
-  return <CalendarFlatIcon className={className} variant="range" />;
+/** ไอคอนจองบริการอื่นๆ — ปฏิทินเป้าธนู */
+export function ServiceCalendarImageIcon({ className }: IconProps) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/icons/service-calendar.png" alt="" className={className} />;
 }
 
 /** ไอคอนแดชบอร์ด — จอมอนิเตอร์ + กราฟแท่ง สไตล์ flat สีฟ้า */

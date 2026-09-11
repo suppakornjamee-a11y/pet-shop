@@ -75,6 +75,7 @@ function revalidateOrderViews(orderId: string) {
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
+  revalidatePath("/orders/boarding");
   revalidatePath("/boarding");
   revalidatePath("/calendar");
   revalidatePath("/calendar-other");
@@ -114,6 +115,7 @@ export async function createOrder(input: unknown): Promise<ActionResult> {
 
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
+  revalidatePath("/orders/boarding");
   revalidatePath("/boarding");
   return { ok: true, id: result.id, message: "สร้างออเดอร์เรียบร้อย" };
 }
@@ -185,6 +187,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
+  revalidatePath("/orders/boarding");
   revalidatePath("/boarding");
   return { ok: true, id: orderId, message: "แก้ไขออเดอร์เรียบร้อย สร้าง QR ใหม่แล้ว (15 นาที)" };
 }
@@ -408,6 +411,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
   if (!result.ok) return result;
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
+  revalidatePath("/orders/boarding");
   revalidatePath("/boarding");
 
   if (result.justFullyPaid) {
@@ -448,12 +452,29 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
 
 export async function rejectPayment(paymentId: string, reason: string): Promise<ActionResult> {
   await requireUser();
+  const note = reason || "ยอดไม่ตรง / สลิปไม่ถูกต้อง";
   const payment = await prisma.payment.update({
     where: { id: paymentId },
-    data: { status: "REJECTED", rejectReason: reason || "ยอดไม่ตรง / สลิปไม่ถูกต้อง" },
+    data: { status: "REJECTED", rejectReason: note },
   });
-  revalidatePath(`/orders/${payment.orderId}`);
-  return { ok: true, message: "ปฏิเสธการชำระเงินแล้ว แจ้งลูกค้าให้ส่งสลิปใหม่" };
+
+  // ลูกค้าส่งสลิปแล้วก็ปิดแอปไป ไม่มีทางรู้เองว่าโดนปฏิเสธ — ต้องดันไปบอกทาง LINE
+  // เหมือนทุกจังหวะอื่นของ flow (ยืนยันคิว / ปฏิเสธคิว / ยืนยันเงิน / งานเสร็จ)
+  const link = buildLiffDeepLink(`/pay/${payment.orderId}`);
+  void notifyCustomerLine(
+    payment.orderId,
+    link
+      ? `❌ สลิปไม่ผ่านการตรวจสอบ
+เหตุผล : ${note}
+รบกวนส่งสลิปใหม่อีกครั้ง
+${link}`
+      : `❌ สลิปไม่ผ่านการตรวจสอบ
+เหตุผล : ${note}
+รบกวนส่งสลิปใหม่อีกครั้ง`
+  );
+
+  revalidateOrderViews(payment.orderId);
+  return { ok: true, message: "ปฏิเสธการชำระเงินแล้ว แจ้งลูกค้าทาง LINE ให้ส่งสลิปใหม่" };
 }
 
 const statusSchema = z.enum([
@@ -605,6 +626,7 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
+  revalidatePath("/orders/boarding");
   revalidatePath("/boarding");
 
   if (target === "COMPLETED") {

@@ -29,6 +29,7 @@ type PaymentRow = {
   status: "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED" | "EXPIRED";
   qrPayload: string | null;
   expiresAt: string | null;
+  rejectReason: string | null;
   bankAccount: { bankName: string; accountName: string; accountNumber: string } | null;
 };
 type OrderStatusVal =
@@ -131,6 +132,9 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
 
   const isCancelled = orderStatus === "CANCELLED";
   const isSubmitted = payment.status === "SUBMITTED" || justSubmitted;
+  // สลิปรอบก่อนไม่ผ่าน — ต้องขึ้นให้เห็นชัดพร้อมเหตุผล ไม่งั้นลูกค้าเปิดมาเจอหน้าเดิมแล้วไม่รู้ว่าต้องทำอะไร
+  // (justSubmitted = เพิ่งส่งใหม่ในหน้านี้ ไม่ต้องเตือนซ้ำแล้ว)
+  const isRejected = payment.status === "REJECTED" && !justSubmitted;
   const isExpired = !isCancelled && !isSubmitted && payment.expiresAt !== null && remaining <= 0;
   const isUnusable = isExpired || isCancelled;
   const mm = Math.floor(remaining / 60000);
@@ -139,6 +143,20 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
 
   return (
     <div className="space-y-4">
+      {isRejected && (
+        <div className="space-y-1 rounded-lg border border-rose-300 bg-rose-50 p-3 text-center dark:border-rose-900 dark:bg-rose-950/40">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
+            {t.liff.slipRejectedTitle}
+          </p>
+          {payment.rejectReason && (
+            <p className="text-xs text-rose-700/80 dark:text-rose-400/80">
+              {t.liff.slipRejectedReason(payment.rejectReason)}
+            </p>
+          )}
+          <p className="text-xs text-rose-700/80 dark:text-rose-400/80">{t.liff.slipRejectedHint}</p>
+        </div>
+      )}
+
       <div className="text-center">
         <div className="text-xs text-muted-foreground">{t.orders.payment.amountDue}</div>
         <div className="text-3xl font-bold text-primary">{formatBaht(payment.amount)}</div>

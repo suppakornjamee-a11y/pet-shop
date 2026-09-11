@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, BedDouble } from "lucide-react";
+import { BedDouble } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { isSlotAvailable } from "@/lib/booking";
 import { isValidDateStr, isValidTimeStr, isPastSlot } from "@/lib/slots";
@@ -68,25 +68,12 @@ export default async function NewOrderPage(props: PageProps<"/orders/new">) {
   const locale = await getLocale();
   const t = getDictionary(locale);
 
-  const dateLabel = hasQueueEntry
-    ? new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
-        dateStyle: "full",
-        timeZone: "UTC",
-      }).format(new Date(`${date}T00:00:00Z`))
-    : null;
-
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title={t.orders.createTitle}
-        description={t.orders.createDescription}
         action={
-          hasQueueEntry ? (
-            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
-              <CalendarClock className="h-4 w-4 text-primary" />
-              {t.orders.queueBadge(dateLabel ?? "", time)}
-            </Badge>
-          ) : (
+          hasQueueEntry ? null : (
             <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
               <BedDouble className="h-4 w-4 text-primary" />
               {t.orders.roomBookingBadge}

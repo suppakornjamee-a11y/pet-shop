@@ -106,7 +106,6 @@ export default async function BoardingPage(props: PageProps<"/boarding">) {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title={t.boarding.title}
-        description={t.boarding.description}
         action={
           <div className="flex items-center gap-1.5">
             <Button
@@ -206,47 +205,59 @@ function SectionRows({
           {section.categoryName}
         </td>
       </tr>
-      {section.rows.map(({ room, segments }) => (
-        <tr key={room.id} className="border-b">
-          <td className="sticky left-0 z-10 border-r bg-card px-3 py-2 text-xs font-medium">
-            {room.name}
-          </td>
-          {segments.map((seg) =>
-            seg.kind === "empty" ? (
-              <td key={seg.dateStr} className="border-r p-0.5">
-                <Link
-                  href={`/orders/new?roomId=${room.id}&checkIn=${seg.dateStr}`}
-                  className="flex h-12 items-center justify-center rounded text-muted-foreground/30 transition-colors hover:bg-accent hover:text-primary"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Link>
+      {section.rows.map(({ room, lanes }) =>
+        lanes.map((segments, laneIndex) => (
+          <tr
+            key={`${room.id}-${laneIndex}`}
+            className={cn(laneIndex === lanes.length - 1 && "border-b")}
+          >
+            {/* ชื่อห้องเขียนครั้งเดียวแล้วกินความสูงทุก lane ของห้องนั้น */}
+            {laneIndex === 0 && (
+              <td
+                rowSpan={lanes.length}
+                className="sticky left-0 z-10 border-r bg-card px-3 py-2 align-top text-xs font-medium"
+              >
+                {room.name}
               </td>
-            ) : (
-              <td key={seg.startDateStr} colSpan={seg.days} className="border-r p-0.5">
-                <Link
-                  href={`/orders/${seg.booking.orderId}`}
-                  className={cn(
-                    "flex h-12 flex-col items-center justify-center overflow-hidden rounded border px-1.5 py-0.5 text-center text-[11px] leading-tight transition-opacity hover:opacity-80",
-                    orderStatusColor[seg.booking.status]
-                  )}
-                >
-                  <div className="truncate font-bold">
-                    {seg.continuesFromBefore && seg.booking.status !== "COMPLETED" && "← "}
-                    {seg.booking.petName ?? seg.booking.customerName}
-                    {seg.continuesAfter && seg.booking.status !== "COMPLETED" && " →"}
-                  </div>
-                  <div className="truncate opacity-80">
-                    {t.labels.orderStatus[seg.booking.status]}
-                    {seg.booking.nannyType === "REGULAR" && t.boarding.nannyTag}
-                    {seg.booking.nannyType === "VIP" && t.boarding.nannyVipTag}
-                    {seg.booking.depositAmount > 0 && t.boarding.depositTag(seg.booking.depositAmount)}
-                  </div>
-                </Link>
-              </td>
-            )
-          )}
-        </tr>
-      ))}
+            )}
+            {segments.map((seg) =>
+              seg.kind === "empty" ? (
+                <td key={seg.dateStr} className="border-r p-0.5">
+                  <Link
+                    href={`/orders/new?roomId=${room.id}&checkIn=${seg.dateStr}`}
+                    className="flex h-6 items-center justify-center rounded text-muted-foreground/30 transition-colors hover:bg-accent hover:text-primary"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Link>
+                </td>
+              ) : (
+                <td key={seg.startDateStr} colSpan={seg.days} className="border-r p-0.5">
+                  <Link
+                    href={`/orders/${seg.booking.orderId}`}
+                    title={`${seg.booking.petName ?? seg.booking.customerName} · ${t.labels.orderStatus[seg.booking.status]}`}
+                    className={cn(
+                      "flex h-6 items-center justify-center gap-1.5 overflow-hidden rounded border px-1.5 text-[11px] leading-none whitespace-nowrap transition-opacity hover:opacity-80",
+                      orderStatusColor[seg.booking.status]
+                    )}
+                  >
+                    <span className="truncate font-bold">
+                      {seg.continuesFromBefore && seg.booking.status !== "COMPLETED" && "← "}
+                      {seg.booking.petName ?? seg.booking.customerName}
+                      {seg.continuesAfter && seg.booking.status !== "COMPLETED" && " →"}
+                    </span>
+                    <span className="hidden truncate opacity-80 sm:inline">
+                      {t.labels.orderStatus[seg.booking.status]}
+                      {seg.booking.nannyType === "REGULAR" && t.boarding.nannyTag}
+                      {seg.booking.nannyType === "VIP" && t.boarding.nannyVipTag}
+                      {seg.booking.depositAmount > 0 && t.boarding.depositTag(seg.booking.depositAmount)}
+                    </span>
+                  </Link>
+                </td>
+              )
+            )}
+          </tr>
+        ))
+      )}
     </>
   );
 }

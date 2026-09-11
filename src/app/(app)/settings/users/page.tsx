@@ -14,7 +14,6 @@ export default async function UsersSettingsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title={t.settings.users.title}
-        description={t.settings.users.description}
       />
       <UserManager
         currentUserId={me.id}

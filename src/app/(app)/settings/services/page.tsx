@@ -14,7 +14,7 @@ export default async function ServicesSettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader title={t.settings.services.title} description={t.settings.services.description} />
+      <PageHeader title={t.settings.services.title} />
       <ServiceManager services={services} />
     </div>
   );

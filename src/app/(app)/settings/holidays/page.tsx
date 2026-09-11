@@ -15,7 +15,6 @@ export default async function HolidaysSettingsPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title={t.settings.holidays.title}
-        description={t.settings.holidays.description}
       />
       <HolidayManager
         holidays={holidays.map((h) => ({

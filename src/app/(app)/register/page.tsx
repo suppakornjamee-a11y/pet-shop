@@ -11,7 +11,6 @@ export default async function RegisterPage() {
     <div className="mx-auto max-w-4xl">
       <PageHeader
         title={t.register.pageTitle}
-        description={t.register.pageDescription}
       />
       <RegisterForm />
     </div>
