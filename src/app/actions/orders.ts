@@ -515,17 +515,11 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
     }),
   ]);
 
-  // ลูกค้าออกจากหน้าจอไปแล้วตั้งแต่ตอนจอง ต้องส่งลิงก์จ่ายเงินไปให้ ไม่งั้นไม่มีทางรู้ว่าคิวผ่านแล้ว
-  const link = buildLiffDeepLink(`/pay/${orderId}`);
-  void notifyCustomerLine(
-    orderId,
-    link
-      ? `✅ ยืนยันการจองเรียบร้อย\nเลขจอง : ${order.code}\nลิ้งค์ชำระเงิน : ${link}`
-      : `✅ ยืนยันการจองเรียบร้อย\nเลขจอง : ${order.code}`
-  );
+  // ไม่ต้องส่งลิงก์ชำระเงินทาง LINE แล้ว — หน้าจองของลูกค้าคอยถามสถานะเองอยู่
+  // พอพนักงานกดยืนยันคิว หน้าจอจะพาไปขั้นชำระเงินต่อให้เอง
 
   revalidateOrderViews(orderId);
-  return { ok: true, message: "ยืนยันคิวแล้ว แจ้งลูกค้าให้ชำระเงินทาง LINE" };
+  return { ok: true, message: "ยืนยันคิวแล้ว" };
 }
 
 /** ปฏิเสธคิวที่ลูกค้าจองมา — ยกเลิกออเดอร์และแจ้งเหตุผลกลับไปทาง LINE */

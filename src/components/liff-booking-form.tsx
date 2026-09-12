@@ -430,7 +430,7 @@ const STEP_ICONS = [
   "/images/icons/step-queue.png",
   "/images/icons/step-checking.png",
   "/images/icons/step-pay.png",
-  "/images/icons/step-booking.png",
+  "/images/icons/step-progress.png",
 ];
 
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
@@ -990,7 +990,6 @@ function BookingBody() {
             </span>
           </div>
           <h1 className="text-xl font-bold tracking-tight">{t.liff.inProgressTitle}</h1>
-          <p className="text-sm text-muted-foreground">{t.liff.inProgressHint}</p>
         </div>
 
         <div className="rounded-2xl border bg-card p-4">
@@ -1200,10 +1199,12 @@ function BookingBody() {
         <img
           src="/images/logo-light.png"
           alt={t.liff.bookPageTitle}
-          className="mx-auto h-20 w-auto"
+          className="mx-auto mt-4 h-20 w-auto sm:mt-0"
         />
 
-        <Stepper step={1} t={t} onJump={setStep} />
+        <div className="pt-2 sm:pt-0">
+          <Stepper step={1} t={t} onJump={setStep} />
+        </div>
 
         {pets.length > 1 && (
           <div className="space-y-2">
@@ -1532,13 +1533,17 @@ function BookingBody() {
           <DialogFooter className="gap-2 sm:flex-row">
             <Button
               variant="outline"
-              className="h-12 flex-1 rounded-2xl"
+              className="h-12 w-full rounded-2xl text-base sm:flex-1"
               onClick={() => setConfirmOpen(false)}
               disabled={isPending}
             >
               {t.common.cancel}
             </Button>
-            <Button className="h-12 flex-1 rounded-2xl" onClick={submit} disabled={isPending}>
+            <Button
+              className="h-12 w-full rounded-2xl text-base sm:flex-1"
+              onClick={submit}
+              disabled={isPending}
+            >
               {isPending ? <Loader2 className="animate-spin" /> : null}
               {t.liff.confirmBookingButton}
             </Button>

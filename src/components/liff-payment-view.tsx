@@ -293,10 +293,6 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
         <p className="rounded-lg bg-emerald-50 p-3 text-center text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
           {t.liff.slipSubmittedNotice}
         </p>
-      ) : !isCancelled ? (
-        <p className="rounded-lg bg-muted/50 p-3 text-center text-xs text-muted-foreground">
-          {t.liff.waitingForShopNotice}
-        </p>
       ) : null}
     </div>
   );
