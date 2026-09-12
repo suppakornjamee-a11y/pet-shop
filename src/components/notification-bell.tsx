@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, BellRing, CalendarClock, Receipt } from "lucide-react";
 import { getStaffAlerts, type StaffAlert } from "@/app/actions/notifications";
+import { onStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { formatBaht, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
@@ -61,10 +62,13 @@ export function NotificationBell() {
     }, POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && void load();
     document.addEventListener("visibilitychange", onVisible);
+    // พนักงานเพิ่งยืนยันคิว/ยืนยันสลิปเสร็จ — ถามใหม่ทันที ไม่ต้องรอครบรอบ 30 วินาที
+    const offChanged = onStaffAlertsChanged(() => void load());
     return () => {
       clearTimeout(first);
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      offChanged();
     };
   }, [load]);
 

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { useI18n } from "@/components/i18n-provider";
 
 export function OrderStatusControl({
@@ -63,6 +64,7 @@ export function OrderStatusControl({
         toast.success(res.message);
         if (res.cctvReminder) setCctvOpen(true);
         router.refresh();
+        notifyStaffAlertsChanged();
       }
     });
   }
@@ -74,6 +76,7 @@ export function OrderStatusControl({
       else {
         toast.success(res.message);
         router.refresh();
+        notifyStaffAlertsChanged();
       }
     });
   }
@@ -87,6 +90,7 @@ export function OrderStatusControl({
         setRejectReason("");
         toast.success(res.message);
         router.refresh();
+        notifyStaffAlertsChanged();
       }
     });
   }
@@ -98,6 +102,7 @@ export function OrderStatusControl({
       else {
         toast.success(res.message);
         router.refresh();
+        notifyStaffAlertsChanged();
       }
     });
   }

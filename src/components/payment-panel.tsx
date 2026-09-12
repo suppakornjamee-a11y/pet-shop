@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { useI18n } from "@/components/i18n-provider";
 
 type PaymentRow = {
@@ -290,6 +291,8 @@ function ActivePaymentPanel({
       else {
         toast.success(res.message);
         router.refresh();
+        // ยืนยัน/ปฏิเสธสลิปแล้ว รายการนี้หลุดจากงานค้าง — บอกกระดิ่งให้ลดเลขทันที
+        notifyStaffAlertsChanged();
       }
     });
   }
