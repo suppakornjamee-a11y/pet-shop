@@ -323,12 +323,12 @@ const STEP_ICONS = [
   "/images/icons/step-progress.png",
 ];
 
-/** ขั้นแรกคือ "เลือกบริการ" — สลับรูปตามสิ่งที่ลูกค้าเลือกจริง ให้แถบบอกขั้นตอนพูดถึงการจองใบนี้
- * ไม่ใช่รูปกลางๆ ใบเดียวที่ใช้กับทุกประเภท */
+/** ขั้นสุดท้าย "รอดำเนินการ" — สลับรูปตามสิ่งที่ลูกค้าจองจริง (อาบน้ำ / บริการ / โรงแรม)
+ * ให้ภาพบอกว่าร้านกำลังจะทำอะไรให้ ไม่ใช่รูปอาบน้ำใบเดียวกับทุกประเภท */
 const KIND_STEP_ICONS: Record<Kind, string> = {
-  BATH: "/images/icons/step-service.png",
-  OTHER: "/images/icons/step-service-other.png",
-  BOARDING: "/images/icons/step-service-boarding.png",
+  BATH: "/images/icons/step-progress.png",
+  OTHER: "/images/icons/step-progress-other.png",
+  BOARDING: "/images/icons/step-progress-boarding.png",
 };
 
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
@@ -398,7 +398,7 @@ function Stepper({
               )}
             >
               <StepIcon
-                src={i === 0 ? KIND_STEP_ICONS[kind] : STEP_ICONS[i]}
+                src={i === STEP_ICONS.length - 1 ? KIND_STEP_ICONS[kind] : STEP_ICONS[i]}
                 className={cn(
                   "h-8 w-8 transition-colors",
                   passed || current ? "text-primary" : "text-muted-foreground/35"
