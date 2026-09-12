@@ -310,7 +310,7 @@ function MonthCalendar({
               disabled={isPast}
               onClick={() => onChange(dateStr)}
               className={cn(
-                "relative flex h-10 items-center justify-center rounded-xl text-sm transition-colors",
+                "relative flex h-10 items-center justify-center rounded-xl text-sm transition-colors sm:h-12",
                 isPast && "text-muted-foreground/35",
                 !isPast && !isSelected && "hover:bg-muted",
                 isSelected && "bg-primary font-semibold text-primary-foreground"
@@ -380,7 +380,7 @@ function TimeSlotGroups({
                 {/* บอกเฉพาะตอนเต็มทั้งช่วง — ตอนว่างไม่ต้องบอก เพราะปุ่มที่กดได้ก็บอกอยู่แล้ว */}
                 {!hasOpen && <span className="ml-auto text-muted-foreground">{t.liff.slotGroupFull}</span>}
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {g.slots.map((s) => {
                   const isSelected = s.time === value;
                   return (
@@ -474,7 +474,7 @@ function Stepper({
               disabled={!canJump}
               onClick={canJump ? () => onJump(n) : undefined}
               className={cn(
-                "flex w-16 shrink-0 flex-col items-center gap-1.5 rounded-xl py-1 transition-colors",
+                "flex w-14 shrink-0 flex-col items-center gap-1 rounded-xl py-1 transition-colors",
                 canJump && "cursor-pointer hover:bg-accent/30",
                 !canJump && "cursor-default"
               )}
@@ -482,7 +482,7 @@ function Stepper({
               <StepIcon
                 src={STEP_ICONS[i]}
                 className={cn(
-                  "h-10 w-10 transition-colors",
+                  "h-8 w-8 transition-colors",
                   passed || current ? "text-primary" : "text-muted-foreground/35"
                 )}
               />
@@ -498,7 +498,7 @@ function Stepper({
             {i < labels.length - 1 && (
               <div
                 className={cn(
-                  "mt-6 flex-1 border-t-2 border-dashed",
+                  "mt-4 flex-1 border-t-2 border-dashed",
                   passed ? "border-primary" : "border-border"
                 )}
               />
@@ -1031,10 +1031,9 @@ function BookingBody() {
           })}
         </div>
 
-        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md">
+        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl">
           <Button className="h-14 w-full rounded-2xl text-base" onClick={() => setStep(2)}>
             {t.liff.nextStepButton}
-            <ArrowRight />
           </Button>
         </div>
       </div>
@@ -1263,7 +1262,7 @@ function BookingBody() {
       </div>
 
       {/* สรุปยอด + ปุ่มยืนยัน แปะด้านล่างจอเสมอ */}
-      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
+      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] sm:max-w-xl md:max-w-2xl">
         <div className="mb-2 flex items-center justify-between px-1 text-sm">
           <span className="text-muted-foreground">
             {kind === "BATH" && depositAmount > 0 ? t.orders.form.depositLabel : t.orders.form.grandTotal}

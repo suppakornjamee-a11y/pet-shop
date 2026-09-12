@@ -14,7 +14,7 @@ export default function LiffLayout({ children }: { children: React.ReactNode }) 
   return (
     <LiffProvider>
       {/* liff-theme ตรึงชุดสีชมพูไว้ (ดู globals.css) — ฝั่งลูกค้าไม่สลับตามธีมมืดของฝั่งพนักงาน */}
-      <div className="liff-theme mx-auto min-h-dvh w-full max-w-md bg-background px-4 py-6 text-foreground">
+      <div className="liff-theme mx-auto min-h-dvh w-full max-w-md bg-background px-4 py-6 text-foreground sm:max-w-xl sm:px-6 sm:py-8 md:max-w-2xl">
         {children}
       </div>
     </LiffProvider>
