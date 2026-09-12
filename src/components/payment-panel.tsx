@@ -12,6 +12,7 @@ import {
   QrCode,
   Wallet,
   Image as ImageIcon,
+  Smartphone,
 } from "lucide-react";
 import {
   regeneratePayment,
@@ -64,6 +65,7 @@ export function PaymentPanel({
   extraChargesTotal = 0,
   payments,
   isQueueBooking = false,
+  isOnlineBooking = false,
 }: {
   orderId: string;
   orderStatus: OrderStatus;
@@ -72,6 +74,8 @@ export function PaymentPanel({
   extraChargesTotal?: number;
   payments: PaymentRow[];
   isQueueBooking?: boolean;
+  /** ลูกค้าจองเองผ่าน LINE — จ่ายเงินในแอปตัวเอง ฝั่งพนักงานไม่ต้องใช้ QR */
+  isOnlineBooking?: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -132,6 +136,7 @@ export function PaymentPanel({
             payment={activePayment}
             showPurposeLabel={showPurposeLabel}
             isQueueBooking={isQueueBooking}
+            isOnlineBooking={isOnlineBooking}
           />
         ) : fullyPaid ? (
           <div className="flex flex-col items-center gap-2 rounded-lg bg-emerald-50 p-6 text-center dark:bg-emerald-950/40">
@@ -222,11 +227,13 @@ function ActivePaymentPanel({
   payment,
   showPurposeLabel,
   isQueueBooking,
+  isOnlineBooking,
 }: {
   orderStatus: OrderStatus;
   payment: PaymentRow;
   showPurposeLabel: boolean;
   isQueueBooking: boolean;
+  isOnlineBooking: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -269,7 +276,9 @@ function ActivePaymentPanel({
     payment.expiresAt !== null &&
     remaining <= 0;
   // QR ใช้ไม่ได้แล้ว (หมดอายุ หรือ ออเดอร์ถูกยกเลิก) → เบลอทิ้ง
-  const isUnusable = isExpired || isCancelled;
+  // ลูกค้าจองผ่าน LINE จ่ายจากหน้าจอตัวเองอยู่แล้ว — เบลอ QR ฝั่งพนักงานไว้
+  // กันสับสนว่าต้องยื่นจอให้ลูกค้าสแกน
+  const isUnusable = isExpired || isCancelled || isOnlineBooking;
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
   const account = payment.bankAccount;
@@ -354,6 +363,13 @@ function ActivePaymentPanel({
                       <XCircle className="h-8 w-8 text-rose-500" />
                       <span className="font-medium text-zinc-800">{t.orders.payment.orderCancelled}</span>
                     </>
+                  ) : isOnlineBooking ? (
+                    <>
+                      <Smartphone className="h-8 w-8 text-zinc-500" />
+                      <span className="font-medium text-zinc-800">
+                        {t.orders.payment.paidOnlineNotice}
+                      </span>
+                    </>
                   ) : (
                     <>
                       <Clock className="h-8 w-8 text-zinc-500" />
@@ -388,7 +404,7 @@ function ActivePaymentPanel({
         </div>
       )}
 
-      {!isCancelled && !awaitingApproval && payment.status !== "SUBMITTED" && (
+      {!isCancelled && !awaitingApproval && !isOnlineBooking && payment.status !== "SUBMITTED" && (
         <Button
           variant="outline"
           className="w-full"

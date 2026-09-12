@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Eye, EyeOff, ImagePlus, Loader2, Save, X } from "lucide-react";
 import { updateMyProfile } from "@/app/actions/profile";
-import { fileToDataUrl } from "@/lib/file";
+import { compressImageToDataUrl } from "@/lib/file";
 import { useI18n } from "@/components/i18n-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,9 @@ export function ProfileDialog({
     setUploading(true);
     setImageError("");
     try {
-      // จำกัด 1MB เพราะเก็บเป็น data URL ลงฐานข้อมูลโดยตรง (แนวเดียวกับรูปสินค้า/สัตว์เลี้ยง)
-      const dataUrl = await fileToDataUrl(file, 1024 * 1024);
+      // ย่อให้เล็กก่อนเก็บเป็น data URL ลงฐานข้อมูลโดยตรง (แนวเดียวกับรูปสินค้า/สัตว์เลี้ยง)
+      // รูปโปรไฟล์แสดงแค่ไอคอนกลมเล็กๆ 512px ก็เกินพอ
+      const dataUrl = await compressImageToDataUrl(file, { maxSide: 512, quality: 0.85 });
       setForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
     } catch (e) {
       setImageError(e instanceof Error ? e.message : t.profile.uploadFailed);

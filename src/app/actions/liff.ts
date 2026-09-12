@@ -595,7 +595,11 @@ export async function liffSubmitPaymentSlip(
  * จงใจไม่ให้ยกเลิกหลังพนักงานยืนยันคิวแล้ว เพราะจากจุดนั้นไปมีทั้งเงินมัดจำและคิวที่ร้านกันไว้
  * ให้แล้ว ต้องคุยกับร้านเป็นรายกรณี (กฎการคืนเงิน/แจ้งล่วงหน้ายังไม่มีในระบบ) — ปล่อยให้กดเองไม่ได้
  */
-export async function liffCancelOrder(idToken: string, orderId: string): Promise<ActionResult> {
+export async function liffCancelOrder(
+  idToken: string,
+  orderId: string,
+  reason?: string
+): Promise<ActionResult> {
   const identity = await verifyLiffIdToken(idToken);
   if (!identity) {
     return { ok: false, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" };
@@ -603,7 +607,13 @@ export async function liffCancelOrder(idToken: string, orderId: string): Promise
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, code: true, status: true, customer: { select: { lineUserId: true } } },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      customer: { select: { lineUserId: true } },
+      payments: { select: { status: true } },
+    },
   });
   // ตอบข้อความเดียวกันทั้งกรณีไม่มีออเดอร์และกรณีเป็นของคนอื่น จะได้ไม่กลายเป็นเครื่องมือเดาว่า
   // เลขออเดอร์ไหนมีอยู่จริงบ้าง
@@ -613,14 +623,25 @@ export async function liffCancelOrder(idToken: string, orderId: string): Promise
   if (order.status === "CANCELLED") {
     return { ok: false, error: "การจองนี้ถูกยกเลิกไปแล้ว" };
   }
-  if (order.status !== "PENDING_APPROVAL") {
-    return { ok: false, error: "การจองนี้ผ่านการเช็คคิวแล้ว กรุณาติดต่อร้านเพื่อยกเลิก" };
+  // เส้นแบ่งคือ "จ่ายเงินมาแล้วหรือยัง" ไม่ใช่ "ผ่านการเช็คคิวหรือยัง" — ตราบใดที่ยังไม่มีเงินเข้า
+  // ลูกค้ายกเลิกเองได้ ไม่ต้องโทรหาร้าน พอมีเงินเข้าแล้วต้องคุยเรื่องคืนเงินซึ่งระบบยังไม่มีกฎรองรับ
+  if (order.payments.some((p) => p.status === "VERIFIED")) {
+    return { ok: false, error: "การจองนี้ชำระเงินแล้ว กรุณาติดต่อร้านเพื่อยกเลิกและคืนเงิน" };
+  }
+  if (order.status !== "PENDING_APPROVAL" && order.status !== "PENDING_PAYMENT") {
+    return { ok: false, error: "การจองนี้เริ่มดำเนินการแล้ว กรุณาติดต่อร้าน" };
   }
 
+  const note = (reason ?? "").trim();
   await prisma.$transaction([
     prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } }),
     prisma.orderActivityLog.create({
-      data: { orderId, action: "ลูกค้ายกเลิกการจองเองผ่าน LINE" },
+      data: {
+        orderId,
+        action: note
+          ? `ลูกค้ายกเลิกการจองเองผ่าน LINE: ${note}`
+          : "ลูกค้ายกเลิกการจองเองผ่าน LINE",
+      },
     }),
   ]);
 

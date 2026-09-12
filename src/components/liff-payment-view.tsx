@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { getLiffOrderPaymentStatus, liffSubmitPaymentSlip } from "@/app/actions/liff";
 import { formatBaht } from "@/lib/format";
-import { fileToDataUrl } from "@/lib/file";
+import { compressImageToDataUrl } from "@/lib/file";
 import { allergyText } from "@/lib/pet-notes";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
@@ -87,7 +87,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   // เลือกรูปแค่พรีวิวไว้ก่อน ยังไม่ส่งจนกว่าจะกดยืนยัน — เผื่อเลือกรูปผิดจะได้เปลี่ยนก่อนส่งจริง
   async function handleSlipFileSelect(file: File) {
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await compressImageToDataUrl(file);
       setSlipPreview(dataUrl);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t.liff.errorTitle);
@@ -106,6 +106,11 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
       }
       setJustSubmitted(true);
       toast.success(res.message);
+    } catch (e) {
+      // เดิมไม่มี catch — พอ server action ตีกลับ (เช่น body ใหญ่เกิน) จะไม่มีอะไรขึ้นเลย
+      // ลูกค้าเห็นแค่ปุ่มหมุนแล้วหยุด ไม่รู้ว่าพลาดตรงไหน
+      console.error("[liff] submit slip failed:", e);
+      toast.error(t.liff.slipUploadFailed);
     } finally {
       setUploading(false);
     }

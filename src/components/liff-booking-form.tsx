@@ -17,6 +17,7 @@ import {
   Sun,
   Sunset,
   XCircle,
+  CalendarCheck,
 } from "lucide-react";
 import {
   liffBootstrap,
@@ -39,6 +40,13 @@ import { LiffPaymentBody } from "@/components/liff-payment-view";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -536,6 +544,9 @@ function BookingBody() {
   const [step, setStep] = useState<Step>(1);
   // ออเดอร์ถูกปฏิเสธคิว — แยกจาก done เพราะยังต้องโชว์สรุปเดิมไว้ให้ลูกค้าอ่าน
   const [rejected, setRejected] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [done, setDone] = useState<BookingDone | null>(null);
 
   const [loadingCustomer, setLoadingCustomer] = useState(true);
@@ -772,16 +783,8 @@ function BookingBody() {
     ...speciesFilteredServices.filter((s) => serviceIds.has(s.id)).map((s) => s.name),
   ];
 
-  async function submit() {
+  function submit() {
     if (!idToken || !petId) return;
-    // ถามยืนยันก่อนส่งจริง — กดแล้วออเดอร์ถูกสร้างในระบบทันทีและแก้ไขเองต่อไม่ได้
-    // กล่องนี้เอาข้อความออกหมดตามที่ร้านสั่ง เหลือแค่สองปุ่ม (srTitle ไว้ให้ screen reader อ่าน)
-    const ok = await confirm({
-      confirmLabel: t.liff.confirmBookingButton,
-      srTitle: t.liff.confirmBookingTitle,
-    });
-    if (!ok) return;
-
     const payload =
       kind === "BOARDING"
         ? {
@@ -827,6 +830,7 @@ function BookingBody() {
         time: kind === "BOARDING" ? checkInTime : time,
         checkOutDate: kind === "BOARDING" ? checkOutDate : null,
       });
+      setConfirmOpen(false);
       setStep(3);
     });
   }
@@ -855,6 +859,41 @@ function BookingBody() {
       setTime("");
       setStep(1);
     });
+  }
+
+  /**
+   * ยกเลิกจากหน้าชำระเงิน — ตรงนี้ร้านยืนยันคิวให้แล้ว ลูกค้าเลยควรบอกเหตุผลไว้ให้ร้านรู้
+   * backTo ใส่มาเมื่อกดย้อนจากแถบขั้นตอน (ยกเลิกใบเดิมแล้วพากลับไปเลือกวันเวลาใหม่)
+   */
+  function cancelFromPayment(reason: string, backTo: Step) {
+    if (!idToken || !done) return;
+    startTransition(async () => {
+      const res = await liffCancelOrder(idToken, done.orderId, reason);
+      if (!res.ok) {
+        handleLiffAuthExpiry(res);
+        toast.error(res.error);
+        return;
+      }
+      toast.success(res.message);
+      setCancelOpen(false);
+      setCancelReason("");
+      setDone(null);
+      setRejected(false);
+      setTime("");
+      setStep(backTo);
+    });
+  }
+
+  /** กดแถบขั้นตอนย้อนกลับจากหน้าชำระเงิน — ต้องยกเลิกใบเดิมก่อน ไม่งั้นจองซ้ำสองใบ */
+  async function jumpBackFromPayment(target: Step) {
+    const ok = await confirm({
+      title: t.liff.changeBookingTitle,
+      description: t.liff.changeBookingHint,
+      confirmLabel: t.liff.changeBookingConfirm,
+      tone: "danger",
+    });
+    if (!ok) return;
+    cancelFromPayment("", target);
   }
 
   // ขั้น "รอตรวจสอบ" — ถามสถานะออเดอร์เองเรื่อยๆ พอพนักงานกดยืนยันคิว หน้าจอลูกค้าจะเด้งไป
@@ -911,9 +950,50 @@ function BookingBody() {
   if (step === 4 && done) {
     return (
       <div className="space-y-5 py-4">
-        <Stepper step={4} t={t} />
+        {/* กดย้อนขั้นตอนได้ แต่ต้องยกเลิกใบเดิมก่อน — เตือนในกล่องยืนยันแล้ว */}
+        <Stepper step={4} t={t} onJump={jumpBackFromPayment} />
+
         {/* ตัวนี้ถามสถานะเองทุก 8 วินาที จึงอัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
         <LiffPaymentBody orderId={done.orderId} />
+
+        <Button
+          variant="outline"
+          className="h-12 w-full rounded-2xl text-destructive"
+          disabled={isPending}
+          onClick={() => setCancelOpen(true)}
+        >
+          <XCircle /> {t.liff.cancelBookingButton}
+        </Button>
+
+        <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t.liff.confirmCancelBookingTitle}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t.liff.cancelReasonLabel}</Label>
+              <Textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder={t.liff.cancelReasonPlaceholder}
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={isPending}>
+                {t.common.cancel}
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isPending}
+                onClick={() => cancelFromPayment(cancelReason.trim(), 1)}
+              >
+                {isPending ? <Loader2 className="animate-spin" /> : <XCircle />}
+                {t.liff.cancelBookingButton}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -1350,6 +1430,42 @@ function BookingBody() {
         <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="rounded-xl bg-card" />
       </div>
 
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-sm">
+          <DialogHeader className="items-center text-center">
+            <span className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-accent/40">
+              <CalendarCheck className="h-7 w-7 text-primary" />
+            </span>
+            <DialogTitle className="text-center text-lg">{t.liff.confirmBookingTitle}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-1 rounded-2xl bg-muted/50 p-4 text-center">
+            <p className="text-sm text-muted-foreground">{t.liff.confirmBookingQuestion}</p>
+            <p className="text-base font-semibold">
+              {formatDateLong(thaiDayRange(kind === "BOARDING" ? checkInDate : date).start)}
+            </p>
+            <p className="text-sm font-medium text-primary">
+              {kind === "BOARDING" ? checkInTime : time} {t.liff.timeUnitSuffix}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              className="h-12 flex-1 rounded-2xl"
+              onClick={() => setConfirmOpen(false)}
+              disabled={isPending}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button className="h-12 flex-1 rounded-2xl" onClick={submit} disabled={isPending}>
+              {isPending ? <Loader2 className="animate-spin" /> : null}
+              {t.liff.confirmBookingButton}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* สรุปยอด + ปุ่มยืนยัน แปะด้านล่างจอเสมอ */}
       <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] sm:max-w-xl md:max-w-2xl">
         <div className="mb-2 flex items-center justify-between px-1 text-sm">
@@ -1362,7 +1478,7 @@ function BookingBody() {
         </div>
         <Button
           className="h-14 w-full rounded-2xl text-base"
-          onClick={submit}
+          onClick={() => setConfirmOpen(true)}
           disabled={isPending || !canSubmit}
         >
           {isPending ? <Loader2 className="animate-spin" /> : null}

@@ -1,17 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ArrowLeft,
-  PawPrint,
-  Pencil,
-  CalendarClock,
-  BedDouble,
-  Syringe,
-  Bug,
-  UserCheck,
-  Video,
-  Smartphone,
-} from "lucide-react";
+import { ArrowLeft, PawPrint, Pencil, CalendarClock, BedDouble, Syringe, Bug, UserCheck, Video } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { allergyText } from "@/lib/pet-notes";
 import { requireUser } from "@/lib/auth-helpers";
@@ -147,16 +136,18 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
           <Card>
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">
               <div>
+                {/* หัวข้อ + ป้ายช่องทาง + ป้ายสถานะ อยู่บรรทัดเดียวกัน ตกบรรทัดเองถ้าจอแคบ */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
                   {order.createdVia === "LIFF" && (
                     <Badge
                       variant="outline"
-                      className="gap-1 border-green-300 text-green-700 dark:border-green-900 dark:text-green-400"
+                      className="border-green-300 text-green-700 dark:border-green-900 dark:text-green-400"
                     >
-                      <Smartphone className="h-3 w-3" /> {t.orders.bookedViaLiff}
+                      {t.orders.bookedViaLiff}
                     </Badge>
                   )}
+                  <OrderStatusBadges info={badgeInfo} t={t} />
                 </div>
                 {orderKind === "BATH" && activeWorkers.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -164,9 +155,6 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                     <span className="font-medium text-foreground">{activeWorkers.join(", ")}</span>
                   </p>
                 )}
-                <div className="mt-1.5">
-                  <OrderStatusBadges info={badgeInfo} t={t} />
-                </div>
               </div>
               <OrderStatusControl
                 isShopOrder={isShopOrder}
@@ -407,6 +395,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 orderTotal={order.total}
                 extraChargesTotal={extraChargesTotal}
                 isQueueBooking={Boolean(order.appointmentAt) && order.queueType !== "OTHER"}
+                isOnlineBooking={order.createdVia === "LIFF"}
                 payments={order.payments.map((p) => ({
                   id: p.id,
                   purpose: p.purpose,

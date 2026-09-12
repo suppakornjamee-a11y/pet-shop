@@ -147,7 +147,6 @@ export function OrderStatusControl({
               </Button>
               <ConfirmButton
                 title={t.orders.confirmApproveQueueTitle}
-                description={t.orders.confirmApproveQueueDescription}
                 confirmLabel={t.orders.approveQueue}
                 onConfirm={approveQueue}
                 disabled={isPending}
@@ -213,14 +212,12 @@ export function OrderStatusControl({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.orders.confirmRejectQueueTitle}</DialogTitle>
-            <DialogDescription>{t.orders.rejectQueueReasonHint}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label className="text-xs">{t.orders.rejectQueueReasonLabel}</Label>
             <Textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder={t.orders.rejectQueueReasonPlaceholder}
               rows={3}
               autoFocus
             />
