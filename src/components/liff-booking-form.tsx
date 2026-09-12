@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  ArrowRight,
   Bath,
   Check,
   ChevronLeft,
@@ -27,6 +26,7 @@ import {
   getOpenSlots,
   liffCreateOrder,
   liffCancelOrder,
+  getLiffOrderPaymentStatus,
 } from "@/app/actions/liff";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { toThaiDateStr, addDaysThai, daysBetween, thaiDayRange } from "@/lib/slots";
@@ -35,6 +35,7 @@ import { SpeciesIcon } from "@/components/species-icon";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
 import { useConfirm } from "@/components/confirm-provider";
+import { LiffPaymentBody } from "@/components/liff-payment-view";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -69,6 +70,10 @@ type Room = {
   category: { id: string; name: string; billingUnit: "PER_NIGHT" | "PER_VISIT" };
 };
 type Kind = "BATH" | "OTHER" | "BOARDING";
+/** 1 เลือกบริการ · 2 เลือกวันเวลา · 3 รอพนักงานเช็คคิว · 4 ชำระเงิน */
+type Step = 1 | 2 | 3 | 4;
+/** ถามสถานะออเดอร์ถี่แค่ไหนตอนรอพนักงานเช็คคิว — เท่ากับหน้าชำระเงินใช้อยู่ */
+const APPROVAL_POLL_MS = 8000;
 
 /** สรุปการจองที่สร้างสำเร็จแล้ว — เก็บจาก state ฝั่งนี้ตอนกดยืนยัน ไม่ต้องยิงถามเซิร์ฟเวอร์ซ้ำ
  * เพราะทุกค่าที่หน้าสรุปต้องใช้ ผู้ใช้เพิ่งกรอกเองมาทั้งหมด */
@@ -370,15 +375,12 @@ function TimeSlotGroups({
       {groups
         .filter((g) => g.slots.length > 0)
         .map((g) => {
-          const hasOpen = g.slots.some((s) => s.available);
           return (
             <div key={g.key} className="space-y-2">
               <div className="flex items-center gap-2 text-xs">
                 <g.icon className="h-3.5 w-3.5 shrink-0 text-primary" />
                 <span className="font-medium">{g.label}</span>
                 <span className="text-muted-foreground">{groupRangeLabel(g.slots)}</span>
-                {/* บอกเฉพาะตอนเต็มทั้งช่วง — ตอนว่างไม่ต้องบอก เพราะปุ่มที่กดได้ก็บอกอยู่แล้ว */}
-                {!hasOpen && <span className="ml-auto text-muted-foreground">{t.liff.slotGroupFull}</span>}
               </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                 {g.slots.map((s) => {
@@ -417,8 +419,9 @@ function TimeSlotGroups({
  * ใช้ชุดเดียวกันทั้งสามหน้า ลูกค้าจะได้รู้ตลอดว่าอยู่ตรงไหนและเหลืออีกกี่ขั้น */
 const STEP_ICONS = [
   "/images/icons/step-service.png",
-  "/images/icons/step-booking.png",
   "/images/icons/step-review.png",
+  "/images/icons/step-booking.png",
+  "/images/icons/receipt.png",
 ];
 
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
@@ -455,15 +458,20 @@ function Stepper({
   t,
   onJump,
 }: {
-  step: 1 | 2 | 3;
+  step: Step;
   t: ReturnType<typeof useI18n>["t"];
-  onJump?: (step: 1 | 2 | 3) => void;
+  onJump?: (step: Step) => void;
 }) {
-  const labels = [t.liff.stepChooseService, t.liff.stepBookQueue, t.liff.stepAwaitReview];
+  const labels = [
+    t.liff.stepChooseService,
+    t.liff.stepBookQueue,
+    t.liff.stepAwaitReview,
+    t.liff.stepPayment,
+  ];
   return (
     <div className="flex items-start">
       {labels.map((label, i) => {
-        const n = (i + 1) as 1 | 2 | 3;
+        const n = (i + 1) as Step;
         const passed = n < step;
         const current = n === step;
         const canJump = !!onJump && passed;
@@ -525,7 +533,9 @@ function BookingBody() {
   const confirm = useConfirm();
   const [isPending, startTransition] = useTransition();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<Step>(1);
+  // ออเดอร์ถูกปฏิเสธคิว — แยกจาก done เพราะยังต้องโชว์สรุปเดิมไว้ให้ลูกค้าอ่าน
+  const [rejected, setRejected] = useState(false);
   const [done, setDone] = useState<BookingDone | null>(null);
 
   const [loadingCustomer, setLoadingCustomer] = useState(true);
@@ -841,10 +851,44 @@ function BookingBody() {
       }
       toast.success(res.message);
       setDone(null);
+      setRejected(false);
       setTime("");
       setStep(1);
     });
   }
+
+  // ขั้น "รอตรวจสอบ" — ถามสถานะออเดอร์เองเรื่อยๆ พอพนักงานกดยืนยันคิว หน้าจอลูกค้าจะเด้งไป
+  // ขั้นชำระเงินต่อให้เลย ไม่ต้องรอกดลิงก์จาก LINE (ลิงก์ยังส่งอยู่ เผื่อลูกค้าปิดแอปไปแล้ว)
+  useEffect(() => {
+    if (step !== 3 || !idToken || !done?.orderId || rejected) return;
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    async function poll() {
+      const res = await getLiffOrderPaymentStatus(idToken!, done!.orderId);
+      if (!active) return;
+      if (!res.ok) {
+        handleLiffAuthExpiry(res);
+        timeoutId = setTimeout(poll, APPROVAL_POLL_MS);
+        return;
+      }
+      if (res.status === "CANCELLED") {
+        setRejected(true);
+        return;
+      }
+      if (res.status !== "PENDING_APPROVAL") {
+        setStep(4);
+        return;
+      }
+      timeoutId = setTimeout(poll, APPROVAL_POLL_MS);
+    }
+
+    timeoutId = setTimeout(poll, APPROVAL_POLL_MS);
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [step, idToken, done, rejected]);
 
   if (loadingCustomer) {
     return (
@@ -863,6 +907,17 @@ function BookingBody() {
     );
   }
 
+  /* ---------- ขั้นที่ 4: ชำระเงิน ---------- */
+  if (step === 4 && done) {
+    return (
+      <div className="space-y-5 py-4">
+        <Stepper step={4} t={t} />
+        {/* ตัวนี้ถามสถานะเองทุก 8 วินาที จึงอัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
+        <LiffPaymentBody orderId={done.orderId} />
+      </div>
+    );
+  }
+
   /* ---------- ขั้นที่ 3: ยืนยันแล้ว ---------- */
   if (step === 3 && done) {
     return (
@@ -870,12 +925,31 @@ function BookingBody() {
         <Stepper step={3} t={t} />
 
         <div className="flex flex-col items-center gap-3 pt-4 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/40">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary">
-              <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
+          <div
+            className={cn(
+              "flex h-16 w-16 items-center justify-center rounded-full",
+              rejected ? "bg-destructive/15" : "bg-accent/40"
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-full",
+                rejected ? "bg-destructive" : "bg-primary"
+              )}
+            >
+              {rejected ? (
+                <XCircle className="h-5 w-5 text-primary-foreground" />
+              ) : (
+                <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
+              )}
             </span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">{t.liff.checkingQueueTitle}</h1>
+          <h1 className="text-xl font-bold tracking-tight">
+            {rejected ? t.liff.queueRejectedTitle : t.liff.checkingQueueTitle}
+          </h1>
+          {rejected && (
+            <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
+          )}
         </div>
 
         <div className="rounded-2xl border bg-card p-4">
@@ -926,18 +1000,33 @@ function BookingBody() {
           </dl>
         </div>
 
-        {/* ยกเลิกเองได้เฉพาะตอนนี้ — พอพนักงานเช็คคิวผ่านแล้วจะมีเรื่องมัดจำกับคิวที่กันไว้ให้
-            เข้ามาเกี่ยว ต้องคุยกับร้านเป็นรายกรณี ปุ่มนี้เลยหายไปเองเมื่อออเดอร์เดินหน้าต่อ */}
-        {done.orderId && (
+        {rejected ? (
+          // คิวไม่ผ่าน — พาไปเลือกวันเวลาใหม่ได้เลย โดยคงบริการกับสัตว์เลี้ยงที่เลือกไว้แล้ว
           <Button
-            variant="outline"
-            className="h-12 w-full rounded-2xl text-destructive"
-            disabled={isPending}
-            onClick={cancelBooking}
+            className="h-12 w-full rounded-2xl"
+            onClick={() => {
+              setRejected(false);
+              setDone(null);
+              setTime("");
+              setStep(2);
+            }}
           >
-            {isPending ? <Loader2 className="animate-spin" /> : <XCircle />}
-            {t.liff.cancelBookingButton}
+            {t.liff.bookAnotherButton}
           </Button>
+        ) : (
+          /* ยกเลิกเองได้เฉพาะตอนนี้ — พอพนักงานเช็คคิวผ่านแล้วจะมีเรื่องมัดจำกับคิวที่กันไว้ให้
+             เข้ามาเกี่ยว ต้องคุยกับร้านเป็นรายกรณี ปุ่มนี้เลยหายไปเองเมื่อออเดอร์เดินหน้าต่อ */
+          done.orderId && (
+            <Button
+              variant="outline"
+              className="h-12 w-full rounded-2xl text-destructive"
+              disabled={isPending}
+              onClick={cancelBooking}
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <XCircle />}
+              {t.liff.cancelBookingButton}
+            </Button>
+          )
         )}
       </div>
     );
@@ -1278,7 +1367,6 @@ function BookingBody() {
         >
           {isPending ? <Loader2 className="animate-spin" /> : null}
           {kind !== "BOARDING" && time ? t.liff.confirmWithTime(time) : t.liff.confirmBookingButton}
-          {!isPending && <ArrowRight />}
         </Button>
       </div>
     </div>

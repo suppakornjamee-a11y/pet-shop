@@ -424,7 +424,12 @@ function OrderSummaryCard({ detail, total }: { detail: OrderDetail; total: numbe
   );
 }
 
-function PaymentBody({ orderId }: { orderId: string }) {
+/**
+ * เนื้อหาหน้าชำระเงิน — แยก export ไว้ให้ฟอร์มจองเอาไปวางเป็นขั้นตอนสุดท้ายได้ด้วย
+ * (ที่นั่นอยู่ใน LiffGate อยู่แล้ว จึงไม่ต้องห่อซ้ำ) ตัวมันคอยถามสถานะเองทุก 8 วินาที
+ * จึงอัปเดตตามเองทั้งตอนพนักงานยืนยันสลิปและตอนจ่ายครบ
+ */
+export function LiffPaymentBody({ orderId }: { orderId: string }) {
   const { t } = useI18n();
   const { idToken } = useLiff();
   const [loading, setLoading] = useState(true);
@@ -546,7 +551,7 @@ function PaymentBody({ orderId }: { orderId: string }) {
 export function LiffPaymentView({ orderId }: { orderId: string }) {
   return (
     <LiffGate>
-      <PaymentBody orderId={orderId} />
+      <LiffPaymentBody orderId={orderId} />
     </LiffGate>
   );
 }
