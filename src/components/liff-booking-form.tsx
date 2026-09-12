@@ -78,8 +78,8 @@ type Room = {
   category: { id: string; name: string; billingUnit: "PER_NIGHT" | "PER_VISIT" };
 };
 type Kind = "BATH" | "OTHER" | "BOARDING";
-/** 1 เลือกบริการ · 2 เลือกวันเวลา · 3 รอพนักงานเช็คคิว · 4 ชำระเงิน */
-type Step = 1 | 2 | 3 | 4;
+/** 1 เลือกบริการ · 2 เลือกวันเวลา · 3 รอพนักงานเช็คคิว · 4 ชำระเงิน · 5 รอร้านดำเนินการ */
+type Step = 1 | 2 | 3 | 4 | 5;
 /** ถามสถานะออเดอร์ถี่แค่ไหนตอนรอพนักงานเช็คคิว — เท่ากับหน้าชำระเงินใช้อยู่ */
 const APPROVAL_POLL_MS = 8000;
 
@@ -427,9 +427,10 @@ function TimeSlotGroups({
  * ใช้ชุดเดียวกันทั้งสามหน้า ลูกค้าจะได้รู้ตลอดว่าอยู่ตรงไหนและเหลืออีกกี่ขั้น */
 const STEP_ICONS = [
   "/images/icons/step-service.png",
-  "/images/icons/step-review.png",
+  "/images/icons/step-queue.png",
+  "/images/icons/step-checking.png",
+  "/images/icons/step-pay.png",
   "/images/icons/step-booking.png",
-  "/images/icons/receipt.png",
 ];
 
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
@@ -475,6 +476,7 @@ function Stepper({
     t.liff.stepBookQueue,
     t.liff.stepAwaitReview,
     t.liff.stepPayment,
+    t.liff.stepInProgress,
   ];
   return (
     <div className="flex items-start">
@@ -929,6 +931,35 @@ function BookingBody() {
     };
   }, [step, idToken, done, rejected]);
 
+  // ขั้น "ชำระเงิน" — พอร้านยืนยันเงินครบแล้ว เลื่อนไปขั้นรอดำเนินการต่อเอง
+  // (หน้าชำระเงินข้างในก็ถามสถานะของมันเองอยู่ ตัวนี้ถามแยกเพื่อรู้ว่าจะเปลี่ยนขั้นตอนเมื่อไหร่)
+  useEffect(() => {
+    if (step !== 4 || !idToken || !done?.orderId) return;
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    async function poll() {
+      const res = await getLiffOrderPaymentStatus(idToken!, done!.orderId);
+      if (!active) return;
+      if (res.ok) {
+        const verified = res.payments
+          .filter((p) => p.status === "VERIFIED")
+          .reduce((sum, p) => sum + p.amount, 0);
+        if (res.total > 0 && verified >= res.total) {
+          setStep(5);
+          return;
+        }
+      }
+      timeoutId = setTimeout(poll, APPROVAL_POLL_MS);
+    }
+
+    timeoutId = setTimeout(poll, APPROVAL_POLL_MS);
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [step, idToken, done]);
+
   if (loadingCustomer) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
@@ -942,6 +973,56 @@ function BookingBody() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
         {t.liff.noPetsFound}
+      </div>
+    );
+  }
+
+  /* ---------- ขั้นที่ 5: รอร้านดำเนินการ ---------- */
+  if (step === 5 && done) {
+    return (
+      <div className="space-y-6 py-4">
+        <Stepper step={5} t={t} />
+
+        <div className="flex flex-col items-center gap-3 pt-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/40">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary">
+              <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
+            </span>
+          </div>
+          <h1 className="text-xl font-bold tracking-tight">{t.liff.inProgressTitle}</h1>
+          <p className="text-sm text-muted-foreground">{t.liff.inProgressHint}</p>
+        </div>
+
+        <div className="rounded-2xl border bg-card p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
+              {(() => {
+                const Icon = KIND_ICONS[done.kind];
+                return <Icon className="h-5 w-5 text-primary" />;
+              })()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">{done.serviceLabel}</div>
+              {done.petName && <div className="text-xs text-muted-foreground">{done.petName}</div>}
+            </div>
+            <div className="font-semibold text-primary">{formatBaht(done.total)}</div>
+          </div>
+
+          <div className="my-4 border-t border-dashed" />
+
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryDateLabel}</dt>
+              <dd className="text-right font-medium">{formatDateLong(thaiDayRange(done.date).start)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryTimeLabel}</dt>
+              <dd className="text-right font-medium">
+                {done.time} {t.liff.timeUnitSuffix}
+              </dd>
+            </div>
+          </dl>
+        </div>
       </div>
     );
   }
@@ -975,7 +1056,6 @@ function BookingBody() {
               <Textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder={t.liff.cancelReasonPlaceholder}
                 rows={3}
               />
             </div>
