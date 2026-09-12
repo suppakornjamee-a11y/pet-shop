@@ -541,7 +541,10 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
     return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ระหว่างรอเช็คคิว" };
   }
 
-  const note = reason.trim() || "คิวเต็ม";
+  // เหตุผลนี้ถูกส่งให้ลูกค้าอ่านตรงๆ ทาง LINE — ปล่อยว่างไม่ได้ (ฝั่ง UI ก็บังคับกรอกอยู่แล้ว
+  // ด่านนี้กันกรณีเรียกมาจากที่อื่นหรือหน้าจอค้างเวอร์ชันเก่า)
+  const note = reason.trim();
+  if (!note) return { ok: false, error: "กรุณาระบุเหตุผลที่ปฏิเสธคิว" };
   await prisma.$transaction([
     prisma.order.update({
       where: { id: orderId },

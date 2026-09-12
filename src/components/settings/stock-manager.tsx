@@ -147,20 +147,33 @@ export function StockManager({ products }: { products: Product[] }) {
 
   const isHuman = form.target === "HUMAN";
 
-  /** สลับประเภทสินค้า — ถ้าค่าหมวดหมู่/หน่วยเดิมไม่มีในตัวเลือกของฝั่งคน ต้องดันให้เป็นตัวเลือกแรก
-   *  ไม่งั้น Select จะโชว์ค่าดิบที่ไม่มีในลิสต์ (พฤติกรรมของ base-ui) */
+  /**
+   * สลับประเภทสินค้า — หมวดหมู่กับหน่วยของสองฝั่งเป็นคนละชุดกัน ต้องล้างค่าข้ามฝั่งทิ้งทุกครั้ง
+   *
+   * ฝั่งคนเลือกจากลิสต์ตายตัว ส่วนฝั่งสัตว์พิมพ์เอง — ถ้าไม่ล้าง สลับจากคนมาเป็นสัตว์แล้วค่าเดิม
+   * อย่าง "เบเกอรี่ / แก้ว" จะค้างอยู่ในช่องพิมพ์เอง แล้วถูกบันทึกติดไปกับสินค้าสัตว์โดยไม่มีใครทันสังเกต
+   * (ขามาฝั่งคนต้องดันเป็นตัวเลือกแรกเสมอ เพราะ Select ของ base-ui ที่ค่าไม่อยู่ในลิสต์จะโชว์ว่าง)
+   */
   function changeTarget(target: ProductTarget) {
-    if (target !== "HUMAN") {
-      setForm((prev) => ({ ...prev, target }));
-      return;
-    }
     setForm((prev) => ({
       ...prev,
       target,
-      category: (HUMAN_CATEGORIES as readonly string[]).includes(prev.category)
-        ? prev.category
-        : HUMAN_CATEGORIES[0],
-      unit: (HUMAN_UNITS as readonly string[]).includes(prev.unit) ? prev.unit : HUMAN_UNITS[0],
+      category:
+        target === "HUMAN"
+          ? (HUMAN_CATEGORIES as readonly string[]).includes(prev.category)
+            ? prev.category
+            : HUMAN_CATEGORIES[0]
+          : (HUMAN_CATEGORIES as readonly string[]).includes(prev.category)
+            ? ""
+            : prev.category,
+      unit:
+        target === "HUMAN"
+          ? (HUMAN_UNITS as readonly string[]).includes(prev.unit)
+            ? prev.unit
+            : HUMAN_UNITS[0]
+          : (HUMAN_UNITS as readonly string[]).includes(prev.unit)
+            ? empty.unit
+            : prev.unit,
     }));
   }
 

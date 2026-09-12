@@ -144,7 +144,7 @@ export default async function ReportsPage(props: PageProps<"/reports">) {
         action={<ReportRangePicker from={from} to={to} />}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summary.map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4">
@@ -190,7 +190,7 @@ export default async function ReportsPage(props: PageProps<"/reports">) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <TopTable title={t.reports.topServicesTitle} rows={topServices} t={t} />
         <TopTable title={t.reports.topProductsTitle} rows={topProducts} t={t} />
       </div>

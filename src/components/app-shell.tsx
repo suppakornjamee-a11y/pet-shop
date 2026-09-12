@@ -235,7 +235,7 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh">
       {/* Desktop sidebar */}
-      <aside className="hidden w-72 shrink-0 border-r bg-card lg:block">
+      <aside className="hidden w-60 shrink-0 border-r bg-card lg:block xl:w-72">
         <div className="sticky top-0 h-dvh">
           <SidebarContent user={user} pathname={pathname} />
         </div>

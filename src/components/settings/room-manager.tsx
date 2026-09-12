@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save, Plus, Pencil, Trash2, Wind, Fan, Camera } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, Wind, Fan, Camera, Search } from "lucide-react";
 import { upsertRoom, deleteRoom } from "@/app/actions/settings";
 import type { RoomSize, BillingUnit } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -83,15 +84,28 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
   const [editing, setEditing] = useState<Room | null>(null);
   const [form, setForm] = useState(emptyForm(categories[0]?.id ?? ""));
 
+  const [query, setQuery] = useState("");
+  const [showInactive, setShowInactive] = useState(true);
+
+  const inactiveCount = useMemo(() => rooms.filter((r) => !r.active).length, [rooms]);
+
   const grouped = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const map = new Map<string, Room[]>();
     for (const r of rooms) {
-      const list = map.get(r.categoryId) ?? [];
-      list.push(r);
-      map.set(r.categoryId, list);
+      if (!showInactive && !r.active) continue;
+      if (q && !r.name.toLowerCase().includes(q)) continue;
+      (map.get(r.categoryId) ?? map.set(r.categoryId, []).get(r.categoryId)!).push(r);
     }
-    return categories.map((c) => ({ category: c, rooms: map.get(c.id) ?? [] }));
-  }, [categories, rooms]);
+    const all = categories.map((c) => ({ category: c, rooms: map.get(c.id) ?? [] }));
+    // ตอนค้นหา ซ่อนหมวดที่ไม่มีห้องตรงเลย จะได้ไม่ต้องเลื่อนผ่านหมวดว่างเปล่าทีละหมวด
+    return q || !showInactive ? all.filter((g) => g.rooms.length > 0) : all;
+  }, [categories, rooms, query, showInactive]);
+
+  const shownCount = useMemo(
+    () => grouped.reduce((sum, g) => sum + g.rooms.length, 0),
+    [grouped]
+  );
 
   function openNew(categoryId?: string) {
     setEditing(null);
@@ -160,11 +174,27 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={() => openNew()} disabled={categories.length === 0}>
-          <Plus /> {t.settings.rooms.addRoom}
-        </Button>
-      </div>
+      {/* ค้นหาค้างไว้บนสุด — มีหลายสิบห้องกระจายหลายหมวด เลื่อนหาเองเสียเวลา
+          ส่วนการเพิ่มห้องใช้ปุ่มในหัวหมวด ซึ่งเลือกหมวดให้ล่วงหน้าอยู่แล้ว */}
+      {categories.length > 0 && (
+        <div className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 bg-background/95 px-1 py-2 backdrop-blur">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t.settings.rooms.searchPlaceholder}
+              className="pl-9"
+            />
+          </div>
+          {inactiveCount > 0 && (
+            <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <Switch checked={showInactive} onCheckedChange={setShowInactive} />
+              {t.settings.rooms.showInactive}
+            </label>
+          )}
+        </div>
+      )}
 
       {categories.length === 0 && (
         <p className="text-sm text-muted-foreground">
@@ -174,33 +204,70 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
 
       {grouped.map(({ category, rooms: roomsInCategory }) => (
         <div key={category.id} className="space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border-b pb-1.5">
             <h3 className="text-sm font-semibold">{category.name}</h3>
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-[10px] font-normal">
               {t.labels.billingUnit[category.billingUnit]}
             </Badge>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => openNew(category.id)}>
-              <Plus className="h-3 w-3" /> {t.settings.rooms.addRoomInCategory}
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {t.settings.rooms.countBadge(roomsInCategory.length)}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-7 text-xs text-muted-foreground"
+              onClick={() => openNew(category.id)}
+            >
+              <Plus className="h-3.5 w-3.5" /> {t.settings.rooms.addRoomInCategory}
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {roomsInCategory.map((r) => (
-              <Card key={r.id}>
-                <CardContent className="space-y-3 py-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-lg font-bold">{r.name}</div>
-                      {r.size && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {t.labels.roomSize[r.size]}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-primary">{formatBaht(r.pricePerNight)}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {t.labels.billingUnit[r.billingUnit]}
+              <Card key={r.id} className={!r.active ? "opacity-50" : undefined}>
+                <CardContent className="space-y-2 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate font-semibold">{r.name}</span>
+                        <span className="shrink-0 text-sm font-semibold text-primary">
+                          {formatBaht(r.pricePerNight)}
+                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                            {t.labels.billingUnit[r.billingUnit]}
+                          </span>
+                        </span>
                       </div>
+                      <div className="flex flex-wrap items-center gap-1 pt-1.5">
+                        {r.size && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {t.labels.roomSize[r.size]}
+                          </Badge>
+                        )}
+                        {!r.active && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {t.common.inactive}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t.common.edit}
+                        onClick={() => openEdit(r)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t.common.delete}
+                        onClick={() => remove(r.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 text-xs">
@@ -229,14 +296,6 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
                         </Badge>
                       ))}
                   </div>
-                  <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>
-                      <Pencil className="h-4 w-4" /> {t.common.edit}
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => remove(r.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -246,6 +305,12 @@ export function RoomManager({ categories, rooms }: { categories: Category[]; roo
           </div>
         </div>
       ))}
+
+      {categories.length > 0 && rooms.length > 0 && shownCount === 0 && (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          {t.settings.rooms.noMatches}
+        </p>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -142,7 +142,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         }
       />
 
-      <div className={cn("grid gap-6", !isGroomer && "lg:grid-cols-3")}>
+      <div className={cn("grid gap-6", !isGroomer && "xl:grid-cols-3")}>
         <div className={cn("space-y-6", !isGroomer && "lg:col-span-2")}>
           <Card>
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">

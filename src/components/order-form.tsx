@@ -402,7 +402,7 @@ export function OrderForm({
       : t.labels.serviceCategory[key as keyof typeof t.labels.serviceCategory];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-6 xl:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         {/* วันและเวลาคิว — แก้ได้ ไม่ใช่แค่โชว์ค่าที่มาจากปฏิทิน */}
         {isQueueBooking && (

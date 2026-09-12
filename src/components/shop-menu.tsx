@@ -138,7 +138,7 @@ function ProductGrid({
     return <p className="py-10 text-center text-sm text-muted-foreground">{t.shop.empty}</p>;
   }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {products.map((p) => (
         <ProductCard
           key={p.id}

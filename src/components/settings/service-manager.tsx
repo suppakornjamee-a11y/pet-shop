@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Save, Plus, Pencil, Trash2, Search } from "lucide-react";
 import { upsertService, deleteService } from "@/app/actions/settings";
 import type { ServiceCategory, ServiceGroup, Species } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
@@ -44,6 +44,8 @@ type ServiceRow = {
   commissionFlat: number | null;
 };
 
+const GROUP_ORDER = ["BATH", "GROOMING", "ADDON", "TREATMENT", "SPA", "OTHER", "BOARDING"];
+
 const empty = {
   name: "",
   category: "BATH" as ServiceCategory,
@@ -66,16 +68,34 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
   const [editing, setEditing] = useState<ServiceRow | null>(null);
   const [form, setForm] = useState(empty);
 
+  const [query, setQuery] = useState("");
+  const [showInactive, setShowInactive] = useState(true);
+
+  const inactiveCount = useMemo(() => services.filter((s) => !s.active).length, [services]);
+
   const grouped = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const map = new Map<string, ServiceRow[]>();
     for (const s of services) {
+      if (!showInactive && !s.active) continue;
+      if (q && !s.name.toLowerCase().includes(q)) continue;
       const key = s.category === "BATH" && s.group ? s.group : s.category;
-      const list = map.get(key) ?? [];
-      list.push(s);
-      map.set(key, list);
+      (map.get(key) ?? map.set(key, []).get(key)!).push(s);
     }
-    return [...map.entries()];
-  }, [services]);
+    // เรียงหมวดตามลำดับเดียวกับที่พนักงานเห็นตอนสร้างออเดอร์ และเรียงรายการในหมวดตามราคา
+    // เพื่อให้หน้าตั้งค่ากับหน้าใช้งานจริงไล่สายตาตรงกัน
+    for (const list of map.values()) {
+      list.sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, "th"));
+    }
+    return GROUP_ORDER.filter((k) => map.get(k)?.length).map(
+      (k) => [k, map.get(k)!] as const
+    );
+  }, [services, query, showInactive]);
+
+  const shownCount = useMemo(
+    () => grouped.reduce((sum, [, list]) => sum + list.length, 0),
+    [grouped]
+  );
 
   function labelFor(key: string) {
     return key in t.labels.serviceGroup
@@ -83,11 +103,6 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
       : t.labels.serviceCategory[key as keyof typeof t.labels.serviceCategory];
   }
 
-  function openNew() {
-    setEditing(null);
-    setForm(empty);
-    setOpen(true);
-  }
   function openNewForGroup(key: string) {
     setEditing(null);
     const isGroup = key === "ADDON" || key === "TREATMENT" || key === "SPA";
@@ -155,34 +170,62 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={openNew}>
-          <Plus /> {t.settings.services.addService}
-        </Button>
+      {/* แถบค้นหา/ตัวกรอง ค้างไว้บนสุดตอนเลื่อน — บริการมีหลายสิบรายการ ถ้าต้องเลื่อนกลับขึ้นมา
+          ทุกครั้งที่จะค้นหรือกดเพิ่มจะเสียเวลา */}
+      <div className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 bg-background/95 px-1 py-2 backdrop-blur">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t.settings.services.searchPlaceholder}
+            className="pl-9"
+          />
+        </div>
+        {inactiveCount > 0 && (
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
+            {t.settings.services.showInactive}
+          </label>
+        )}
       </div>
 
       {grouped.map(([key, list]) => (
         <div key={key}>
-          <div className="mb-2 flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-muted-foreground">{labelFor(key)}</span>
+          <div className="mb-2 flex items-center gap-2 border-b pb-1.5">
+            <span className="text-sm font-semibold">{labelFor(key)}</span>
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {t.settings.services.countBadge(list.length)}
+            </Badge>
             <Button
               type="button"
-              size="icon"
+              size="sm"
               variant="ghost"
-              className="h-6 w-6"
+              className="ml-auto h-7 text-xs text-muted-foreground"
               onClick={() => openNewForGroup(key)}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" /> {t.settings.services.addToGroup}
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {list.map((s) => (
               <Card key={s.id} className={!s.active ? "opacity-50" : undefined}>
-                <CardContent className="space-y-2 py-2">
+                <CardContent className="py-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{s.name}</div>
-                      <div className="flex flex-wrap items-center gap-1 pt-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate font-medium">{s.name}</span>
+                        {s.price > 0 ? (
+                          <span className="shrink-0 text-sm font-semibold text-primary">
+                            {formatBaht(s.price)}
+                          </span>
+                        ) : (
+                          <Badge variant="outline" className="shrink-0 text-[10px]">
+                            {t.settings.services.noPriceBadge}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1 pt-1.5">
                         {s.speciesScope && (
                           <Badge variant="secondary" className="text-[10px]">
                             {t.labels.species[s.speciesScope]}
@@ -208,26 +251,26 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
                         )}
                       </div>
                     </div>
-                    {s.price > 0 ? (
-                      <span className="shrink-0 font-medium">{formatBaht(s.price)}</span>
-                    ) : (
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        {t.settings.services.noPriceBadge}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
-                      <Pencil className="h-4 w-4" /> {t.common.edit}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => remove(s.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex shrink-0 gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t.common.edit}
+                        onClick={() => openEdit(s)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t.common.delete}
+                        onClick={() => remove(s.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -235,9 +278,13 @@ export function ServiceManager({ services }: { services: ServiceRow[] }) {
           </div>
         </div>
       ))}
-      {services.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t.settings.services.empty}</p>
-      )}
+      {services.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">{t.settings.services.empty}</p>
+      ) : shownCount === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          {t.settings.services.noMatches}
+        </p>
+      ) : null}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">

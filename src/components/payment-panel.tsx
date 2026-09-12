@@ -304,17 +304,6 @@ function ActivePaymentPanel({
         </div>
       )}
 
-      {awaitingApproval && (
-        <div className="space-y-1 rounded-lg border border-violet-300 bg-violet-50 p-3 text-center dark:border-violet-900 dark:bg-violet-950/40">
-          <p className="text-sm font-medium text-violet-800 dark:text-violet-300">
-            {t.orders.payment.awaitingQueueTitle}
-          </p>
-          <p className="text-xs leading-snug text-violet-700/80 dark:text-violet-400/80">
-            {t.orders.payment.awaitingQueueHint}
-          </p>
-        </div>
-      )}
-
       {/* QR แบบ Thai QR Payment / PromptPay — ลูกค้าแนบสลิปมาแล้ว (SUBMITTED) ไม่ต้องโชว์อีก
           เพราะรอพนักงานตรวจสลิปด้านล่างแทน ไม่ใช่รอให้จ่ายเพิ่ม */}
       {payment.status !== "SUBMITTED" && !awaitingApproval && (

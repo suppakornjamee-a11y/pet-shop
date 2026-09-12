@@ -110,7 +110,7 @@ export function RoomCategoryManager({ categories }: { categories: RoomCategoryRo
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {categories.map((c) => (
           <Card key={c.id}>
             <CardContent className="space-y-3 py-2">

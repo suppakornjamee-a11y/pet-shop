@@ -215,7 +215,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
         action={<DashboardDatePicker value={selectedDateStr} />}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => {
           const Icon = s.icon;
           const active = activeFilter === s.key;

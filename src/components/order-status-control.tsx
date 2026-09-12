@@ -22,6 +22,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/components/i18n-provider";
 
 export function OrderStatusControl({
@@ -50,6 +52,8 @@ export function OrderStatusControl({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [cctvOpen, setCctvOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   function change(next: OrderStatus) {
     startTransition(async () => {
@@ -74,11 +78,13 @@ export function OrderStatusControl({
     });
   }
 
-  function rejectQueue() {
+  function rejectQueue(reason: string) {
     startTransition(async () => {
-      const res = await rejectOrderQueue(orderId, "");
+      const res = await rejectOrderQueue(orderId, reason);
       if (!res.ok) toast.error(res.error);
       else {
+        setRejectOpen(false);
+        setRejectReason("");
         toast.success(res.message);
         router.refresh();
       }
@@ -132,17 +138,13 @@ export function OrderStatusControl({
           {/* ลูกค้าจองเองผ่าน LINE — ต้องกดยืนยันคิวก่อน ลูกค้าถึงจะเข้าหน้าชำระเงินได้ */}
           {awaitingApproval && role !== "GROOMER" && (
             <>
-              <ConfirmButton
+              <Button
                 variant="outline"
-                tone="danger"
-                title={t.orders.confirmRejectQueueTitle}
-                description={t.orders.confirmRejectQueueDescription}
-                confirmLabel={t.orders.rejectQueue}
-                onConfirm={rejectQueue}
+                onClick={() => setRejectOpen(true)}
                 disabled={isPending}
               >
                 <Ban /> {t.orders.rejectQueue}
-              </ConfirmButton>
+              </Button>
               <ConfirmButton
                 title={t.orders.confirmApproveQueueTitle}
                 description={t.orders.confirmApproveQueueDescription}
@@ -204,6 +206,40 @@ export function OrderStatusControl({
           )}
         </div>
       )}
+
+      {/* ปฏิเสธคิวต้องบอกเหตุผลเสมอ — ข้อความนี้ถูกส่งให้ลูกค้าทาง LINE ตรงๆ
+          ปล่อยว่างไม่ได้ ไม่งั้นลูกค้าได้แค่ "คิวไม่ว่าง" โดยไม่รู้ว่าเพราะอะไร */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.orders.confirmRejectQueueTitle}</DialogTitle>
+            <DialogDescription>{t.orders.rejectQueueReasonHint}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t.orders.rejectQueueReasonLabel}</Label>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder={t.orders.rejectQueueReasonPlaceholder}
+              rows={3}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={isPending}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => rejectQueue(rejectReason.trim())}
+              disabled={isPending || rejectReason.trim().length === 0}
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <Ban />}
+              {t.orders.rejectQueue}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cctvOpen} onOpenChange={setCctvOpen}>
         <DialogContent showCloseButton={false}>
