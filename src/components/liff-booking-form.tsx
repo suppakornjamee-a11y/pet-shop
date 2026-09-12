@@ -323,14 +323,6 @@ const STEP_ICONS = [
   "/images/icons/step-progress.png",
 ];
 
-/** ขั้นสุดท้าย "รอดำเนินการ" — สลับรูปตามสิ่งที่ลูกค้าจองจริง (อาบน้ำ / บริการ / โรงแรม)
- * ให้ภาพบอกว่าร้านกำลังจะทำอะไรให้ ไม่ใช่รูปอาบน้ำใบเดียวกับทุกประเภท */
-const KIND_STEP_ICONS: Record<Kind, string> = {
-  BATH: "/images/icons/step-progress.png",
-  OTHER: "/images/icons/step-progress-other.png",
-  BOARDING: "/images/icons/step-progress-boarding.png",
-};
-
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
  * ทำให้ไอคอนเปลี่ยนสีตามสถานะของขั้นตอนได้ (ขาวบนพื้นชมพู / ชมพู / เทาจาง) โดยใช้ไฟล์เดียว */
 function StepIcon({ src, className }: { src: string; className?: string }) {
@@ -362,12 +354,10 @@ function StepIcon({ src, className }: { src: string; className?: string }) {
  */
 function Stepper({
   step,
-  kind,
   t,
   onJump,
 }: {
   step: Step;
-  kind: Kind;
   t: ReturnType<typeof useI18n>["t"];
   onJump?: (step: Step) => void;
 }) {
@@ -398,7 +388,7 @@ function Stepper({
               )}
             >
               <StepIcon
-                src={i === STEP_ICONS.length - 1 ? KIND_STEP_ICONS[kind] : STEP_ICONS[i]}
+                src={STEP_ICONS[i]}
                 className={cn(
                   "h-8 w-8 transition-colors",
                   passed || current ? "text-primary" : "text-muted-foreground/35"
@@ -888,7 +878,7 @@ function BookingBody() {
   if (step === 5 && done) {
     return (
       <div className="space-y-6 py-4">
-        <Stepper step={5} kind={done.kind} t={t} />
+        <Stepper step={5} t={t} />
 
         <div className="flex flex-col items-center gap-3 pt-4 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/40">
@@ -939,7 +929,7 @@ function BookingBody() {
     return (
       <div className="space-y-5 py-4">
         {/* กดย้อนขั้นตอนได้ แต่ต้องยกเลิกใบเดิมก่อน — เตือนในกล่องยืนยันแล้ว */}
-        <Stepper step={4} kind={done.kind} t={t} onJump={jumpBackFromPayment} />
+        <Stepper step={4} t={t} onJump={jumpBackFromPayment} />
 
         {/* ตัวนี้ถามสถานะเองทุก 8 วินาที จึงอัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
         <LiffPaymentBody orderId={done.orderId} />
@@ -989,7 +979,7 @@ function BookingBody() {
   if (step === 3 && done) {
     return (
       <div className="space-y-6 py-4">
-        <Stepper step={3} kind={done.kind} t={t} />
+        <Stepper step={3} t={t} />
 
         <div className="flex flex-col items-center gap-3 pt-4 text-center">
           <div
@@ -1103,7 +1093,7 @@ function BookingBody() {
         />
 
         <div className="pt-2 sm:pt-0">
-          <Stepper step={1} kind={kind} t={t} onJump={setStep} />
+          <Stepper step={1} t={t} onJump={setStep} />
         </div>
 
         {pets.length > 1 && (
@@ -1203,7 +1193,7 @@ function BookingBody() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <Stepper step={2} kind={kind} t={t} onJump={setStep} />
+          <Stepper step={2} t={t} onJump={setStep} />
         </div>
       </div>
 
