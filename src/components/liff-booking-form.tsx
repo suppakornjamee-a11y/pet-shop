@@ -16,6 +16,7 @@ import {
   Sunrise,
   Sun,
   Sunset,
+  Video,
   XCircle,
   CalendarCheck,
 } from "lucide-react";
@@ -37,7 +38,9 @@ import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provi
 import { useI18n } from "@/components/i18n-provider";
 import { useConfirm } from "@/components/confirm-provider";
 import { LiffPaymentBody } from "@/components/liff-payment-view";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -111,12 +114,6 @@ function exclusiveKey(s: Service): string | null {
   return null;
 }
 
-// ตัวเลือกวัน/เวลาแบบ <select> ล้วนๆ แทน <input type="date"/"time"> ของเบราว์เซอร์ —
-// input วันที่/เวลาแบบ native เรนเดอร์ไม่นิ่งในหลาย webview (ทับกันเอง/ล้นขอบจอ/แตะเลือกไม่ติด
-// โดยเฉพาะ webview ในแอป LINE) เปลี่ยนมาใช้ select ธรรมดาซึ่งขนาดคงที่ ควบคุมได้ ไม่พังข้ามอุปกรณ์
-const SELECT_CLASS =
-  "h-10 w-full min-w-0 rounded-xl border bg-card px-1.5 text-center text-sm";
-
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
@@ -127,113 +124,6 @@ function parseDateStr(v: string): { y: number; m: number; d: number } {
 function formatDateStr(y: number, m: number, d: number): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
-/** เพิ่ม 1 ชั่วโมงให้เวลา HH:mm (วนกลับ 00:00 ถ้าเลย 23:59) */
-function addOneHour(timeStr: string): string {
-  const [h, m] = timeStr.split(":").map(Number);
-  const total = (h * 60 + m + 60) % (24 * 60);
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
-
-function DateSelect({
-  value,
-  onChange,
-  min,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  min?: string;
-  disabled?: boolean;
-}) {
-  const { y, m, d } = parseDateStr(value);
-  const baseYear = min ? parseDateStr(min).y : y;
-  const yearOptions = [baseYear, baseYear + 1];
-  const maxDay = daysInMonth(y, m);
-
-  function update(newY: number, newM: number, newD: number) {
-    const clampedDay = Math.min(newD, daysInMonth(newY, newM));
-    let next = formatDateStr(newY, newM, clampedDay);
-    if (min && next < min) next = min;
-    onChange(next);
-  }
-
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      <select
-        value={d}
-        disabled={disabled}
-        onChange={(e) => update(y, m, Number(e.target.value))}
-        className={cn(SELECT_CLASS, "disabled:opacity-50")}
-      >
-        {Array.from({ length: maxDay }, (_, i) => i + 1).map((day) => (
-          <option key={day} value={day}>
-            {day}
-          </option>
-        ))}
-      </select>
-      <select
-        value={m}
-        disabled={disabled}
-        onChange={(e) => update(y, Number(e.target.value), d)}
-        className={cn(SELECT_CLASS, "disabled:opacity-50")}
-      >
-        {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-          <option key={month} value={month}>
-            {month}
-          </option>
-        ))}
-      </select>
-      <select
-        value={y}
-        disabled={disabled}
-        onChange={(e) => update(Number(e.target.value), m, d)}
-        className={cn(SELECT_CLASS, "disabled:opacity-50")}
-      >
-        {yearOptions.map((year) => (
-          <option key={year} value={year}>
-            {year + 543}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function TimeSelect({
-  value,
-  onChange,
-  minHour = 0,
-  maxHour = 23,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  minHour?: number;
-  maxHour?: number;
-}) {
-  const [hh, mm] = value.split(":").map(Number);
-  function update(newHH: number, newMM: number) {
-    onChange(`${String(newHH).padStart(2, "0")}:${String(newMM).padStart(2, "0")}`);
-  }
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      <select value={hh} onChange={(e) => update(Number(e.target.value), mm)} className={SELECT_CLASS}>
-        {Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i).map((h) => (
-          <option key={h} value={h}>
-            {String(h).padStart(2, "0")}
-          </option>
-        ))}
-      </select>
-      <select value={mm} onChange={(e) => update(hh, Number(e.target.value))} className={SELECT_CLASS}>
-        {[0, 15, 30, 45].map((min) => (
-          <option key={min} value={min}>
-            {String(min).padStart(2, "0")}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 type SlotOption = { time: string; available: boolean };
 
 /* ---------- ปฏิทินรายเดือน ---------- */
@@ -433,6 +323,14 @@ const STEP_ICONS = [
   "/images/icons/step-progress.png",
 ];
 
+/** ขั้นแรกคือ "เลือกบริการ" — สลับรูปตามสิ่งที่ลูกค้าเลือกจริง ให้แถบบอกขั้นตอนพูดถึงการจองใบนี้
+ * ไม่ใช่รูปกลางๆ ใบเดียวที่ใช้กับทุกประเภท */
+const KIND_STEP_ICONS: Record<Kind, string> = {
+  BATH: "/images/icons/step-service.png",
+  OTHER: "/images/icons/step-service-other.png",
+  BOARDING: "/images/icons/step-service-boarding.png",
+};
+
 /** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask แทนการโหลดรูปหลายสี
  * ทำให้ไอคอนเปลี่ยนสีตามสถานะของขั้นตอนได้ (ขาวบนพื้นชมพู / ชมพู / เทาจาง) โดยใช้ไฟล์เดียว */
 function StepIcon({ src, className }: { src: string; className?: string }) {
@@ -464,10 +362,12 @@ function StepIcon({ src, className }: { src: string; className?: string }) {
  */
 function Stepper({
   step,
+  kind,
   t,
   onJump,
 }: {
   step: Step;
+  kind: Kind;
   t: ReturnType<typeof useI18n>["t"];
   onJump?: (step: Step) => void;
 }) {
@@ -498,7 +398,7 @@ function Stepper({
               )}
             >
               <StepIcon
-                src={STEP_ICONS[i]}
+                src={i === 0 ? KIND_STEP_ICONS[kind] : STEP_ICONS[i]}
                 className={cn(
                   "h-8 w-8 transition-colors",
                   passed || current ? "text-primary" : "text-muted-foreground/35"
@@ -714,16 +614,23 @@ function BookingBody() {
 
   function onRoomChange(id: string) {
     setRoomId(id);
-    if (checkOutDate <= checkInDate) setCheckOutDate(addDaysThai(checkInDate, 1));
+    const room = rooms.find((r) => r.id === id);
+    if (room?.category.billingUnit === "PER_VISIT") {
+      // ห้องรายครั้ง (Daycare/Pawsome) เข้า-ออกวันเดียวกัน ล็อกวันเช็คเอาท์ตามวันเช็คอิน
+      // แล้วตั้งเวลาเป็นช่วงกลางวันให้เลย ไม่งั้นค่าเริ่มต้น 13:00-11:00 จะกลายเป็นออกก่อนเข้า
+      setCheckOutDate(checkInDate);
+      setCheckInTime("13:00");
+      setCheckOutTime("18:00");
+    } else if (checkOutDate <= checkInDate) {
+      setCheckOutDate(addDaysThai(checkInDate, 1));
+    }
   }
 
   function onDateChange(v: string) {
     setDate(v);
     if (kind !== "BOARDING") return;
-    const suggested = addOneHour(checkInTime);
-    const suggestedHour = Number(suggested.split(":")[0]);
-    setCheckOutTime(suggestedHour > 20 ? "20:00" : suggested);
-    if (checkOutDate <= v) setCheckOutDate(addDaysThai(v, 1));
+    if (isPerVisit) setCheckOutDate(v);
+    else if (checkOutDate <= v) setCheckOutDate(addDaysThai(v, 1));
   }
 
   // เช็คห้องว่างแบบ live ทุกครั้งที่เปลี่ยนห้อง/วัน-เวลา ก่อนให้กดยืนยันจริง
@@ -981,7 +888,7 @@ function BookingBody() {
   if (step === 5 && done) {
     return (
       <div className="space-y-6 py-4">
-        <Stepper step={5} t={t} />
+        <Stepper step={5} kind={done.kind} t={t} />
 
         <div className="flex flex-col items-center gap-3 pt-4 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/40">
@@ -1001,7 +908,8 @@ function BookingBody() {
               })()}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="font-semibold">{done.serviceLabel}</div>
+              {/* ชื่อประเภท + ชื่อรายการที่จองจริง — ลำพัง "บริการ" เฉยๆ ลูกค้าไม่รู้ว่าจองอะไรไว้ */}
+              <div className="font-semibold">{[done.serviceLabel, ...done.items].join(" · ")}</div>
               {done.petName && <div className="text-xs text-muted-foreground">{done.petName}</div>}
             </div>
             <div className="font-semibold text-primary">{formatBaht(done.total)}</div>
@@ -1031,7 +939,7 @@ function BookingBody() {
     return (
       <div className="space-y-5 py-4">
         {/* กดย้อนขั้นตอนได้ แต่ต้องยกเลิกใบเดิมก่อน — เตือนในกล่องยืนยันแล้ว */}
-        <Stepper step={4} t={t} onJump={jumpBackFromPayment} />
+        <Stepper step={4} kind={done.kind} t={t} onJump={jumpBackFromPayment} />
 
         {/* ตัวนี้ถามสถานะเองทุก 8 วินาที จึงอัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
         <LiffPaymentBody orderId={done.orderId} />
@@ -1081,7 +989,7 @@ function BookingBody() {
   if (step === 3 && done) {
     return (
       <div className="space-y-6 py-4">
-        <Stepper step={3} t={t} />
+        <Stepper step={3} kind={done.kind} t={t} />
 
         <div className="flex flex-col items-center gap-3 pt-4 text-center">
           <div
@@ -1120,22 +1028,14 @@ function BookingBody() {
               })()}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="font-semibold">{done.serviceLabel}</div>
+              {/* ชื่อประเภท + ชื่อรายการที่จองจริง — ลำพัง "บริการ" เฉยๆ ลูกค้าไม่รู้ว่าจองอะไรไว้ */}
+              <div className="font-semibold">{[done.serviceLabel, ...done.items].join(" · ")}</div>
               {done.petName && <div className="text-xs text-muted-foreground">{done.petName}</div>}
             </div>
             <div className="font-semibold text-primary">{formatBaht(done.total)}</div>
           </div>
 
           <div className="my-4 border-t border-dashed" />
-
-          {/* รายการที่เลือกไว้ ตัวเล็กเหนือบรรทัดวันที่/เวลา — ลูกค้าจะได้เห็นว่าจองอะไรไปบ้าง
-              ไม่ใช่แค่ชื่อประเภทบริการรวมๆ ด้านบน */}
-          {done.items.length > 0 && (
-            <div className="mb-3">
-              <div className="text-[11px] text-muted-foreground">{t.liff.selectedItemsLabel}</div>
-              <div className="mt-0.5 text-xs leading-relaxed">{done.items.join(" · ")}</div>
-            </div>
-          )}
 
           <dl className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between gap-3">
@@ -1203,7 +1103,7 @@ function BookingBody() {
         />
 
         <div className="pt-2 sm:pt-0">
-          <Stepper step={1} t={t} onJump={setStep} />
+          <Stepper step={1} kind={kind} t={t} onJump={setStep} />
         </div>
 
         {pets.length > 1 && (
@@ -1303,7 +1203,7 @@ function BookingBody() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <Stepper step={2} t={t} onJump={setStep} />
+          <Stepper step={2} kind={kind} t={t} onJump={setStep} />
         </div>
       </div>
 
@@ -1328,7 +1228,9 @@ function BookingBody() {
         </button>
       </div>
 
-      <MonthCalendar value={date} min={todayStr()} onChange={onDateChange} />
+      {kind !== "BOARDING" && (
+        <MonthCalendar value={date} min={todayStr()} onChange={onDateChange} />
+      )}
 
       {kind !== "BOARDING" ? (
         <div className="space-y-3">
@@ -1386,15 +1288,65 @@ function BookingBody() {
 
           {selectedRoom && (
             <>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">{t.orders.form.checkInLabel}</Label>
-                <TimeSelect value={checkInTime} onChange={setCheckInTime} minHour={9} maxHour={20} />
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="secondary">
+                  {t.labels.billingUnit[selectedRoom.category.billingUnit]}
+                </Badge>
+                {selectedRoom.hasAir && <Badge variant="secondary">{t.settings.rooms.hasAir}</Badge>}
+                {selectedRoom.hasFan && <Badge variant="secondary">{t.settings.rooms.hasFan}</Badge>}
+                {selectedRoom.equipment
+                  ?.split(",")
+                  .filter(Boolean)
+                  .map((e) => (
+                    <Badge key={e} variant="outline">
+                      {e.trim()}
+                    </Badge>
+                  ))}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">{t.orders.form.checkOutLabel}</Label>
-                <div className="space-y-2">
-                  <DateSelect value={checkOutDate} min={checkInDate} onChange={setCheckOutDate} />
-                  <TimeSelect value={checkOutTime} onChange={setCheckOutTime} minHour={9} maxHour={20} />
+
+              {/* ชุดวันที่+เวลาเหมือนหน้าพนักงาน — มือถือและแท็บเล็ตวางเช็คอิน/เช็คเอาท์คนละบรรทัด
+                  เพราะสี่ช่องเรียงบรรทัดเดียวบนจอแคบจะบีบจนกดเลือกไม่ถูก */}
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    {t.orders.form.checkInLabel}
+                  </Label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input
+                      type="date"
+                      className="min-w-0"
+                      value={checkInDate}
+                      min={todayStr()}
+                      onChange={(e) => onDateChange(e.target.value)}
+                    />
+                    <Input
+                      type="time"
+                      value={checkInTime}
+                      onChange={(e) => setCheckInTime(e.target.value)}
+                      className="w-28"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    {t.orders.form.checkOutLabel}
+                  </Label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input
+                      type="date"
+                      className="min-w-0"
+                      value={checkOutDate}
+                      min={checkInDate}
+                      disabled={isPerVisit}
+                      onChange={(e) => setCheckOutDate(e.target.value)}
+                    />
+                    <Input
+                      type="time"
+                      value={checkOutTime}
+                      onChange={(e) => setCheckOutTime(e.target.value)}
+                      className="w-28"
+                    />
+                  </div>
                 </div>
               </div>
               {nights > 0 && (
@@ -1445,6 +1397,7 @@ function BookingBody() {
                   onChange={(e) => setCctvRequested(e.target.checked)}
                   className="h-4 w-4 accent-primary"
                 />
+                <Video className="h-4 w-4 text-muted-foreground" />
                 {t.liff.cctvLabel} ({formatBaht(CCTV_ROOM_RATE)})
               </label>
             </>
