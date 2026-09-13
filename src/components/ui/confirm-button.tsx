@@ -11,6 +11,7 @@ export function ConfirmButton({
   title,
   description,
   confirmLabel,
+  cancelLabel,
   tone = "default",
   onConfirm,
   children,
@@ -25,7 +26,7 @@ export function ConfirmButton({
     <Button
       {...buttonProps}
       onClick={async () => {
-        if (await confirm({ title, description, confirmLabel, tone })) onConfirm();
+        if (await confirm({ title, description, confirmLabel, cancelLabel, tone })) onConfirm();
       }}
     >
       {children}

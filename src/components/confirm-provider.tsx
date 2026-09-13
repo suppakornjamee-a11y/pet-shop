@@ -18,6 +18,8 @@ export type ConfirmOptions = {
   description?: string;
   /** ข้อความบนปุ่มยืนยัน — ไม่ใส่ = "ยืนยัน" */
   confirmLabel?: string;
+  /** ข้อความบนปุ่มปิดกล่อง — ไม่ใส่ = "ยกเลิก" (ใส่ "ไม่" เมื่อหัวข้อเป็นคำถามใช่/ไม่ หรือเมื่อคำว่ายกเลิกจะซ้ำกับปุ่มยืนยัน) */
+  cancelLabel?: string;
   /** danger = ปุ่มยืนยันสีแดง สำหรับงานที่ย้อนกลับไม่ได้ (ลบ/ยกเลิก) */
   tone?: "default" | "danger";
   /** ใช้คู่กับการไม่ใส่ title — ข้อความที่ screen reader อ่านแทน (dialog ต้องมีชื่อเสมอ) */
@@ -74,7 +76,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => close(false)}>
-              {t.common.cancel}
+              {pending?.options.cancelLabel ?? t.common.cancel}
             </Button>
             <Button
               variant={pending?.options.tone === "danger" ? "destructive" : "default"}

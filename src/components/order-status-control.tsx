@@ -207,7 +207,8 @@ export function OrderStatusControl({
             tone="danger"
             title={t.orders.confirmCancelTitle}
             description={t.orders.confirmCancelDescription}
-            confirmLabel={t.orders.cancelOrder}
+            confirmLabel={t.common.yes}
+            cancelLabel={t.common.no}
             onConfirm={() => change("CANCELLED")}
             disabled={isPending}
           >
