@@ -7,7 +7,6 @@ import { formatBaht, formatDateTime } from "@/lib/format";
 import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { thaiDayRange, todayThaiStr, isValidDateStr } from "@/lib/slots";
 import { PageHeader } from "@/components/page-header";
-import { SpeciesIcon } from "@/components/species-icon";
 import { OrderStatusBadges } from "@/components/order-status-badges";
 import { DateFilter } from "@/components/date-filter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -135,12 +134,22 @@ export async function OrdersList({
                       <span className="font-medium">{o.code}</span>
                       <OrderStatusBadges info={getStatusBadgeInfo(o, user)} t={t} size="xs" />
                     </div>
-                    <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      {o.pet && <SpeciesIcon species={o.pet.species} className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate">{o.customer?.name}</span>
-                    </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {t.orders.transactionDate}: {formatDateTime(o.createdAt)}
+                      {[
+                        o.customer && t.orders.customerLine(o.customer.name),
+                        o.pet && t.orders.petLine(o.pet.name),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                    {/* วันที่จองคิว = วันที่ลูกค้าจะมาใช้บริการ (โรงแรมคือวันเช็คอิน) แยกจากวันที่ทำรายการ */}
+                    {(o.appointmentAt ?? o.checkInAt) && (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {t.orders.serviceDateLabel}: {formatDateTime((o.appointmentAt ?? o.checkInAt)!)}
+                      </div>
+                    )}
+                    <div className="truncate text-xs text-muted-foreground">
+                      {t.orders.createdDateLabel}: {formatDateTime(o.createdAt)}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>
