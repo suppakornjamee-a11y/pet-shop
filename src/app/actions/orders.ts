@@ -452,29 +452,20 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
 
 export async function rejectPayment(paymentId: string, reason: string): Promise<ActionResult> {
   await requireUser();
-  const note = reason || "ยอดไม่ตรง / สลิปไม่ถูกต้อง";
+  // เหตุผลนี้ไปขึ้นบนหน้าชำระเงินของลูกค้าตรงๆ — ห้ามว่าง ไม่งั้นลูกค้าไม่รู้ว่าต้องแก้อะไรก่อนแนบใหม่
+  const note = reason.trim();
+  if (!note) return { ok: false, error: "กรุณาระบุเหตุผลที่ปฏิเสธสลิป" };
+
   const payment = await prisma.payment.update({
     where: { id: paymentId },
     data: { status: "REJECTED", rejectReason: note },
   });
 
-  // ลูกค้าส่งสลิปแล้วก็ปิดแอปไป ไม่มีทางรู้เองว่าโดนปฏิเสธ — ต้องดันไปบอกทาง LINE
-  // เหมือนทุกจังหวะอื่นของ flow (ยืนยันคิว / ปฏิเสธคิว / ยืนยันเงิน / งานเสร็จ)
-  const link = buildLiffDeepLink(`/pay/${payment.orderId}`);
-  void notifyCustomerLine(
-    payment.orderId,
-    link
-      ? `❌ สลิปไม่ผ่านการตรวจสอบ
-เหตุผล : ${note}
-รบกวนส่งสลิปใหม่อีกครั้ง
-${link}`
-      : `❌ สลิปไม่ผ่านการตรวจสอบ
-เหตุผล : ${note}
-รบกวนส่งสลิปใหม่อีกครั้ง`
-  );
+  // ไม่ส่งข้อความ LINE แล้ว — หน้าชำระเงินของลูกค้าถามสถานะเองเป็นรอบ พอสลิปถูกปฏิเสธ
+  // หน้าจอจะขึ้นเหตุผลพร้อมช่องแนบสลิปใหม่ให้เอง
 
   revalidateOrderViews(payment.orderId);
-  return { ok: true, message: "ปฏิเสธการชำระเงินแล้ว แจ้งลูกค้าทาง LINE ให้ส่งสลิปใหม่" };
+  return { ok: true, message: "ปฏิเสธสลิปแล้ว" };
 }
 
 const statusSchema = z.enum([

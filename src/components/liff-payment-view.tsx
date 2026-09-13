@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -83,6 +83,19 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   const [slipPreview, setSlipPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const rejectedRef = useRef<HTMLDivElement>(null);
+
+  // หน้านี้ถามสถานะใหม่ทุก 8 วินาที — พอพนักงานปฏิเสธสลิป สถานะจะเปลี่ยนเป็น REJECTED ระหว่างที่
+  // ลูกค้ายังเปิดค้างอยู่ ต้องล้าง "เพิ่งส่งไป" กับรูปพรีวิวเดิมทิ้ง ไม่งั้นหน้าจอจะค้างที่ "ส่งสลิปแล้ว"
+  // ไปตลอดจนกว่าลูกค้าจะปิดเปิดใหม่เอง (ปรับ state ระหว่าง render ตามแนวทางของ React แทน effect)
+  const [seenStatus, setSeenStatus] = useState(payment.status);
+  if (payment.status !== seenStatus) {
+    setSeenStatus(payment.status);
+    if (payment.status === "REJECTED") {
+      setJustSubmitted(false);
+      setSlipPreview(null);
+    }
+  }
 
   // เลือกรูปแค่พรีวิวไว้ก่อน ยังไม่ส่งจนกว่าจะกดยืนยัน — เผื่อเลือกรูปผิดจะได้เปลี่ยนก่อนส่งจริง
   async function handleSlipFileSelect(file: File) {
@@ -140,7 +153,14 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   // สลิปรอบก่อนไม่ผ่าน — ต้องขึ้นให้เห็นชัดพร้อมเหตุผล ไม่งั้นลูกค้าเปิดมาเจอหน้าเดิมแล้วไม่รู้ว่าต้องทำอะไร
   // (justSubmitted = เพิ่งส่งใหม่ในหน้านี้ ไม่ต้องเตือนซ้ำแล้ว)
   const isRejected = payment.status === "REJECTED" && !justSubmitted;
-  const isExpired = !isCancelled && !isSubmitted && payment.expiresAt !== null && remaining <= 0;
+  // สลิปถูกปฏิเสธ = ลูกค้าจ่ายไปแล้วแต่หลักฐานไม่ผ่าน ต้องให้แนบใหม่ได้เสมอแม้ QR จะเลย 15 นาทีไปแล้ว
+  const isExpired =
+    !isCancelled && !isSubmitted && !isRejected && payment.expiresAt !== null && remaining <= 0;
+
+  // สลิปเพิ่งถูกปฏิเสธ — เลื่อนจอไปที่กล่องเหตุผลให้เห็นทันที ไม่ต้องเลื่อนหาเอง
+  useEffect(() => {
+    if (isRejected) rejectedRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [isRejected]);
   const isUnusable = isExpired || isCancelled;
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
@@ -149,7 +169,9 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   return (
     <div className="space-y-4">
       {isRejected && (
-        <div className="space-y-1 rounded-lg border border-rose-300 bg-rose-50 p-3 text-center dark:border-rose-900 dark:bg-rose-950/40">
+        <div
+          ref={rejectedRef}
+          className="space-y-1 rounded-lg border border-rose-300 bg-rose-50 p-3 text-center dark:border-rose-900 dark:bg-rose-950/40">
           <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
             {t.liff.slipRejectedTitle}
           </p>

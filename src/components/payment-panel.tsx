@@ -28,7 +28,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { useI18n } from "@/components/i18n-provider";
 
@@ -240,6 +249,8 @@ function ActivePaymentPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const remaining = useCountdown(payment.expiresAt);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   // สร้าง QR ฝั่งเบราว์เซอร์ จาก payload (เลี่ยงปัญหา serverless บน Vercel)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -284,11 +295,12 @@ function ActivePaymentPanel({
   const ss = Math.floor((remaining % 60000) / 1000);
   const account = payment.bankAccount;
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
+  function run(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>, onDone?: () => void) {
     startTransition(async () => {
       const res = await fn();
       if (!res.ok) toast.error(res.error);
       else {
+        onDone?.();
         toast.success(res.message);
         router.refresh();
         // ยืนยัน/ปฏิเสธสลิปแล้ว รายการนี้หลุดจากงานค้าง — บอกกระดิ่งให้ลดเลขทันที
@@ -455,22 +467,52 @@ function ActivePaymentPanel({
             >
               <CheckCircle2 /> {t.orders.payment.verify}
             </ConfirmButton>
-            <ConfirmButton
-              variant="destructive"
-              tone="danger"
-              title={t.orders.payment.confirmRejectTitle}
-              description={t.orders.payment.confirmRejectDescription}
-              confirmLabel={t.orders.payment.reject}
-              onConfirm={() =>
-                run(() => rejectPayment(payment.id, t.orders.payment.rejectReasonDefault))
-              }
-              disabled={isPending}
-            >
+            <Button variant="destructive" onClick={() => setRejectOpen(true)} disabled={isPending}>
               <XCircle /> {t.orders.payment.reject}
-            </ConfirmButton>
+            </Button>
           </div>
         </div>
       )}
+
+      {/* ปฏิเสธสลิปต้องบอกเหตุผลเสมอ — ข้อความนี้ไปขึ้นบนหน้าชำระเงินของลูกค้าใน LINE ตรงๆ
+          ลูกค้าจะได้รู้ว่าต้องแก้อะไรก่อนแนบใหม่ (ไม่ได้ส่งเป็นข้อความ LINE แล้ว) */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.orders.payment.confirmRejectTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t.orders.payment.rejectReasonLabel}</Label>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={isPending}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                run(
+                  () => rejectPayment(payment.id, rejectReason.trim()),
+                  () => {
+                    setRejectOpen(false);
+                    setRejectReason("");
+                  }
+                )
+              }
+              disabled={isPending || rejectReason.trim().length === 0}
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <XCircle />}
+              {t.orders.payment.reject}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
