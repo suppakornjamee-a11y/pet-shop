@@ -1509,12 +1509,29 @@ function BookingBody() {
 
           <div className="space-y-1 rounded-2xl bg-muted/50 p-4 text-center">
             <p className="text-sm text-muted-foreground">{t.liff.confirmBookingQuestion}</p>
-            <p className="text-base font-semibold">
-              {formatDateLong(thaiDayRange(kind === "BOARDING" ? checkInDate : date).start)}
-            </p>
-            <p className="text-sm font-medium text-primary">
-              {kind === "BOARDING" ? checkInTime : time} {t.liff.timeUnitSuffix}
-            </p>
+            {kind === "BOARDING" ? (
+              // โรงแรมมีทั้งวันเข้าและวันออก — สรุปครบทั้งช่วงที่พัก ลูกค้าจะได้เช็คก่อนกดยืนยันว่าเลือกวันถูก
+              <div className="space-y-1 pt-1">
+                <p className="text-sm font-semibold">
+                  {t.liff.confirmCheckInLine(formatDateLong(thaiDayRange(checkInDate).start), checkInTime)}
+                </p>
+                <p className="text-sm font-semibold">
+                  {t.liff.confirmCheckOutLine(formatDateLong(thaiDayRange(checkOutDate).start), checkOutTime)}
+                </p>
+                <p className="text-sm font-medium text-primary">
+                  {t.liff.confirmStayTotal(
+                    nights > 0 ? t.orders.form.nightsCount(nights) : `1 ${t.orders.form.perVisitUnit}`
+                  )}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-base font-semibold">{formatDateLong(thaiDayRange(date).start)}</p>
+                <p className="text-sm font-medium text-primary">
+                  {time} {t.liff.timeUnitSuffix}
+                </p>
+              </>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:flex-row">
