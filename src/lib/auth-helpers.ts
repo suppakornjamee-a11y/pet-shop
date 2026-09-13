@@ -5,16 +5,25 @@ import { prisma } from "@/lib/prisma";
 /**
  * คืนค่า user จาก session — เช็คกับฐานข้อมูลจริงด้วยว่ายังมีอยู่/ยัง active อยู่หรือไม่
  * (session เป็น JWT ไม่ผูกกับ DB โดยตรง ถ้า user ถูกลบ/ปิดใช้งานไปแล้ว ต้องไม่ถือว่า login อยู่)
+ *
+ * ตำแหน่ง/level/ชื่อ อ่านสดจากฐานข้อมูลทุกครั้ง ไม่ใช้ค่าที่ฝังใน JWT — ค่าใน JWT ถูกเขียนตอนล็อกอิน
+ * ถ้าผู้จัดการเปลี่ยนตำแหน่งให้ใครทีหลัง (เช่นจากพนักงานเป็นช่าง) สิทธิ์เก่าจะติดอยู่จนกว่าคนนั้น
+ * จะล็อกเอาท์ ทำให้ด่านตรวจสิทธิ์ทุกจุดตัดสินจากตำแหน่งที่ไม่ใช่ปัจจุบัน
  */
 export async function getSessionUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
-  const exists = await prisma.user.findUnique({
+  const current = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, active: true },
+    select: { active: true, role: true, groomerLevel: true, name: true },
   });
-  if (!exists || !exists.active) return null;
-  return session.user;
+  if (!current || !current.active) return null;
+  return {
+    ...session.user,
+    role: current.role,
+    groomerLevel: current.groomerLevel,
+    name: current.name,
+  };
 }
 
 /** ต้องล็อกอิน — ไม่งั้นเด้งไป /login */

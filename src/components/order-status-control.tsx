@@ -47,7 +47,7 @@ export function OrderStatusControl({
   roomLabel: string | null;
   iHaveStartedNotFinished: boolean;
   badgeInfo: StatusBadgeInfo;
-  /** ยังไม่ถึงวันคิว/วันเช็คอิน — ช่างอาบน้ำกดเริ่มดำเนินการไม่ได้ */
+  /** ยังไม่ถึงวันคิว/วันเช็คอิน — ทุกตำแหน่งกดเริ่ม/เสร็จสิ้นไม่ได้ (ยกเลิกยังกดได้) */
   beforeServiceDay?: boolean;
   /** บิลร้านอาหารไม่มีขั้นตอนดำเนินการ/เช็คเอ้าท์ — เหลือแค่ยกเลิกบิล */
   isShopOrder?: boolean;
@@ -138,8 +138,9 @@ export function OrderStatusControl({
   const checkoutBlocked = badgeInfo.kind === "AWAITING_PAYMENT";
 
   const startBlocked = showStart && orderKind === "BOARDING" && !isFullyPaid;
-  // ช่างทุก level ต้องรอถึงวันใช้บริการก่อน (ฝั่ง server ก็กันซ้ำไว้แล้ว)
-  const startNotYet = showStart && role === "GROOMER" && beforeServiceDay;
+  // ทุกตำแหน่งต้องรอถึงวันใช้บริการก่อน ทั้งปุ่มเริ่ม, ช่างกดเสร็จ และทำรายการเสร็จสิ้น
+  // (ฝั่ง server ก็กันซ้ำไว้แล้ว) — ปุ่มยกเลิกไม่โดนล็อก
+  const notYet = beforeServiceDay && (showStart || showFinishMyWork || showCheckout);
 
   return (
     <>
@@ -168,15 +169,12 @@ export function OrderStatusControl({
           )}
           {showStart && (
             <div>
-              <Button onClick={() => change("IN_PROGRESS")} disabled={isPending || startBlocked || startNotYet}>
+              <Button onClick={() => change("IN_PROGRESS")} disabled={isPending || startBlocked || beforeServiceDay}>
                 {isPending ? <Loader2 className="animate-spin" /> : <PlayCircle />}
                 {t.orders.startWork}
               </Button>
               {startBlocked && (
                 <p className="mt-1 text-xs text-muted-foreground">{t.orders.startBlockedNotFullyPaid}</p>
-              )}
-              {startNotYet && (
-                <p className="mt-1 text-xs text-muted-foreground">{t.orders.startBlockedNotServiceDay}</p>
               )}
             </div>
           )}
@@ -184,7 +182,7 @@ export function OrderStatusControl({
             <Button
               className="bg-sky-600 hover:bg-sky-700"
               onClick={finishMyWork}
-              disabled={isPending}
+              disabled={isPending || beforeServiceDay}
             >
               {isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
               {t.orders.finishMyWork}
@@ -197,7 +195,7 @@ export function OrderStatusControl({
               description={t.orders.confirmFinishDescription}
               confirmLabel={t.orders.finishWork}
               onConfirm={() => change("COMPLETED")}
-              disabled={isPending || checkoutBlocked}
+              disabled={isPending || checkoutBlocked || beforeServiceDay}
             >
               {isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
               {t.orders.finishWork}
@@ -215,6 +213,11 @@ export function OrderStatusControl({
           >
             <Ban /> {t.orders.cancelOrder}
           </ConfirmButton>
+          )}
+          {notYet && (
+            <p className="w-full text-right text-xs text-muted-foreground">
+              {t.orders.startBlockedNotServiceDay}
+            </p>
           )}
         </div>
       )}

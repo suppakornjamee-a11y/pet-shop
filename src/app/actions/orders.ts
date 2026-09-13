@@ -583,10 +583,10 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
           : "เช็คเอ้าท์ได้เฉพาะพนักงานหรือผู้จัดการเท่านั้น",
     };
   }
-  // ช่างอาบน้ำทุก level เริ่มงานล่วงหน้าไม่ได้ — กันกดเริ่มผิดใบ (เช่นคิวพรุ่งนี้ของน้องชื่อซ้ำ)
-  // ผู้จัดการยังเริ่มได้เผื่อกรณีลูกค้ามาก่อนวันนัดจริง
-  if (target === "IN_PROGRESS" && user.role === "GROOMER" && isBeforeServiceDay(order)) {
-    return { ok: false, error: "ยังไม่ถึงวันใช้บริการ จึงยังเริ่มดำเนินการไม่ได้" };
+  // ยังไม่ถึงวันใช้บริการ ทุกตำแหน่ง (ช่างทุก level และผู้จัดการ) เริ่มงานหรือปิดงานล่วงหน้าไม่ได้
+  // กันกดผิดใบ เช่นคิวพรุ่งนี้ของน้องชื่อซ้ำ — ยกเลิกออเดอร์ยังทำได้ตามปกติ
+  if ((target === "IN_PROGRESS" || target === "COMPLETED") && isBeforeServiceDay(order)) {
+    return { ok: false, error: "ยังไม่ถึงวันใช้บริการ จึงยังดำเนินการไม่ได้" };
   }
   if (orderKind === "BOARDING" && target === "IN_PROGRESS" && !fullyPaid) {
     return { ok: false, error: "ออเดอร์ฝากเลี้ยงต้องชำระเงินเต็มจำนวนก่อนเริ่มดำเนินการ" };
@@ -647,6 +647,7 @@ export async function markGroomerFinished(orderId: string): Promise<ActionResult
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
   if (getOrderKind(order) !== "BATH") return { ok: false, error: "ใช้ได้เฉพาะออเดอร์อาบน้ำ" };
   if (order.status !== "IN_PROGRESS") return { ok: false, error: "ออเดอร์นี้ยังไม่ได้เริ่มดำเนินการ" };
+  if (isBeforeServiceDay(order)) return { ok: false, error: "ยังไม่ถึงวันใช้บริการ จึงยังดำเนินการไม่ได้" };
 
   const actor = user.role === "ADMIN" ? "ผู้จัดการ" : "ช่าง";
   await prisma.orderActivityLog.create({
