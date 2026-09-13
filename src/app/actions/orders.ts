@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import { sendLinePush, buildLiffDeepLink } from "@/lib/line";
+import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
 import { formatBaht } from "@/lib/format";
 import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder } from "@/lib/order-kind";
 import { buildOrderPlan, createOrderSchema, persistOrder, parseFleaTickDate } from "@/lib/order-plan";
@@ -513,7 +514,7 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
   return { ok: true, message: "ยืนยันคิวแล้ว" };
 }
 
-/** ปฏิเสธคิวที่ลูกค้าจองมา — ยกเลิกออเดอร์และแจ้งเหตุผลกลับไปทาง LINE */
+/** ปฏิเสธคิวที่ลูกค้าจองมา — ยกเลิกออเดอร์ เหตุผลไปขึ้นเป็น popup บนหน้าจองของลูกค้า */
 export async function rejectOrderQueue(orderId: string, reason: string): Promise<ActionResult> {
   const user = await requireUser();
   if (user.role === "GROOMER") {
@@ -526,7 +527,7 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
     return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ระหว่างรอเช็คคิว" };
   }
 
-  // เหตุผลนี้ถูกส่งให้ลูกค้าอ่านตรงๆ ทาง LINE — ปล่อยว่างไม่ได้ (ฝั่ง UI ก็บังคับกรอกอยู่แล้ว
+  // เหตุผลนี้ไปขึ้นบนหน้าจอลูกค้าตรงๆ — ปล่อยว่างไม่ได้ (ฝั่ง UI ก็บังคับกรอกอยู่แล้ว
   // ด่านนี้กันกรณีเรียกมาจากที่อื่นหรือหน้าจอค้างเวอร์ชันเก่า)
   const note = reason.trim();
   if (!note) return { ok: false, error: "กรุณาระบุเหตุผลที่ปฏิเสธคิว" };
@@ -536,19 +537,15 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
       data: { status: "CANCELLED", updatedById: user.id },
     }),
     prisma.orderActivityLog.create({
-      data: { orderId, action: `ปฏิเสธคิว: ${note}`, createdById: user.id },
+      data: { orderId, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: user.id },
     }),
   ]);
 
-  void notifyCustomerLine(
-    orderId,
-    `ขออภัย คิวที่จองไว้ไม่ว่าง ออเดอร์ ${order.code}
-เหตุผล ${note}
-รบกวนติดต่อร้านเพื่อจองเวลาใหม่`
-  );
+  // ไม่ส่งข้อความ LINE แล้ว — หน้าจองของลูกค้าถามสถานะเองเป็นรอบ พอเจอว่าถูกปฏิเสธจะเด้ง popup
+  // พร้อมเหตุผลนี้ และพาไปเลือกวันเวลาใหม่ให้เอง (อ่านเหตุผลกลับจาก activity log ด้วย prefix เดียวกัน)
 
   revalidateOrderViews(orderId);
-  return { ok: true, message: "ปฏิเสธคิวแล้ว แจ้งลูกค้าทาง LINE" };
+  return { ok: true, message: "ปฏิเสธคิวแล้ว" };
 }
 
 export type UpdateOrderStatusResult = ActionResult & { cctvReminder?: boolean };

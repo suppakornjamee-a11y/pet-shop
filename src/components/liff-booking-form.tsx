@@ -436,6 +436,9 @@ function BookingBody() {
   const [step, setStep] = useState<Step>(1);
   // ออเดอร์ถูกปฏิเสธคิว — แยกจาก done เพราะยังต้องโชว์สรุปเดิมไว้ให้ลูกค้าอ่าน
   const [rejected, setRejected] = useState(false);
+  // เหตุผลที่พนักงานพิมพ์ตอนปฏิเสธคิว + popup แจ้งลูกค้าบนหน้าจอ (แทนข้อความ LINE ที่เคยส่ง)
+  const [queueRejectReason, setQueueRejectReason] = useState<string | null>(null);
+  const [rejectNoticeOpen, setRejectNoticeOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -734,6 +737,16 @@ function BookingBody() {
     });
   }
 
+  /** คิวไม่ผ่าน — พาไปเลือกวันเวลาใหม่ โดยคงบริการกับสัตว์เลี้ยงที่เลือกไว้แล้ว */
+  function pickNewSlot() {
+    setRejectNoticeOpen(false);
+    setRejected(false);
+    setQueueRejectReason(null);
+    setDone(null);
+    setTime("");
+    setStep(2);
+  }
+
   /** ยกเลิกคำขอจองที่เพิ่งส่งไป แล้วพากลับไปเริ่มใหม่ที่ขั้นแรก */
   async function cancelBooking() {
     if (!idToken || !done) return;
@@ -811,7 +824,11 @@ function BookingBody() {
         return;
       }
       if (res.status === "CANCELLED") {
+        setQueueRejectReason(res.queueRejectReason);
         setRejected(true);
+        setRejectNoticeOpen(true);
+        // สั่นเบาๆ ให้รู้ตัวว่ามีอะไรเด้งขึ้น (iOS ไม่รองรับ ก็แค่ไม่สั่น)
+        navigator.vibrate?.(200);
         return;
       }
       if (res.status !== "PENDING_APPROVAL") {
@@ -1005,7 +1022,14 @@ function BookingBody() {
             {rejected ? t.liff.queueRejectedTitle : t.liff.checkingQueueTitle}
           </h1>
           {rejected && (
-            <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
+            <>
+              {queueRejectReason && (
+                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                  {t.liff.slipRejectedReason(queueRejectReason)}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
+            </>
           )}
         </div>
 
@@ -1051,15 +1075,7 @@ function BookingBody() {
 
         {rejected ? (
           // คิวไม่ผ่าน — พาไปเลือกวันเวลาใหม่ได้เลย โดยคงบริการกับสัตว์เลี้ยงที่เลือกไว้แล้ว
-          <Button
-            className="h-12 w-full rounded-2xl"
-            onClick={() => {
-              setRejected(false);
-              setDone(null);
-              setTime("");
-              setStep(2);
-            }}
-          >
+          <Button className="h-12 w-full rounded-2xl" onClick={pickNewSlot}>
             {t.liff.bookAnotherButton}
           </Button>
         ) : (
@@ -1077,6 +1093,32 @@ function BookingBody() {
             </Button>
           )
         )}
+
+        {/* แจ้งเตือนในหน้าจอเมื่อพนักงานปฏิเสธคิว — เด้งขึ้นทันทีที่หน้านี้ถามสถานะแล้วเจอ
+            (ไม่ส่งข้อความ LINE แล้ว) ปิดไปก็ยังเห็นเหตุผลบนหน้าจอด้านหลังอยู่ */}
+        <Dialog open={rejectNoticeOpen} onOpenChange={setRejectNoticeOpen}>
+          <DialogContent className="rounded-3xl sm:max-w-sm">
+            <DialogHeader className="items-center text-center">
+              <span className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/15">
+                <XCircle className="h-7 w-7 text-destructive" />
+              </span>
+              <DialogTitle className="text-center text-lg">{t.liff.queueRejectedTitle}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 rounded-2xl bg-muted/50 p-4 text-center">
+              {queueRejectReason && (
+                <p className="text-base font-semibold text-destructive">
+                  {t.liff.slipRejectedReason(queueRejectReason)}
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
+            </div>
+            <DialogFooter>
+              <Button className="h-12 w-full rounded-2xl text-base" onClick={pickNewSlot}>
+                {t.liff.bookAnotherButton}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

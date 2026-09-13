@@ -739,6 +739,7 @@ const en: Dictionary = {
     slipRejectedTitle: "Slip was not accepted",
     slipRejectedReason: (reason: string) => `Reason: ${reason}`,
     slipRejectedHint: "Please attach the slip again.",
+    reattachSlipButton: "Attach a new slip",
     qrExpiredContactShop: "This QR has expired — please message the shop on LINE for a new one.",
     orderNotFound: "Booking not found",
     profilePageTitle: "My Profile",

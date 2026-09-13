@@ -753,6 +753,7 @@ const th = {
     slipRejectedTitle: "สลิปไม่ผ่านการตรวจสอบ",
     slipRejectedReason: (reason: string) => `เหตุผล: ${reason}`,
     slipRejectedHint: "รบกวนแนบสลิปใหม่อีกครั้งค่ะ",
+    reattachSlipButton: "แนบสลิปใหม่",
     qrExpiredContactShop: "QR หมดอายุแล้ว กรุณาทักแชท LINE ของร้านเพื่อขอ QR ใหม่",
     orderNotFound: "ไม่พบการจองนี้",
     profilePageTitle: "โปรไฟล์ของฉัน",

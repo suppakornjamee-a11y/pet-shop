@@ -21,6 +21,7 @@ import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provi
 import { useI18n } from "@/components/i18n-provider";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type PaymentRow = {
   id: string;
@@ -84,6 +85,9 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   const [uploading, setUploading] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const rejectedRef = useRef<HTMLDivElement>(null);
+  const slipInputRef = useRef<HTMLInputElement>(null);
+  // popup แจ้งสลิปไม่ผ่าน — เปิดเองตอนเข้าหน้ามาเจอสลิปที่ถูกปฏิเสธค้างอยู่ หรือตอนที่เพิ่งถูกปฏิเสธระหว่างเปิดหน้าอยู่
+  const [rejectNoticeOpen, setRejectNoticeOpen] = useState(payment.status === "REJECTED");
 
   // หน้านี้ถามสถานะใหม่ทุก 8 วินาที — พอพนักงานปฏิเสธสลิป สถานะจะเปลี่ยนเป็น REJECTED ระหว่างที่
   // ลูกค้ายังเปิดค้างอยู่ ต้องล้าง "เพิ่งส่งไป" กับรูปพรีวิวเดิมทิ้ง ไม่งั้นหน้าจอจะค้างที่ "ส่งสลิปแล้ว"
@@ -94,6 +98,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
     if (payment.status === "REJECTED") {
       setJustSubmitted(false);
       setSlipPreview(null);
+      setRejectNoticeOpen(true);
     }
   }
 
@@ -159,7 +164,10 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
 
   // สลิปเพิ่งถูกปฏิเสธ — เลื่อนจอไปที่กล่องเหตุผลให้เห็นทันที ไม่ต้องเลื่อนหาเอง
   useEffect(() => {
-    if (isRejected) rejectedRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!isRejected) return;
+    rejectedRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // สั่นเบาๆ ให้รู้ตัวว่ามีแจ้งเตือนเด้งขึ้น (iOS ไม่รองรับ ก็แค่ไม่สั่น)
+    navigator.vibrate?.(200);
   }, [isRejected]);
   const isUnusable = isExpired || isCancelled;
   const mm = Math.floor(remaining / 60000);
@@ -316,6 +324,52 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
           {t.liff.slipSubmittedNotice}
         </p>
       ) : null}
+
+      {/* ปุ่ม "แนบสลิปใหม่" ใน popup เปิดตัวเลือกรูปผ่านช่องนี้ — แยกจากช่องแนบปกติด้านบน
+          เพราะช่องนั้นหายไปเมื่อมีรูปพรีวิวค้างอยู่ */}
+      <input
+        ref={slipInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleSlipFileSelect(file);
+          e.target.value = "";
+        }}
+      />
+
+      {/* แจ้งเตือนในหน้าจอเมื่อพนักงานปฏิเสธสลิป พร้อมเหตุผลที่พนักงานพิมพ์ (แทนข้อความ LINE) */}
+      <Dialog open={rejectNoticeOpen && isRejected} onOpenChange={setRejectNoticeOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-sm">
+          <DialogHeader className="items-center text-center">
+            <span className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/15">
+              <XCircle className="h-7 w-7 text-destructive" />
+            </span>
+            <DialogTitle className="text-center text-lg">{t.liff.slipRejectedTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 rounded-2xl bg-muted/50 p-4 text-center">
+            {payment.rejectReason && (
+              <p className="text-base font-semibold text-destructive">
+                {t.liff.slipRejectedReason(payment.rejectReason)}
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">{t.liff.slipRejectedHint}</p>
+          </div>
+          <DialogFooter>
+            <Button
+              className="h-12 w-full rounded-2xl text-base"
+              onClick={() => {
+                setRejectNoticeOpen(false);
+                slipInputRef.current?.click();
+              }}
+            >
+              <Paperclip className="h-4 w-4" />
+              {t.liff.reattachSlipButton}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -550,7 +604,7 @@ export function LiffPaymentBody({ orderId }: { orderId: string }) {
           </div>
         </div>
       ) : activePayment ? (
-        <QrBlock payment={activePayment} orderStatus={status} />
+        <QrBlock key={activePayment.id} payment={activePayment} orderStatus={status} />
       ) : fullyPaid ? (
         <div className="flex flex-col items-center gap-3 rounded-lg bg-emerald-50 p-8 text-center dark:bg-emerald-950/40">
           <PartyPopper className="h-12 w-12 text-emerald-600" />

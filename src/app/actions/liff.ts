@@ -17,6 +17,7 @@ import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-pl
 import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
+import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
 import { isPastSlot, isValidDateStr, isValidTimeStr, buildSlotDate, toThaiDateStr } from "@/lib/slots";
 import type { ActionResult } from "./customers";
 
@@ -500,6 +501,13 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
         orderBy: { createdAt: "desc" },
         select: { id: true, description: true, amount: true },
       },
+      // เหตุผลที่พนักงานปฏิเสธคิว — เก็บไว้ใน activity log ไม่มีคอลัมน์แยก เอาเฉพาะรายการล่าสุดที่ขึ้นต้นด้วย prefix
+      activityLogs: {
+        where: { action: { startsWith: QUEUE_REJECT_LOG_PREFIX } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { action: true },
+      },
       payments: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -537,6 +545,7 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
     room: order.room,
     items: order.items,
     extraCharges: order.extraCharges,
+    queueRejectReason: order.activityLogs[0]?.action.slice(QUEUE_REJECT_LOG_PREFIX.length) ?? null,
     payments: order.payments.map((p) => ({
       id: p.id,
       purpose: p.purpose,
