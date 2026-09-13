@@ -126,7 +126,7 @@ export function LiffGate({ children }: { children: React.ReactNode }) {
         <p className="font-medium">{t.liff.errorTitle}</p>
         <p className="text-sm text-muted-foreground">{error}</p>
         {debugDetail && (
-          <p className="mt-2 max-w-full break-words rounded-md bg-muted/50 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+          <p className="mt-2 max-w-full break-words rounded-md bg-muted/50 px-3 py-2 font-mono text-[0.6875rem] text-muted-foreground">
             {debugDetail}
           </p>
         )}

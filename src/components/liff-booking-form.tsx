@@ -189,7 +189,7 @@ function MonthCalendar({
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
+      <div className="grid grid-cols-7 gap-1 text-center text-[0.6875rem] text-muted-foreground">
         {WEEKDAY_LABELS.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -396,7 +396,7 @@ function Stepper({
               />
               <span
                 className={cn(
-                  "text-center text-[10px] leading-tight",
+                  "text-center text-[0.625rem] leading-tight",
                   passed || current ? "font-medium text-primary" : "text-muted-foreground"
                 )}
               >
@@ -1171,7 +1171,7 @@ function BookingBody() {
           })}
         </div>
 
-        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl">
+        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
           <Button className="h-14 w-full rounded-2xl text-base" onClick={() => setStep(2)}>
             {t.liff.nextStepButton}
           </Button>
@@ -1495,7 +1495,7 @@ function BookingBody() {
       </Dialog>
 
       {/* สรุปยอด + ปุ่มยืนยัน แปะด้านล่างจอเสมอ */}
-      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] sm:max-w-xl md:max-w-2xl">
+      <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md rounded-2xl border bg-card p-3 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
         <div className="mb-2 flex items-center justify-between px-1 text-sm">
           <span className="text-muted-foreground">
             {kind === "BATH" && depositAmount > 0 ? t.orders.form.depositLabel : t.orders.form.grandTotal}

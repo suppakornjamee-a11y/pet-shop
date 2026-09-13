@@ -101,11 +101,11 @@ function OrdersBody() {
                   <div className="font-medium">{o.code}</div>
                   <div className="mt-1">
                     {o.hasSubmittedSlip && !isCancelled ? (
-                      <Badge variant="outline" className={cn("text-[10px]", paymentStatusColor.SUBMITTED)}>
+                      <Badge variant="outline" className={cn("text-[0.625rem]", paymentStatusColor.SUBMITTED)}>
                         {t.orders.slipPendingReviewBadge}
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className={cn("text-[10px]", orderStatusColor[o.status])}>
+                      <Badge variant="outline" className={cn("text-[0.625rem]", orderStatusColor[o.status])}>
                         {t.labels.orderStatus[o.status]}
                       </Badge>
                     )}

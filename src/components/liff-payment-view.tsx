@@ -167,7 +167,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
         <div className="text-3xl font-bold text-primary">{formatBaht(payment.amount)}</div>
       </div>
 
-      <div className="mx-auto w-fit rounded-[28px] bg-emerald-500 p-3.5 shadow-sm">
+      <div className="mx-auto w-fit rounded-[1.75rem] bg-emerald-500 p-3.5 shadow-sm">
         <div className="overflow-hidden rounded-3xl bg-white">
           <div className="flex items-center justify-center gap-2.5 bg-[#0b2f6b] px-6 py-3 text-white">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/15">
@@ -179,7 +179,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
             </div>
           </div>
           <div className="flex flex-col items-center gap-0.5 pt-3">
-            <span className="text-[9px] font-medium text-[#0b2f6b]">พร้อมเพย์</span>
+            <span className="text-[0.5625rem] font-medium text-[#0b2f6b]">พร้อมเพย์</span>
             <div className="flex overflow-hidden rounded border border-[#0b2f6b] text-xs font-bold">
               <span className="px-1.5 py-0.5 text-[#0b2f6b]">Prompt</span>
               <span className="bg-[#0b2f6b] px-1.5 py-0.5 text-white">Pay</span>
@@ -195,7 +195,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
                 </div>
               </div>
             ) : (
-              <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-zinc-400">
+              <div className="flex h-[13.75rem] w-[13.75rem] items-center justify-center text-center text-sm text-zinc-400">
                 {t.orders.payment.noQrYet}
                 <br />
                 {t.orders.payment.noQrHint}
