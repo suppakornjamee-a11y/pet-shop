@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { allergyText } from "@/lib/pet-notes";
 import { requireUser } from "@/lib/auth-helpers";
 import { formatBaht, formatDateTime } from "@/lib/format";
-import { getOrderKind, getMyGroomerPhase, getStatusBadgeInfo } from "@/lib/order-kind";
+import { getOrderKind, getMyGroomerPhase, getStatusBadgeInfo, isBeforeServiceDay } from "@/lib/order-kind";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { SpeciesIcon } from "@/components/species-icon";
@@ -166,6 +166,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
                 iHaveStartedNotFinished={iHaveStartedNotFinished}
                 badgeInfo={badgeInfo}
+                beforeServiceDay={isBeforeServiceDay(order)}
               />
             </CardHeader>
             <CardContent className="space-y-4">

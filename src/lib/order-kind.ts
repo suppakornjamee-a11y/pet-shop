@@ -1,6 +1,20 @@
 import type { OrderStatus, Role } from "@/generated/prisma/enums";
+import { toThaiDateStr } from "@/lib/slots";
 
 export type OrderKind = "BOARDING" | "BATH" | "OTHER";
+
+/**
+ * ยังไม่ถึงวันใช้บริการ — เทียบเป็น "วันที่ไทย" ไม่ใช่เวลา (มาก่อนเวลาคิวในวันเดียวกันยังเริ่มได้)
+ * วันใช้บริการ = วันคิว (อาบน้ำ/บริการ) หรือวันเช็คอิน (โรงแรม) ออเดอร์ที่ไม่มีวันเลยถือว่าเริ่มได้
+ */
+export function isBeforeServiceDay(
+  order: { appointmentAt: Date | null; checkInAt: Date | null },
+  now: Date = new Date()
+): boolean {
+  const serviceAt = order.appointmentAt ?? order.checkInAt;
+  if (!serviceAt) return false;
+  return toThaiDateStr(now) < toThaiDateStr(serviceAt);
+}
 
 /** จัดประเภทออเดอร์จากฟิลด์ที่มีอยู่แล้ว — ไม่มีฟิลด์ประเภทแยกต่างหาก */
 export function getOrderKind(order: { roomId: string | null; queueType: string | null }): OrderKind {

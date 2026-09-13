@@ -8,7 +8,7 @@ import { buildPromptPayPayload } from "@/lib/promptpay";
 import { sendLinePush, buildLiffDeepLink } from "@/lib/line";
 import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
 import { formatBaht } from "@/lib/format";
-import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder } from "@/lib/order-kind";
+import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder, isBeforeServiceDay } from "@/lib/order-kind";
 import { buildOrderPlan, createOrderSchema, persistOrder, parseFleaTickDate } from "@/lib/order-plan";
 import type { Role } from "@/generated/prisma/enums";
 import type { ActionResult } from "./customers";
@@ -582,6 +582,11 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
           ? "จัดการสถานะออเดอร์ฝากเลี้ยงได้เฉพาะผู้จัดการเท่านั้น"
           : "เช็คเอ้าท์ได้เฉพาะพนักงานหรือผู้จัดการเท่านั้น",
     };
+  }
+  // ช่างอาบน้ำทุก level เริ่มงานล่วงหน้าไม่ได้ — กันกดเริ่มผิดใบ (เช่นคิวพรุ่งนี้ของน้องชื่อซ้ำ)
+  // ผู้จัดการยังเริ่มได้เผื่อกรณีลูกค้ามาก่อนวันนัดจริง
+  if (target === "IN_PROGRESS" && user.role === "GROOMER" && isBeforeServiceDay(order)) {
+    return { ok: false, error: "ยังไม่ถึงวันใช้บริการ จึงยังเริ่มดำเนินการไม่ได้" };
   }
   if (orderKind === "BOARDING" && target === "IN_PROGRESS" && !fullyPaid) {
     return { ok: false, error: "ออเดอร์ฝากเลี้ยงต้องชำระเงินเต็มจำนวนก่อนเริ่มดำเนินการ" };

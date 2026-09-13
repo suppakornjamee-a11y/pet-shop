@@ -392,6 +392,7 @@ const th = {
     activeWorkersLabel: "ดำเนินการโดย",
     groomerPrefix: "ช่าง",
     startBlockedNotFullyPaid: "ต้องชำระเงินเต็มจำนวนก่อน จึงจะเริ่มดำเนินการได้",
+    startBlockedNotServiceDay: "ยังไม่ถึงวันใช้บริการ",
     workDoneBadge: "อาบน้ำเรียบร้อย",
     transactionDate: "วันที่จองคิว",
     bathingInProgressBadge: "กำลังอาบน้ำ",

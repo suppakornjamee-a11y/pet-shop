@@ -379,6 +379,7 @@ const en: Dictionary = {
     activeWorkersLabel: "Handled by",
     groomerPrefix: "",
     startBlockedNotFullyPaid: "Full payment is required before you can start.",
+    startBlockedNotServiceDay: "The service day has not arrived yet.",
     workDoneBadge: "Bath Complete",
     transactionDate: "Booking date",
     bathingInProgressBadge: "Bathing In Progress",
