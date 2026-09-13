@@ -13,7 +13,7 @@ import {
 
 /* ธงเป็นไฟล์รูป ไม่ใช้อิโมจิธง เพราะ Windows ไม่รองรับ จะกลายเป็นตัวอักษร "TH"/"GB" แทนรูปธง
    รูปทั้งสองถูกครอปเป็นอัตราส่วน 3:2 ไว้แล้ว (120x80) กรอบด้านล่างจึงใช้ 3:2 เท่ากัน ไม่มีขอบว่าง */
-const FLAG_CLASS = "block h-4 w-6 shrink-0 rounded-[3px] object-cover ring-1 ring-black/10";
+const FLAG_CLASS = "block h-3.5 w-[21px] shrink-0 rounded-[2px] object-cover ring-1 ring-black/10";
 
 export function LanguageToggle() {
   const { locale, t, setLocale } = useI18n();
