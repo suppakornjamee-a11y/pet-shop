@@ -1084,7 +1084,9 @@ function BookingBody() {
   /* ---------- ขั้นที่ 1: เลือกบริการ ---------- */
   if (step === 1) {
     return (
-      <div className="space-y-5 pb-28">
+      // สูงเต็มจอ (หักระยะขอบบน-ล่างของ layout) เพื่อให้กลุ่มปุ่มเลือกบริการลงไปอยู่กลางพื้นที่ว่าง
+      // ระหว่างแถบขั้นตอนกับปุ่ม "ถัดไป" แทนที่จะกองอยู่ข้างบนแล้วเหลือที่ว่างโล่งครึ่งจอ
+      <div className="flex min-h-[calc(100dvh-3rem)] flex-col gap-5 pb-28 sm:min-h-[calc(100dvh-4rem)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/logo-light.png"
@@ -1092,7 +1094,7 @@ function BookingBody() {
           className="mx-auto mt-4 h-20 w-auto sm:mt-0"
         />
 
-        <div className="pt-2 sm:pt-0">
+        <div className="pt-4">
           <Stepper step={1} t={t} onJump={setStep} />
         </div>
 
@@ -1127,7 +1129,7 @@ function BookingBody() {
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="flex flex-1 flex-col justify-center space-y-3">
           <p className="text-xs font-medium text-muted-foreground">{t.liff.chooseServiceTitle}</p>
           {(["BOARDING", "OTHER", "BATH"] as const).map((k) => {
             const Icon = KIND_ICONS[k];
