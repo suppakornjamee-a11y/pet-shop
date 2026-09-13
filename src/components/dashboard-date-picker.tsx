@@ -4,17 +4,12 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/components/i18n-provider";
+import { toThaiDateStr } from "@/lib/slots";
 
 export function DashboardDatePicker({ value }: { value: string }) {
   const { t } = useI18n();
   const router = useRouter();
 
-  function todayStr() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
-    ).padStart(2, "0")}`;
-  }
 
   return (
     <div className="flex items-center gap-2">
@@ -26,7 +21,7 @@ export function DashboardDatePicker({ value }: { value: string }) {
           className="w-[180px]"
         />
       </div>
-      {value !== todayStr() && (
+      {value !== toThaiDateStr(new Date()) && (
         <Button variant="outline" size="sm" onClick={() => router.push("/")}>
           {t.calendar.todayLabel}
         </Button>

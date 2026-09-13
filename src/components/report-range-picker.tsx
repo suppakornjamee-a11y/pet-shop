@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { addDaysThai, toThaiDateStr } from "@/lib/slots";
 
 /** เลือกช่วงวันที่ของรายงาน — เก็บไว้ใน query string จะได้แชร์ลิงก์/รีเฟรชแล้วช่วงเดิมยังอยู่ */
 export function ReportRangePicker({ from, to }: { from: string; to: string }) {
@@ -14,19 +15,15 @@ export function ReportRangePicker({ from, to }: { from: string; to: string }) {
     router.push(`/reports?from=${nextFrom}&to=${nextTo}`);
 
   /** ช่วงย้อนหลัง n วันนับถึงวันนี้ (รวมวันนี้) */
+  // นับ "วันนี้" ตามเวลาไทยเสมอ ไม่พึ่งโซนเวลาของเครื่องที่เปิดหน้า
   function lastDays(n: number) {
-    const today = new Date();
-    const start = new Date(today.getTime() - (n - 1) * 86_400_000);
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    go(fmt(start), fmt(today));
+    const today = toThaiDateStr(new Date());
+    go(addDaysThai(today, -(n - 1)), today);
   }
 
   function thisMonth() {
-    const d = new Date();
-    const first = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    go(first, today);
+    const today = toThaiDateStr(new Date());
+    go(`${today.slice(0, 8)}01`, today);
   }
 
   return (

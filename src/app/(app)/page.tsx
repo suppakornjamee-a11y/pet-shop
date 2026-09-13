@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardDatePicker } from "@/components/dashboard-date-picker";
 import { requireStaffUser } from "@/lib/auth-helpers";
+import { isValidDateStr, thaiDayRange, toThaiDateStr } from "@/lib/slots";
 
 function CheckInStatIcon({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
@@ -32,35 +33,17 @@ function CafeStatIcon({ className }: { className?: string }) {
   return <img src="/images/icons/cafe.png" alt="" className={className} />;
 }
 
-function parseDate(input?: string) {
-  if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
-    const [y, m, d] = input.split("-").map(Number);
-    const start = new Date(y, m - 1, d);
-    if (!isNaN(start.getTime())) return start;
-  }
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function toDateStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
-
 export default async function DashboardPage(props: PageProps<"/">) {
   const user = await requireStaffUser();
   const t = getDictionary(await getLocale());
   const searchParams = await props.searchParams;
   const dateParam = typeof searchParams.date === "string" ? searchParams.date : undefined;
-  const startOfDay = parseDate(dateParam);
-  const endOfDay = new Date(
-    startOfDay.getFullYear(),
-    startOfDay.getMonth(),
-    startOfDay.getDate() + 1
-  );
-  const selectedDateStr = toDateStr(startOfDay);
-  const isToday = selectedDateStr === toDateStr(new Date());
+  // "วันนี้" และขอบวันต้องนับตามเวลาไทย — เดิมใช้เวลาของเครื่อง บน Vercel (UTC) วันใหม่จึงเริ่มตอน 07:00
+  // งานช่วงเที่ยงคืนถึงเจ็ดโมงเช้าไปโผล่ในวันก่อนหน้า และหน้าแรกยังเปิดเป็นเมื่อวานจนถึง 07:00
+  const todayStr = toThaiDateStr(new Date());
+  const selectedDateStr = dateParam && isValidDateStr(dateParam) ? dateParam : todayStr;
+  const { start: startOfDay, end: endOfDay } = thaiDayRange(selectedDateStr);
+  const isToday = selectedDateStr === todayStr;
 
   // กดการ์ดสถิติด้านบนเพื่อกรองรายการออเดอร์ด้านล่าง — เก็บไว้ใน query string จะได้แชร์/รีเฟรชแล้วไม่หาย
   const dayRange = { gte: startOfDay, lt: endOfDay };
