@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ReceiptText } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
-import { formatDate, formatBaht, formatTime } from "@/lib/format";
+import { formatDate, formatBaht, formatDateTime } from "@/lib/format";
 import { getStatusBadgeInfo } from "@/lib/order-kind";
 import { getLocale } from "@/i18n/get-locale";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -292,10 +292,22 @@ export default async function DashboardPage(props: PageProps<"/">) {
                         </Badge>
                       )}
                     </div>
+                    {/* แบบเดียวกับหน้าประวัติจอง: ลูกค้า · สัตว์เลี้ยง / วันที่จองคิว / วันที่ทำรายการ */}
                     <div className="truncate text-xs text-muted-foreground">
-                      {o.customer?.name ?? t.common.walkInCustomer}
-                      {o.pet ? ` (${o.pet.name})` : ""} {t.dashboard.timeLabel}{" "}
-                      {formatTime(o.createdAt)}
+                      {[
+                        o.customer ? t.orders.customerLine(o.customer.name) : t.common.walkInCustomer,
+                        o.pet && t.orders.petLine(o.pet.name),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                    {(o.appointmentAt ?? o.checkInAt) && (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {t.orders.serviceDateLabel}: {formatDateTime((o.appointmentAt ?? o.checkInAt)!)}
+                      </div>
+                    )}
+                    <div className="truncate text-xs text-muted-foreground">
+                      {t.orders.createdDateLabel}: {formatDateTime(o.createdAt)}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold">{formatBaht(o.total)}</div>

@@ -86,7 +86,6 @@ const en: Dictionary = {
     statCafeToday: "Cafe",
     underpaidBadge: "Underpaid",
     clearFilter: "Show all",
-    timeLabel: "at",
     ordersToday: (date) => `Today's orders — ${date}`,
     ordersOn: (date) => `Orders on ${date}`,
     noOrdersToday: "No orders today",

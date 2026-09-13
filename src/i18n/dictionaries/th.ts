@@ -98,7 +98,6 @@ const th = {
     statCafeToday: "คาเฟ่",
     underpaidBadge: "ชำระไม่ครบ",
     clearFilter: "ดูทั้งหมด",
-    timeLabel: "เวลา",
     ordersToday: (date: string) => `ออเดอร์วันนี้ ${date}`,
     ordersOn: (date: string) => `ออเดอร์วันที่ ${date}`,
     noOrdersToday: "ไม่มีออเดอร์ในวันนี้",
