@@ -2,13 +2,12 @@
 
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
-import { Search, Users, Smartphone, Loader2, FileText } from "lucide-react";
+import { Search, Users, Loader2, FileText } from "lucide-react";
 import { listCustomers, type CustomerFilter } from "@/app/actions/customers";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/components/i18n-provider";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -157,17 +156,7 @@ export function CustomerTable({ initial }: { initial: CustomerRow[] }) {
                 pagination.paged.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-medium">{c.name}</span>
-                        {c.createdVia === "LIFF" && (
-                          <Badge
-                            variant="outline"
-                            className="gap-1 border-green-300 text-[10px] text-green-700 dark:border-green-900 dark:text-green-400"
-                          >
-                            <Smartphone className="h-3 w-3" /> Line
-                          </Badge>
-                        )}
-                      </div>
+                      <div className="font-medium">{c.name}</div>
                       {c.nickname && (
                         <div className="text-xs text-muted-foreground">{c.nickname}</div>
                       )}

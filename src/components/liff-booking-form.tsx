@@ -1021,15 +1021,10 @@ function BookingBody() {
           <h1 className="text-xl font-bold tracking-tight">
             {rejected ? t.liff.queueRejectedTitle : t.liff.checkingQueueTitle}
           </h1>
-          {rejected && (
-            <>
-              {queueRejectReason && (
-                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
-                  {t.liff.slipRejectedReason(queueRejectReason)}
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
-            </>
+          {rejected && queueRejectReason && (
+            <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+              {t.liff.slipRejectedReason(queueRejectReason)}
+            </p>
           )}
         </div>
 
@@ -1104,14 +1099,13 @@ function BookingBody() {
               </span>
               <DialogTitle className="text-center text-lg">{t.liff.queueRejectedTitle}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 rounded-2xl bg-muted/50 p-4 text-center">
-              {queueRejectReason && (
+            {queueRejectReason && (
+              <div className="rounded-2xl bg-muted/50 p-4 text-center">
                 <p className="text-base font-semibold text-destructive">
                   {t.liff.slipRejectedReason(queueRejectReason)}
                 </p>
-              )}
-              <p className="text-sm text-muted-foreground">{t.liff.queueRejectedHint}</p>
-            </div>
+              </div>
+            )}
             <DialogFooter>
               <Button className="h-12 w-full rounded-2xl text-base" onClick={pickNewSlot}>
                 {t.liff.bookAnotherButton}
