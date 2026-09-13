@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { CustomerPreviewButton } from "@/components/customer-preview-dialog";
 import { OrderStatusBadges } from "@/components/order-status-badges";
 import { OrderExtraCharges } from "@/components/order-extra-charges";
 import { AddOrderItemForm } from "@/components/add-order-item-form";
@@ -242,7 +243,12 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               {!isShopOrder && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-sm font-bold">{t.orders.owner}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">{t.orders.owner}</span>
+                    {order.customer && (
+                      <CustomerPreviewButton customerId={order.customer.id} highlightPetId={order.pet?.id ?? null} />
+                    )}
+                  </div>
                   <div className="text-xs">{order.customer?.name ?? "-"}</div>
                   <div className="text-xs text-muted-foreground">{order.customer?.phone}</div>
                 </div>

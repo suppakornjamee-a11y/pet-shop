@@ -228,3 +228,62 @@ export async function listCustomers(filter: CustomerFilter) {
     lastVisitAt: c.orders[0]?.createdAt.toISOString() ?? null,
   }));
 }
+
+/**
+ * ข้อมูลลูกค้า + สัตว์เลี้ยงทุกตัว สำหรับ popup ดูประวัติจากหน้ารายละเอียดออเดอร์ (อ่านอย่างเดียว)
+ *
+ * แยกโหลดตอนกดเปิด popup แทนการ include มากับหน้าออเดอร์ เพราะรูปสัตว์เลี้ยงและรูปสมุดวัคซีน
+ * เก็บเป็น data URL ตัวละหลายร้อย KB — ถ้าโหลดมาทุกครั้งที่เปิดออเดอร์ หน้าจะหนักขึ้นทั้งที่ส่วนใหญ่ไม่มีใครกดดู
+ * ช่างก็เรียกได้ (requireUser) เพราะข้อมูลนิสัย/อาการแพ้/ข้อควรระวังคือสิ่งที่ช่างต้องรู้ก่อนลงมือ
+ */
+export async function getCustomerPreview(customerId: string) {
+  await requireUser();
+  const c = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { pets: { orderBy: { createdAt: "asc" } } },
+  });
+  if (!c) return null;
+  const iso = (d: Date | null) => d?.toISOString() ?? null;
+  return {
+    id: c.id,
+    name: c.name,
+    nickname: c.nickname,
+    phone: c.phone,
+    email: c.email,
+    lineId: c.lineId,
+    address: c.address,
+    petInstagram: c.petInstagram,
+    preferredLanguage: c.preferredLanguage,
+    createdVia: c.createdVia,
+    lineLinked: c.lineUserId != null,
+    note: c.note,
+    createdAt: c.createdAt.toISOString(),
+    pets: c.pets.map((p) => ({
+      id: p.id,
+      name: p.name,
+      species: p.species,
+      breed: p.breed,
+      gender: p.gender,
+      birthDate: iso(p.birthDate),
+      weightKg: p.weightKg,
+      color: p.color,
+      neutered: p.neutered,
+      personality: p.personality,
+      aggressiveNotes: p.aggressiveNotes,
+      allergies: p.allergies,
+      foodNote: p.foodNote,
+      medicationNote: p.medicationNote,
+      note: p.note,
+      // ข้อมูลเก่ามีรูปเดี่ยว (photoUrl/vaccinePhotoUrl) ก่อนเปลี่ยนเป็นหลายรูป — รวมเข้าชุดเดียวกัน ไม่ให้รูปเก่าหาย
+      photoUrls: p.photoUrls.length > 0 ? p.photoUrls : p.photoUrl ? [p.photoUrl] : [],
+      vaccinePhotoUrls:
+        p.vaccinePhotoUrls.length > 0 ? p.vaccinePhotoUrls : p.vaccinePhotoUrl ? [p.vaccinePhotoUrl] : [],
+      vaccine5in1At: iso(p.vaccine5in1At),
+      rabiesVaccineAt: iso(p.rabiesVaccineAt),
+      lastFleaTickAt: iso(p.lastFleaTickAt),
+      fleaTickMedicine: p.fleaTickMedicine,
+    })),
+  };
+}
+
+export type CustomerPreview = NonNullable<Awaited<ReturnType<typeof getCustomerPreview>>>;
