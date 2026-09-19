@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDayBookings } from "@/components/calendar-day-bookings";
+import { CalendarSlotPanel } from "@/components/calendar-slot-panel";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
@@ -76,9 +76,11 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
   const openSlot = isPastDate ? null : await firstOpenSlot(selectedDate, "OTHER");
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title={t.calendarOther.title} />
 
+      {/* ปฏิทินซ้าย · ช่วงเวลาของวันที่เลือกขวา (จอแคบเรียงบนล่าง) */}
+      <div className="grid items-start gap-6 lg:grid-cols-[1.3fr_1fr]">
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-base">{monthLabel}</CardTitle>
@@ -115,11 +117,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
           {/* วันที่เลือกไว้ + ปุ่มเปิดออเดอร์ อยู่บนสุด เห็นก่อนต้องเลื่อนดูปฏิทิน */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
             <p className="text-sm font-medium">{selectedLabel}</p>
-            {isPastDate ? null : !openSlot ? (
-              <p className="rounded-lg border border-dashed px-3 py-2.5 text-center text-xs text-muted-foreground">
-                {t.calendar.dayFullNotice}
-              </p>
-            ) : (
+            {isPastDate || !openSlot ? null : (
               <Button
                 render={
                   <Link
@@ -194,9 +192,11 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
             })}
           </div>
 
-          <CalendarDayBookings dateStr={selectedDate} queueType="OTHER" />
         </CardContent>
       </Card>
+
+      <CalendarSlotPanel dateStr={selectedDate} queueType="OTHER" />
+      </div>
     </div>
   );
 }

@@ -96,8 +96,6 @@ type OrderInitial = {
   cctvRequested?: boolean;
   depositAmount?: number;
   vaccineComplete?: boolean;
-  lastFleaTickDate?: string;
-  fleaTickMedicine?: string;
   productQty?: Record<string, number>;
   note?: string | null;
 };
@@ -172,8 +170,6 @@ export function OrderForm({
   );
   const [cctvRequested, setCctvRequested] = useState(initial?.cctvRequested ?? false);
   const [vaccineComplete, setVaccineComplete] = useState(initial?.vaccineComplete ?? false);
-  const [lastFleaTickDate, setLastFleaTickDate] = useState(initial?.lastFleaTickDate ?? "");
-  const [fleaTickMedicine, setFleaTickMedicine] = useState(initial?.fleaTickMedicine ?? "");
   const [productQty, setProductQty] = useState<Record<string, number>>(
     initial?.productQty ?? {}
   );
@@ -231,8 +227,6 @@ export function OrderForm({
   function prefillFromPet(pet?: Pet) {
     if (!pet) return;
     setVaccineComplete(pet.vaccineComplete ?? false);
-    setLastFleaTickDate(pet.lastFleaTickAt ? toThaiDateStr(new Date(pet.lastFleaTickAt)) : "");
-    setFleaTickMedicine(pet.fleaTickMedicine ?? "");
     // จองอาบน้ำ: รายการที่รวมอยู่แล้ว (ไถเท้า/ไถท้อง/ไถก้น/บีบต่อม/เช็ดหู) ติ๊กให้อัตโนมัติตามชนิดสัตว์ — ถอนออกเองได้ภายหลัง
     if (isBathQueueBooking) {
       setServiceIds((prev) => {
@@ -336,8 +330,6 @@ export function OrderForm({
       cctvRequested: roomId ? cctvRequested : false,
       depositAmount,
       vaccineComplete: roomId ? vaccineComplete : false,
-      lastFleaTickDate: roomId ? lastFleaTickDate : undefined,
-      fleaTickMedicine: roomId ? fleaTickMedicine : undefined,
       serviceIds: [...serviceIds],
       productLines,
       note,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, PawPrint, Pencil, CalendarClock, BedDouble, Syringe, Bug, UserCheck, Video } from "lucide-react";
+import { ArrowLeft, PawPrint, Pencil, CalendarClock, BedDouble, Syringe, UserCheck, Video } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { allergyText } from "@/lib/pet-notes";
 import { requireUser } from "@/lib/auth-helpers";
@@ -15,6 +15,10 @@ import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
 import { CustomerPreviewButton } from "@/components/customer-preview-dialog";
+import { FleaTickStatusBlock } from "@/components/flea-tick-status";
+import { BookingRequestPanel, type BookingRequestView } from "@/components/booking-request-panel";
+import { amountDueNow } from "@/lib/booking-request";
+import { toThaiDateStr } from "@/lib/slots";
 import { OrderStatusBadges } from "@/components/order-status-badges";
 import { OrderExtraCharges } from "@/components/order-extra-charges";
 import { AddOrderItemForm } from "@/components/add-order-item-form";
@@ -52,12 +56,32 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
       where: { id },
       include: {
         customer: true,
-        pet: true,
+        pet: { include: { fleaTickProduct: true } },
         room: { include: { category: true } },
         items: { orderBy: { createdAt: "asc" } },
         payments: { orderBy: { createdAt: "asc" }, include: { bankAccount: true } },
         extraCharges: { orderBy: { createdAt: "desc" }, include: { createdBy: true } },
         activityLogs: { orderBy: { createdAt: "desc" }, include: { createdBy: true } },
+        bookingRequest: {
+          include: {
+            orders: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                code: true,
+                status: true,
+                total: true,
+                depositAmount: true,
+                appointmentAt: true,
+                checkInAt: true,
+                checkOutAt: true,
+                pet: { select: { name: true, species: true } },
+                room: { select: { name: true, category: { select: { name: true } } } },
+                items: { orderBy: { createdAt: "asc" }, select: { name: true } },
+              },
+            },
+          },
+        },
       },
     }),
     prisma.service.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -91,6 +115,38 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
     ),
   ];
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
+  // คำขอจองจาก LINE ที่ออเดอร์นี้อยู่ — แสดงทุกรายการในคำขอ ให้แอดมินตัดสินใจทั้งคำขอทีเดียว
+  const requestView: BookingRequestView | null = order.bookingRequest
+    ? (() => {
+        const live = order.bookingRequest.orders.filter((o) => o.status !== "CANCELLED");
+        return {
+          id: order.bookingRequest.id,
+          code: order.bookingRequest.code,
+          status: order.bookingRequest.status,
+          rescheduleReason: order.bookingRequest.rescheduleReason,
+          totalEstimate: live.reduce((s, o) => s + o.total, 0),
+          dueNow: live.reduce((s, o) => s + amountDueNow(o), 0),
+          items: order.bookingRequest.orders.map((o) => ({
+            orderId: o.id,
+            orderCode: o.code,
+            isCurrent: o.id === order.id,
+            petName: o.pet?.name ?? null,
+            species: o.pet?.species ?? null,
+            summary: [o.room ? `${o.room.category.name} · ${o.room.name}` : null, ...o.items.map((i) => i.name)]
+              .filter(Boolean)
+              .join(" · "),
+            when: o.appointmentAt
+              ? formatDateTime(o.appointmentAt)
+              : o.checkInAt
+                ? `${formatDateTime(o.checkInAt)}${o.checkOutAt ? ` – ${formatDateTime(o.checkOutAt)}` : ""}`
+                : "-",
+            total: o.total,
+            dueNow: amountDueNow(o),
+            cancelled: o.status === "CANCELLED",
+          })),
+        };
+      })()
+    : null;
   const backHref = order.roomId
     ? "/boarding"
     : order.queueType === "OTHER"
@@ -134,6 +190,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
 
       <div className={cn("grid gap-6", !isGroomer && "xl:grid-cols-3")}>
         <div className={cn("space-y-6", !isGroomer && "lg:col-span-2")}>
+          {requestView && <BookingRequestPanel request={requestView} canManage={!isGroomer} />}
           <Card>
             <CardHeader className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -167,6 +224,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
                 iHaveStartedNotFinished={iHaveStartedNotFinished}
                 badgeInfo={badgeInfo}
+                inBookingRequest={!!order.bookingRequestId}
                 beforeServiceDay={isBeforeServiceDay(order)}
               />
             </CardHeader>
@@ -225,14 +283,6 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                       <Syringe className="h-3 w-3" />
                       {order.vaccineComplete ? t.orders.vaccineComplete : t.orders.vaccineIncomplete}
                     </Badge>
-                    {order.fleaTickMedicine && (
-                      <Badge variant="outline" className="gap-1">
-                        <Bug className="h-3 w-3" />
-                        {order.fleaTickMedicine}
-                        {order.lastFleaTickAt &&
-                          ` · ${new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeZone: "Asia/Bangkok" }).format(order.lastFleaTickAt)}`}
-                      </Badge>
-                    )}
                     {order.depositAmount > 0 && (
                       <Badge variant="outline">{t.orders.depositBadge(formatBaht(order.depositAmount))}</Badge>
                     )}
@@ -266,6 +316,13 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                       "-"
                     )}
                   </div>
+                  {order.pet && (
+                    <FleaTickStatusBlock
+                      t={t}
+                      pet={order.pet}
+                      serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
+                    />
+                  )}
                 </div>
               </div>
               )}

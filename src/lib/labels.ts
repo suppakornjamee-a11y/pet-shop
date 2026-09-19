@@ -12,6 +12,8 @@ export function isFleaTickCheckStale(lastFleaTickAt: Date | null): boolean {
 export const orderStatusColor: Record<OrderStatus, string> = {
   PENDING_APPROVAL:
     "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-900",
+  RESCHEDULE_REQUIRED:
+    "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-900",
   PENDING_PAYMENT: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
   DEPOSIT_PAID: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900",
   PAID: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",

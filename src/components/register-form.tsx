@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Save, ImagePlus, X, Syringe, Bug } from "lucide-react";
 import { createCustomerWithPets, updateCustomerWithPets, type ActionResult } from "@/app/actions/customers";
-import { fileToDataUrl } from "@/lib/file";
+import { getFleaTickCatalog } from "@/app/actions/liff";
+import { compressImageToDataUrl } from "@/lib/file";
+import { matchMedicine, type FleaTickProductInfo } from "@/lib/flea-tick";
+import { toThaiDateStr } from "@/lib/slots";
 import { ageFromBirthDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +60,9 @@ type PetForm = {
   rabiesVaccineDate: string;
   lastFleaTickDate: string;
   fleaTickMedicine: string;
+  // ไม่บังคับใน type เพราะบางหน้าที่ส่งข้อมูลเริ่มต้นเข้ามายังไม่มีสองช่องนี้ — เติมค่าว่างให้ตอนตั้ง state
+  fleaTickProductId?: string | null;
+  fleaTickEvidenceUrls?: string[];
   foodNote: string;
   medicationNote: string;
   neutered: boolean;
@@ -81,6 +87,8 @@ const emptyPet: PetForm = {
   rabiesVaccineDate: "",
   lastFleaTickDate: "",
   fleaTickMedicine: "",
+  fleaTickProductId: null,
+  fleaTickEvidenceUrls: [],
   foodNote: "",
   medicationNote: "",
   neutered: false,
@@ -112,7 +120,7 @@ function MultiPhotoUpload({
     setLoading(true);
     try {
       const uploaded = await Promise.all(
-        Array.from(files).slice(0, remaining).map((f) => fileToDataUrl(f))
+        Array.from(files).slice(0, remaining).map((f) => compressImageToDataUrl(f))
       );
       onChange([...values, ...uploaded]);
     } catch (e) {
@@ -218,6 +226,112 @@ function AgeDisplay({ birthDate }: { birthDate: string }) {
   );
 }
 
+/**
+ * ช่องข้อมูลยาเห็บหมัดของสัตว์เลี้ยง — ลูกค้าพิมพ์ชื่อเอง ระบบช่วยจับคู่กับฐานข้อมูลยา (ไม่ใช้ AI)
+ * - ข้อความที่พิมพ์เก็บไว้เสมอ
+ * - เจอชื่อใกล้เคียง: แสดงชื่อเต็ม + สูตรให้ลูกค้ากดเลือกยืนยันเอง (ไม่เลือกให้อัตโนมัติ แม้ตรงเป๊ะ)
+ * - เจอหลายสูตร: ให้เลือกสูตร หรือแนบรูปกล่องยา / หลักฐานจากคลินิก
+ * - ไม่เจอ: บันทึกได้ แต่ไม่มีระยะคุ้มครอง จนกว่าแอดมินตรวจสอบ
+ * การกรอกเองไม่ใช่การยืนยันว่าให้ยาจริง — สถานะแหล่งข้อมูลเริ่มที่ "ลูกค้าแจ้ง" เสมอ
+ */
+function FleaTickFields({
+  pet,
+  catalog,
+  readOnly,
+  onChange,
+}: {
+  pet: PetForm;
+  catalog: FleaTickProductInfo[];
+  readOnly?: boolean;
+  onChange: (patch: Partial<PetForm>) => void;
+}) {
+  const { t } = useI18n();
+  const selected = catalog.find((p) => p.id === pet.fleaTickProductId) ?? null;
+  const matches = useMemo(
+    () => (selected ? [] : matchMedicine(pet.fleaTickMedicine, catalog, pet.species).slice(0, 6)),
+    [selected, pet.fleaTickMedicine, catalog, pet.species]
+  );
+  const typed = pet.fleaTickMedicine.trim().length >= 2;
+  const describe = (p: FleaTickProductInfo) =>
+    [p.formula, p.species ? t.labels.species[p.species] : null, t.fleaTick.form[p.form]].filter(Boolean).join(" · ");
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1">
+          <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickDateLabel}
+        </Label>
+        <Input
+          type="date"
+          lang="en-GB"
+          max={toThaiDateStr(new Date())}
+          value={pet.lastFleaTickDate}
+          onChange={(e) => onChange({ lastFleaTickDate: e.target.value })}
+          disabled={readOnly}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>{t.orders.form.fleaTickMedicineNameLabel}</Label>
+        <Input
+          value={pet.fleaTickMedicine}
+          onChange={(e) => onChange({ fleaTickMedicine: e.target.value, fleaTickProductId: null })}
+          disabled={readOnly}
+        />
+        {selected ? (
+          <div className="flex items-start justify-between gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+            <div className="min-w-0">
+              <div className="font-medium">{selected.name}</div>
+              <div className="text-xs text-muted-foreground">{describe(selected)}</div>
+            </div>
+            {!readOnly && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                onClick={() => onChange({ fleaTickProductId: null })}
+              >
+                {t.fleaTick.change}
+              </Button>
+            )}
+          </div>
+        ) : (
+          !readOnly &&
+          typed && (
+            <div className="space-y-1.5">
+              {matches.length > 1 && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">{t.fleaTick.pickFormulaHint}</p>
+              )}
+              {matches.length === 0 && <p className="text-xs text-muted-foreground">{t.fleaTick.noMatchHint}</p>}
+              {matches.map(({ product }) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => onChange({ fleaTickProductId: product.id })}
+                  className="flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-accent/50"
+                >
+                  <span className="font-medium">{product.name}</span>
+                  <span className="text-xs text-muted-foreground">{describe(product)}</span>
+                </button>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+      {(typed || (pet.fleaTickEvidenceUrls?.length ?? 0) > 0) && (
+        <div className="sm:col-span-2">
+          <MultiPhotoUpload
+            label={t.fleaTick.evidenceLabel}
+            values={pet.fleaTickEvidenceUrls ?? []}
+            onChange={(urls) => onChange({ fleaTickEvidenceUrls: urls })}
+            readOnly={readOnly}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 export function RegisterForm({
   mode = "create",
   customerId,
@@ -247,8 +361,22 @@ export function RegisterForm({
 
   const [customer, setCustomer] = useState<CustomerForm>(initialCustomer ?? emptyCustomer);
   const [pets, setPets] = useState<PetForm[]>(
-    initialPets && initialPets.length > 0 ? initialPets : [{ ...emptyPet }]
+    initialPets && initialPets.length > 0 ? initialPets.map((p) => ({ ...emptyPet, ...p })) : [{ ...emptyPet }]
   );
+
+  // ฐานข้อมูลยาเห็บหมัด — โหลดครั้งเดียวไว้ช่วยจับคู่ชื่อที่พิมพ์ (ข้อมูลสาธารณะ ใช้ได้ทั้งหน้าลูกค้าและพนักงาน)
+  const [fleaCatalog, setFleaCatalog] = useState<FleaTickProductInfo[]>([]);
+  useEffect(() => {
+    let active = true;
+    getFleaTickCatalog()
+      .then((rows) => {
+        if (active) setFleaCatalog(rows);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function updatePet(i: number, patch: Partial<PetForm>) {
     setPets((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
@@ -576,26 +704,12 @@ export function RegisterForm({
                 disabled={readOnly}
               />
             </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <Bug className="h-3.5 w-3.5" /> {t.orders.form.lastFleaTickDateLabel}
-              </Label>
-              <Input
-                type="date"
-                lang="en-GB"
-                value={pet.lastFleaTickDate}
-                onChange={(e) => updatePet(i, { lastFleaTickDate: e.target.value })}
-                disabled={readOnly}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t.orders.form.fleaTickMedicineNameLabel}</Label>
-              <Input
-                value={pet.fleaTickMedicine}
-                onChange={(e) => updatePet(i, { fleaTickMedicine: e.target.value })}
-                disabled={readOnly}
-              />
-            </div>
+            <FleaTickFields
+              pet={pet}
+              catalog={fleaCatalog}
+              readOnly={readOnly}
+              onChange={(patch) => updatePet(i, patch)}
+            />
             <div className="space-y-2">
               <Label>{t.register.foodNoteLabel}</Label>
               <Textarea

@@ -68,6 +68,7 @@ enum OrderType {
 
 enum OrderStatus {
   PENDING_APPROVAL // รอเช็คคิว — ลูกค้าจองเองผ่าน LINE แล้วรอพนักงานยืนยันว่าคิวว่างจริงก่อนถึงจะจ่ายเงินได้
+  RESCHEDULE_REQUIRED // รอเลือกวันเวลาใหม่ — แอดมินแจ้งคิวไม่ว่าง ไม่กันคิว ลูกค้าแก้วันเวลาแล้วส่งกลับมาได้ (ไม่ใช่การยกเลิก)
   PENDING_PAYMENT // รอชำระเงิน
   DEPOSIT_PAID // มัดจำแล้ว รอชำระส่วนที่เหลือ
   PAID // ชำระแล้ว
@@ -141,26 +142,31 @@ enum CreationChannel {
 // ---------- Staff / Auth ----------
 
 model User {
-  id            String        @id @default(cuid())
-  username      String        @unique
-  name          String
-  email         String?       @unique
-  passwordHash  String
-  avatarUrl     String? // รูปโปรไฟล์ (data URL) — ผู้ใช้อัปโหลดเองจากมุมขวาบน
-  role          Role          @default(USER)
-  groomerLevel  GroomerLevel? // ใช้เฉพาะ role = GROOMER — คิดคอมมิชชั่นไม่เท่ากันตาม level
-  active        Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  username     String        @unique
+  name         String
+  email        String?       @unique
+  passwordHash String
+  avatarUrl    String? // รูปโปรไฟล์ (data URL) — ผู้ใช้อัปโหลดเองจากมุมขวาบน
+  role         Role          @default(USER)
+  groomerLevel GroomerLevel? // ใช้เฉพาะ role = GROOMER — คิดคอมมิชชั่นไม่เท่ากันตาม level
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  ordersCreated     Order[]            @relation("OrderCreatedBy")
-  ordersUpdated     Order[]            @relation("OrderUpdatedBy")
-  paymentsVerified  Payment[]          @relation("PaymentVerifiedBy")
-  stockMovements    StockMovement[]
-  productsCreated   Product[]          @relation("ProductCreatedBy")
-  productsUpdated   Product[]          @relation("ProductUpdatedBy")
-  orderExtraCharges OrderExtraCharge[]
-  orderActivityLogs OrderActivityLog[]
+  ordersCreated            Order[]                 @relation("OrderCreatedBy")
+  ordersUpdated            Order[]                 @relation("OrderUpdatedBy")
+  paymentsVerified         Payment[]               @relation("PaymentVerifiedBy")
+  stockMovements           StockMovement[]
+  productsCreated          Product[]               @relation("ProductCreatedBy")
+  productsUpdated          Product[]               @relation("ProductUpdatedBy")
+  orderExtraCharges        OrderExtraCharge[]
+  orderActivityLogs        OrderActivityLog[]
+  fleaTickProductsVerified FleaTickProduct[]       @relation("FleaTickProductVerifiedBy")
+  fleaTickRecordsChecked   Pet[]                   @relation("FleaTickCheckedBy")
+  bookingRequestsApproved  BookingRequest[]        @relation("BookingRequestApprovedBy")
+  bookingRequestsConfirmed BookingRequest[]        @relation("BookingRequestConfirmedBy")
+  bookingPaymentsVerified  BookingRequestPayment[] @relation("BookingRequestPaymentVerifiedBy")
 }
 
 // ---------- Customers & Pets ----------
@@ -181,8 +187,9 @@ model Customer {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  pets   Pet[]
-  orders Order[]
+  pets            Pet[]
+  orders          Order[]
+  bookingRequests BookingRequest[]
 
   @@index([phone])
   @@index([name])
@@ -213,33 +220,161 @@ model Pet {
   vaccineComplete  Boolean? // วัคซีนครบล่าสุดที่ทราบ (เอาไว้ prefill ตอนจองครั้งถัดไป)
   vaccine5in1At    DateTime? // วันที่ฉีดวัคซีนรวม 5/6 โรคล่าสุด
   rabiesVaccineAt  DateTime? // วันที่ฉีดวัคซีนพิษสุนัขบ้าล่าสุด
-  lastFleaTickAt   DateTime? // วันที่กำจัดเห็บหมัดครั้งล่าสุด
-  fleaTickMedicine String? // ชื่อของยากำจัดเห็บหมัดที่ใช้
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  lastFleaTickAt   DateTime? // วันที่ให้ยาเห็บหมัดจริงครั้งล่าสุด (ไม่รับวันในอนาคต)
+  fleaTickMedicine String? // ข้อความชื่อยาที่ลูกค้า/พนักงานพิมพ์ — เก็บไว้เสมอ แม้จับคู่กับฐานข้อมูลยาได้แล้ว
+
+  // จับคู่กับฐานข้อมูลยาที่ร้านตรวจสอบแล้ว — ระยะคุ้มครองคำนวณจาก product นี้เท่านั้น (ห้ามเดา)
+  fleaTickProduct      FleaTickProduct? @relation(fields: [fleaTickProductId], references: [id], onDelete: SetNull)
+  fleaTickProductId    String?
+  fleaTickSource       FleaTickSource   @default(CUSTOMER) // ลูกค้าแจ้งเอง หรือพนักงานตรวจหลักฐานแล้ว
+  fleaTickEvidenceUrls String[]         @default([]) // รูปกล่องยา / หลักฐานจากคลินิก (data URL)
+  fleaTickCheckedBy    User?            @relation("FleaTickCheckedBy", fields: [fleaTickCheckedById], references: [id], onDelete: SetNull)
+  fleaTickCheckedById  String?
+  fleaTickCheckedAt    DateTime?
+
+  groomingCautions   String? // ข้อควรระวังระหว่างกรูมมิ่ง (หวงก้น หวงเท้า ไม่ชอบเป่าลม มีประวัติงับ ฯลฯ)
+  hasChronicDisease  Boolean? // โรคประจำตัว: null = ยังไม่ได้ถาม, false = ไม่มี, true = มี (ต้องมีรายละเอียด)
+  chronicDiseaseNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orders Order[]
 
   @@index([customerId])
+  @@index([fleaTickProductId])
+}
+
+// ---------- คำขอจองจาก LINE (ตะกร้า) ----------
+
+enum BookingRequestStatus {
+  PENDING_APPROVAL // รอแอดมินตรวจสอบคิว
+  NEEDS_RESCHEDULE // รอเลือกวันเวลาใหม่ (คิวไม่ว่าง — ข้อมูลเดิมยังอยู่ครบ)
+  PENDING_DEPOSIT // รอชำระมัดจำ
+  DEPOSIT_SUBMITTED // รอตรวจสอบมัดจำ
+  CONFIRMED // ยืนยันการจองแล้ว
+  CANCELLED
+}
+
+// ลูกค้าเลือกหลายรายการ (หลายตัว/หลายบริการ) แล้วส่งครั้งเดียว — แต่ละรายการคือ Order หนึ่งใบตามเดิม
+// แอดมินอนุมัติ/แจ้งคิวไม่ว่าง และลูกค้าชำระมัดจำ "ทั้งคำขอ" ครั้งเดียว
+model BookingRequest {
+  id               String               @id @default(cuid())
+  code             String               @unique // เช่น BK-20260920-0001
+  customer         Customer             @relation(fields: [customerId], references: [id])
+  customerId       String
+  status           BookingRequestStatus @default(PENDING_APPROVAL)
+  rescheduleReason String? // เหตุผลที่แอดมินแจ้งคิวไม่ว่าง (ล่าสุด)
+  cancelReason     String?
+  submittedAt      DateTime             @default(now()) // ส่งคำขอ (หรือส่งกลับมาใหม่) ครั้งล่าสุด
+  approvedBy       User?                @relation("BookingRequestApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedById     String?
+  approvedAt       DateTime?
+  confirmedBy      User?                @relation("BookingRequestConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  confirmedById    String?
+  confirmedAt      DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  orders   Order[]
+  payments BookingRequestPayment[]
+
+  @@index([status])
+  @@index([customerId])
+}
+
+// ชำระมัดจำของทั้งคำขอ (QR เดียว สลิปเดียว) — พอแอดมินยืนยัน ระบบกระจายเป็น Payment ของแต่ละออเดอร์
+// ตามยอดของรายการนั้น เพื่อให้ใบเสร็จ/ยอดคงเหลือ/รายงานของแต่ละออเดอร์ทำงานเหมือนเดิม
+model BookingRequestPayment {
+  id            String         @id @default(cuid())
+  request       BookingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId     String
+  amount        Int
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  bankAccountId String?
+  qrPayload     String?
+  expiresAt     DateTime?
+  slipUrl       String?
+  submittedAt   DateTime?
+  status        PaymentStatus  @default(PENDING)
+  verifiedBy    User?          @relation("BookingRequestPaymentVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedById  String?
+  verifiedAt    DateTime?
+  rejectReason  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([requestId])
 }
 
 // ---------- Master data ----------
 
+enum DurationUnit {
+  DAY
+  WEEK // 1 สัปดาห์ = 7 วันพอดี (12 สัปดาห์ = 84 วัน ไม่ใช่ 3 เดือน)
+  MONTH // นับตามเดือนปฏิทิน
+}
+
+enum FleaTickForm {
+  CHEWABLE // เม็ดเคี้ยว / กิน
+  SPOT_ON // หยดหลังคอ
+  COLLAR // ปลอกคอ
+  OTHER
+}
+
+enum VerifyStatus {
+  PENDING // ยังไม่ตรวจ — ไม่นำไปคำนวณระยะคุ้มครอง
+  VERIFIED // ผู้จัดการตรวจกับฉลากแล้ว
+}
+
+enum FleaTickSource {
+  CUSTOMER // ลูกค้าแจ้งเอง (ยังไม่ได้ยืนยันว่าให้ยาจริง)
+  STAFF_CHECKED // พนักงานเห็นหลักฐานแล้ว (กล่องยา / ใบเสร็จ / สมุดสัตวแพทย์)
+}
+
+// ฐานข้อมูลยาเห็บหมัดที่ร้านตรวจสอบ — ใช้จับคู่ชื่อที่ลูกค้าพิมพ์ และเป็นแหล่งเดียวของระยะคุ้มครอง
+// แยกระยะคุ้มครองเห็บกับหมัด เพราะฉลากหลายสูตรระบุไม่เท่ากัน ค่าว่าง = ฉลากไม่ได้ระบุ (ไม่นับว่าคุ้มครอง)
+model FleaTickProduct {
+  id           String        @id @default(cuid())
+  name         String // ชื่อเต็ม เช่น "NexGard Spectra ชนิดเม็ดเคี้ยว"
+  formula      String? // สูตร/รุ่นย่อย เพื่อแยกตัวที่ชื่อคล้ายกัน
+  aliases      String[]      @default([]) // ชื่อเรียกอื่น/คำสะกดไทย ใช้ช่วยจับคู่
+  species      Species? // null = ใช้ได้ทั้งสองชนิด หรือแยกสูตรตามชนิดสัตว์ (ดูหมายเหตุ)
+  form         FleaTickForm  @default(OTHER)
+  tickValue    Int?
+  tickUnit     DurationUnit?
+  fleaValue    Int?
+  fleaUnit     DurationUnit?
+  bathNote     String? // ข้อจำกัดเรื่องอาบน้ำตามฉลากของสูตรนี้
+  labelSource  String? // แหล่งข้อมูลฉลาก
+  note         String? // หมายเหตุอ้างอิง
+  status       VerifyStatus  @default(PENDING)
+  verifiedBy   User?         @relation("FleaTickProductVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedById String?
+  verifiedAt   DateTime?
+  active       Boolean       @default(true)
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  pets Pet[]
+}
+
 model Service {
-  id           String          @id @default(cuid())
-  name         String
-  category     ServiceCategory
-  group        ServiceGroup? // ใช้เฉพาะหมวด BATH — null = รายการอาบน้ำ/ตัดขนหลัก
-  speciesScope Species? // null = หมา & แมวทั้งคู่, ระบุ = เฉพาะชนิดนั้น
-  defaultOn    Boolean         @default(false) // ติ๊กให้อัตโนมัติ (เช่น ไถเท้า/ไถท้อง/ไถก้น/บีบต่อม/เช็ดหู) ถอนออกได้
-  sortOrder    Int             @default(0)
-  description  String?
-  price        Int // หน่วยเป็นบาท
+  id                String          @id @default(cuid())
+  name              String
+  category          ServiceCategory
+  group             ServiceGroup? // ใช้เฉพาะหมวด BATH — null = รายการอาบน้ำ/ตัดขนหลัก
+  speciesScope      Species? // null = หมา & แมวทั้งคู่, ระบุ = เฉพาะชนิดนั้น
+  defaultOn         Boolean         @default(false) // ติ๊กให้อัตโนมัติ (เช่น ไถเท้า/ไถท้อง/ไถก้น/บีบต่อม/เช็ดหู) ถอนออกได้
+  sortOrder         Int             @default(0)
+  description       String?
+  price             Int // หน่วยเป็นบาท
   commissionPercent Float? // ค่าคอมมิชชั่นแบบ % ของยอดบริการนี้ (เลือกอย่างใดอย่างหนึ่งกับ commissionFlat)
   commissionFlat    Int? // ค่าคอมมิชชั่นแบบยอดเงินคงที่ต่อครั้ง
-  active       Boolean         @default(true)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   @@index([category])
 }
@@ -333,46 +468,56 @@ model BankAccount {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  payments Payment[]
+  payments               Payment[]
+  bookingRequestPayments BookingRequestPayment[]
 }
 
 // ---------- Orders / Payments ----------
 
 model Order {
-  id               String      @id @default(cuid())
-  code             String      @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
-  customer         Customer?   @relation(fields: [customerId], references: [id])
+  id               String          @id @default(cuid())
+  code             String          @unique // รหัสออเดอร์ เช่น ORD-20260811-0001
+  customer         Customer?       @relation(fields: [customerId], references: [id])
   customerId       String? // บิลร้านอาหาร (SHOP) เปิดได้โดยไม่ต้องผูกลูกค้า
-  pet              Pet?        @relation(fields: [petId], references: [id])
+  pet              Pet?            @relation(fields: [petId], references: [id])
   petId            String?
-  room             Room?       @relation(fields: [roomId], references: [id])
+  room             Room?           @relation(fields: [roomId], references: [id])
   roomId           String? // ห้องที่จัดให้ (กรณีฝากเลี้ยง)
-  orderType        OrderType   @default(SERVICE) // SERVICE = อาบน้ำ/บริการ/โรงแรม, SHOP = บิลร้านอาหาร
-  status           OrderStatus @default(PENDING_PAYMENT)
+  orderType        OrderType       @default(SERVICE) // SERVICE = อาบน้ำ/บริการ/โรงแรม, SHOP = บิลร้านอาหาร
+  status           OrderStatus     @default(PENDING_PAYMENT)
   appointmentAt    DateTime? // วัน-เวลาคิวที่จอง (slot) — ใช้กับคิวอาบน้ำ/ตัดขนแบบ walk-in
   queueType        QueueType? // พูลคิว (BATH/OTHER) เมื่อมี appointmentAt — null = จองก่อนเพิ่มฟีเจอร์นี้ ถือเป็น BATH
   checkInAt        DateTime? // เช็คอิน (ใช้กับการจองห้อง/คอก/พื้นที่)
   checkOutAt       DateTime? // เช็คเอาท์
-  nights           Int         @default(0)
-  nannyType        NannyType   @default(NONE) // พี่เลี้ยงดูแลพิเศษ (ปกติ/VIP)
-  cctvRequested    Boolean     @default(false) // เลือกห้องกล้องวงจรปิด (+100)
-  depositAmount    Int         @default(0) // มัดจำ (0 = ไม่มีมัดจำ จ่ายเต็มยอด)
-  vaccineComplete  Boolean     @default(false) // วัคซีนครบ (ณ ตอนจองนี้)
+  nights           Int             @default(0)
+  nannyType        NannyType       @default(NONE) // พี่เลี้ยงดูแลพิเศษ (ปกติ/VIP)
+  cctvRequested    Boolean         @default(false) // เลือกห้องกล้องวงจรปิด (+100)
+  depositAmount    Int             @default(0) // มัดจำ (0 = ไม่มีมัดจำ จ่ายเต็มยอด)
+  vaccineComplete  Boolean         @default(false) // วัคซีนครบ (ณ ตอนจองนี้)
   lastFleaTickAt   DateTime? // วันที่หยอด/กินยาเห็บหมัดล่าสุด (ณ ตอนจองนี้)
   fleaTickMedicine String? // ชื่อยาเห็บหมัดล่าสุด
-  subtotal         Int         @default(0)
-  discount         Int         @default(0)
-  holidaySurcharge Int         @default(0) // ค่าบริการเพิ่มเติมวันหยุด (snapshot ตอนสร้างออเดอร์ กันวันหยุดถูกแก้ทีหลังแล้วยอดเก่าเปลี่ยน)
+  subtotal         Int             @default(0)
+  discount         Int             @default(0)
+  holidaySurcharge Int             @default(0) // ค่าบริการเพิ่มเติมวันหยุด (snapshot ตอนสร้างออเดอร์ กันวันหยุดถูกแก้ทีหลังแล้วยอดเก่าเปลี่ยน)
   holidayLabel     String? // ชื่อวันหยุด ณ ตอนสร้างออเดอร์
-  total            Int         @default(0)
+  total            Int             @default(0)
   note             String?
-  createdBy        User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdBy        User?           @relation("OrderCreatedBy", fields: [createdById], references: [id])
   createdById      String?
-  updatedBy        User?       @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
+  updatedBy        User?           @relation("OrderUpdatedBy", fields: [updatedById], references: [id])
   updatedById      String?
   createdVia       CreationChannel @default(STAFF) // สร้างโดยพนักงาน หรือลูกค้าจองเองผ่าน LINE LIFF
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  // คำขอจองที่ออเดอร์นี้อยู่ (จองผ่านตะกร้าใน LINE) — null = ออเดอร์เดี่ยวแบบเดิม
+  bookingRequest   BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: SetNull)
+  bookingRequestId String?
+
+  // ทรงขนที่ลูกค้าต้องการ — ภาพตัวอย่างลบอัตโนมัติหลัง 1 เดือนนับจากวันที่แนบ (ข้อความยังเก็บไว้)
+  groomingStyleNote     String?
+  groomingStyleImages   String[]  @default([])
+  groomingStyleImagesAt DateTime?
 
   items        OrderItem[]
   payments     Payment[]
@@ -380,6 +525,7 @@ model Order {
   activityLogs OrderActivityLog[]
 
   @@index([customerId])
+  @@index([bookingRequestId])
   @@index([orderType])
   @@index([status])
   @@index([createdAt])
@@ -391,13 +537,13 @@ model Order {
 
 // log ว่าใครเพิ่ม/แก้ไขรายการอะไรในออเดอร์ เมื่อไหร่ (ไว้ตรวจสอบย้อนหลัง โดยเฉพาะตอนช่างเพิ่มรายการเอง)
 model OrderActivityLog {
-  id        String   @id @default(cuid())
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId   String
-  action    String // เช่น "เพิ่มบริการ: ตัดเล็บ"
-  createdBy User?    @relation(fields: [createdById], references: [id])
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  action      String // เช่น "เพิ่มบริการ: ตัดเล็บ"
+  createdBy   User?    @relation(fields: [createdById], references: [id])
   createdById String?
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@index([orderId])
 }

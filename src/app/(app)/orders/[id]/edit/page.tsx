@@ -95,8 +95,6 @@ export default async function EditOrderPage(props: PageProps<"/orders/[id]/edit"
           cctvRequested: order.cctvRequested,
           depositAmount: order.depositAmount,
           vaccineComplete: order.vaccineComplete,
-          lastFleaTickDate: order.lastFleaTickAt ? toThaiDateStr(order.lastFleaTickAt) : undefined,
-          fleaTickMedicine: order.fleaTickMedicine ?? undefined,
           productQty,
           note: order.note,
         }}

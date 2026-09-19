@@ -33,9 +33,10 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
   // ช่างอาบน้ำยืนยันคิว/ตรวจสลิปไม่ได้อยู่แล้ว ไม่ต้องรบกวนด้วยตัวเลขที่กดอะไรไม่ได้
   if (user.role === "GROOMER") return { count: 0, items: [] };
 
-  const [queues, slips] = await Promise.all([
+  const [queues, requests, slips] = await Promise.all([
+    // ออเดอร์เดี่ยวที่รอเช็คคิว — ออเดอร์ในคำขอจองไปนับรวมเป็นหนึ่งรายการต่อคำขอด้านล่าง
     prisma.order.findMany({
-      where: { status: "PENDING_APPROVAL" },
+      where: { status: "PENDING_APPROVAL", bookingRequestId: null },
       orderBy: { createdAt: "desc" },
       take: 10,
       select: {
@@ -44,6 +45,23 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
         createdAt: true,
         customer: { select: { name: true } },
         pet: { select: { name: true } },
+      },
+    }),
+    // คำขอจองจาก LINE ที่รอตรวจสอบคิว (รวมที่ลูกค้าเพิ่งเลือกวันเวลาใหม่ส่งกลับมา) — หนึ่งรายการต่อคำขอ
+    prisma.bookingRequest.findMany({
+      where: { status: "PENDING_APPROVAL" },
+      orderBy: { submittedAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        code: true,
+        submittedAt: true,
+        customer: { select: { name: true } },
+        orders: {
+          where: { status: { not: "CANCELLED" } },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, pet: { select: { name: true } } },
+        },
       },
     }),
     // สลิปที่ลูกค้าอัปโหลดมาแล้วยังไม่มีใครกดยืนยัน — ออเดอร์ที่ยกเลิกไปแล้วไม่ต้องเตือน
@@ -79,6 +97,18 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
       amount: null,
       at: o.createdAt.toISOString(),
     })),
+    ...requests
+      .filter((r) => r.orders.length > 0)
+      .map((r) => ({
+        kind: "QUEUE" as const,
+        orderId: r.orders[0].id,
+        key: `request-${r.id}`,
+        code: r.code,
+        customerName: r.customer.name,
+        petName: [...new Set(r.orders.map((o) => o.pet?.name).filter(Boolean))].join(", ") || null,
+        amount: null,
+        at: r.submittedAt.toISOString(),
+      })),
     ...slips.map((p) => ({
       kind: "SLIP" as const,
       orderId: p.order.id,

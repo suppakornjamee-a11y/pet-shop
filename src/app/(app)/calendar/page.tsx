@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDayBookings } from "@/components/calendar-day-bookings";
+import { CalendarSlotPanel } from "@/components/calendar-slot-panel";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
@@ -39,7 +39,11 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   // จองในเดือนนี้ — เก็บเฉพาะที่ยัง "กันคิว" อยู่ (จ่ายแล้ว หรือรอชำระยังไม่หมดอายุ)
   // ดึงเท่าที่ isSlotHolding ต้องใช้ + วันนัด เพราะหน้านี้ใช้แค่ "นับจำนวนคิวต่อวัน" อย่างเดียว
   const rawBookings = await prisma.order.findMany({
-    where: { appointmentAt: { gte: thaiMonthRange(monthStr).start, lt: thaiMonthRange(monthStr).end } },
+    // เฉพาะพูลคิวอาบน้ำ (queueType null = ออเดอร์เก่าก่อนแยกพูล) — เดิมนับคิวบริการอื่นๆ ปนมาด้วย
+    where: {
+      appointmentAt: { gte: thaiMonthRange(monthStr).start, lt: thaiMonthRange(monthStr).end },
+      OR: [{ queueType: "BATH" }, { queueType: null }],
+    },
     select: {
       appointmentAt: true,
       status: true,
@@ -85,9 +89,11 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const openSlot = isPastDate ? null : await firstOpenSlot(selectedDate, "BATH");
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader title={t.calendar.title} />
 
+      {/* ปฏิทินซ้าย · ช่วงเวลาของวันที่เลือกขวา (จอแคบเรียงบนล่าง) */}
+      <div className="grid items-start gap-6 lg:grid-cols-[1.3fr_1fr]">
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-base">{monthLabel}</CardTitle>
@@ -116,11 +122,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
           {/* วันที่เลือกไว้ + ปุ่มเปิดออเดอร์ อยู่บนสุด เห็นก่อนต้องเลื่อนดูปฏิทิน */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
             <p className="text-sm font-medium">{selectedLabel}</p>
-            {isPastDate ? null : !openSlot ? (
-              <p className="rounded-lg border border-dashed px-3 py-2.5 text-center text-xs text-muted-foreground">
-                {t.calendar.dayFullNotice}
-              </p>
-            ) : (
+            {isPastDate || !openSlot ? null : (
               <Button
                 render={<Link href={`/orders/new?date=${selectedDate}&time=${openSlot}${cq}`} />}
                 nativeButton={false}
@@ -192,9 +194,11 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
             })}
           </div>
 
-          <CalendarDayBookings dateStr={selectedDate} />
         </CardContent>
       </Card>
+
+      <CalendarSlotPanel dateStr={selectedDate} queueType="BATH" />
+      </div>
     </div>
   );
 }

@@ -12,6 +12,9 @@ export const TIME_SLOTS = [
   "18:00",
 ] as const;
 
+/** รับสัตว์เลี้ยงได้กี่ตัวต่อหนึ่งช่วงเวลา (ต่อพูลคิว — อาบน้ำกับบริการนับแยกกัน) หนึ่งออเดอร์ = หนึ่งตัว */
+export const SLOT_CAPACITY = 2;
+
 const TZ = "Asia/Bangkok";
 
 /** สร้าง Date ของ slot จากวันที่ (YYYY-MM-DD) + เวลา (HH:mm) ตามเวลาไทย */

@@ -3,17 +3,23 @@
 // ไฟล์นี้เรียกได้โดยไม่ต้องล็อกอิน (เข้าถึงผ่าน LINE LIFF mini-app เท่านั้น) — ห้าม import
 // requireUser/requireStaffUser มาใช้ที่นี่ ทุกฟังก์ชันต้องยืนยันตัวตนด้วย verifyLiffIdToken() ก่อนเสมอ
 //
-// ขอบเขตที่ลูกค้าทำเองได้: "สร้างการจองใหม่" และ "ยกเลิกการจองของตัวเองที่ยังไม่ผ่านการเช็คคิว"
-// เท่านั้น (เดิม v1 อนุญาตแค่สร้างใหม่ — เปิดให้ยกเลิกเพิ่มตามที่ร้านสั่ง) ห้ามเพิ่มฟังก์ชัน
+// ขอบเขตที่ลูกค้าทำเองได้: "สร้างการจองใหม่" (ทีละรายการ หรือส่งทั้งตะกร้าเป็นคำขอจอง),
+// "เลือกวันเวลาใหม่ให้คำขอของตัวเองเมื่อแอดมินแจ้งคิวไม่ว่าง" และ "ยกเลิกการจองของตัวเองก่อนร้านยืนยันเงิน"
+// เท่านั้น (เดิม v1 อนุญาตแค่สร้างใหม่ — เปิดเพิ่มตามที่ร้านสั่ง) ห้ามเพิ่มฟังก์ชัน
 // ยืนยัน/ปฏิเสธการชำระเงิน หรือเปลี่ยนสถานะออเดอร์เป็นอย่างอื่นเด็ดขาด — ของพวกนั้นอยู่ใน
 // actions/orders.ts ที่บังคับล็อกอินพนักงานเท่านั้น (ดูแผนงาน lexical-coalescing-crystal.md)
+//
+// ข้อยกเว้นเดียวที่ไม่ต้องยืนยันตัวตน: getFleaTickCatalog() — อ่านรายชื่อยาเห็บหมัดสาธารณะ (ชื่อ/สูตร/ชนิดสัตว์)
+// ไว้ช่วยลูกค้าจับคู่ชื่อยาในฟอร์ม ไม่มีข้อมูลลูกค้า และเขียนอะไรไม่ได้
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyLiffIdToken } from "@/lib/line";
-import { customerSchema, petRegisterSchema, petCreateData } from "@/lib/customer-schema";
+import { customerSchema, petRegisterSchema } from "@/lib/customer-schema";
+import { petCreateInput, petUpdateInput } from "@/lib/pet-write";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
+import { amountDueNow, cartItemSchema, createBookingRequest } from "@/lib/booking-request";
 import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
@@ -146,7 +152,7 @@ export async function liffRegisterCustomer(
         ...customer.data,
         lineUserId: identity.userId,
         createdVia: "LIFF",
-        pets: { create: petsParsed.data.map(petCreateData) },
+        pets: { create: await Promise.all(petsParsed.data.map((p) => petCreateInput(prisma, p))) },
       },
     });
     return { ok: true, id: created.id, message: "ลงทะเบียนเรียบร้อย" };
@@ -204,6 +210,8 @@ export async function liffGetProfile(idToken: string) {
       rabiesVaccineDate: p.rabiesVaccineAt ? toThaiDateStr(p.rabiesVaccineAt) : "",
       lastFleaTickDate: p.lastFleaTickAt ? toThaiDateStr(p.lastFleaTickAt) : "",
       fleaTickMedicine: p.fleaTickMedicine ?? "",
+      fleaTickProductId: p.fleaTickProductId,
+      fleaTickEvidenceUrls: p.fleaTickEvidenceUrls,
       foodNote: p.foodNote ?? "",
       medicationNote: p.medicationNote ?? "",
       neutered: p.neutered,
@@ -250,9 +258,9 @@ export async function liffUpdateProfile(
     await tx.customer.update({ where: { id: existing.id }, data: customer.data });
     for (const p of petsParsed.data) {
       if (p.id) {
-        await tx.pet.update({ where: { id: p.id }, data: petCreateData(p) });
+        await tx.pet.update({ where: { id: p.id }, data: await petUpdateInput(tx, p.id, p) });
       } else {
-        await tx.pet.create({ data: { customerId: existing.id, ...petCreateData(p) } });
+        await tx.pet.create({ data: { customerId: existing.id, ...(await petCreateInput(tx, p)) } });
       }
     }
   });
@@ -389,8 +397,6 @@ export async function liffCreateOrder(idToken: string, input: unknown): Promise<
     cctvRequested: data.cctvRequested,
     depositAmount: 0,
     vaccineComplete: pet.vaccineComplete ?? false,
-    lastFleaTickDate: pet.lastFleaTickAt ? toThaiDateStr(pet.lastFleaTickAt) : undefined,
-    fleaTickMedicine: pet.fleaTickMedicine ?? undefined,
     note: data.note,
     serviceIds: data.serviceIds,
     productLines: [],
@@ -659,4 +665,224 @@ export async function liffCancelOrder(
     revalidatePath(p);
   }
   return { ok: true, message: "ยกเลิกการจองเรียบร้อย" };
+}
+
+/**
+ * รายชื่อยาเห็บหมัดที่เปิดใช้งาน สำหรับช่วยจับคู่ชื่อที่ลูกค้าพิมพ์ในฟอร์มข้อมูลสัตว์เลี้ยง
+ * ใช้ทั้งฝั่งลูกค้า (LIFF) และฝั่งพนักงาน — ข้อมูลสาธารณะ ไม่ต้องยืนยันตัวตน
+ * ระยะคุ้มครองส่งไปด้วยเพื่อคำนวณสถานะบนหน้าจอ แต่สถานะ PENDING จะไม่ถูกนำไปคำนวณ (ดู lib/flea-tick)
+ */
+export async function getFleaTickCatalog() {
+  return prisma.fleaTickProduct.findMany({
+    where: { active: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      formula: true,
+      aliases: true,
+      species: true,
+      form: true,
+      tickValue: true,
+      tickUnit: true,
+      fleaValue: true,
+      fleaUnit: true,
+      bathNote: true,
+      status: true,
+    },
+  });
+}
+
+/* ---------- คำขอจอง (ตะกร้า) ---------- */
+
+const submitRequestSchema = z.object({
+  items: z.array(cartItemSchema).min(1, "กรุณาเพิ่มรายการจองอย่างน้อย 1 รายการ").max(10, "เพิ่มได้ไม่เกิน 10 รายการต่อคำขอ"),
+});
+
+/** ลูกค้าส่งคำขอจองทั้งตะกร้า — ทุกรายการรอแอดมินตรวจสอบคิว ยังไม่ออก QR จนกว่าจะอนุมัติ */
+export async function liffSubmitBookingRequest(idToken: string, input: unknown) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const customer = await prisma.customer.findUnique({ where: { lineUserId: identity.userId } });
+  if (!customer) return { ok: false as const, error: "ไม่พบข้อมูลลูกค้า กรุณากรอกข้อมูลก่อน" };
+
+  const parsed = submitRequestSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+
+  const result = await createBookingRequest(customer.id, parsed.data.items);
+  if (!result.ok) return { ok: false as const, error: result.error, itemIndex: result.itemIndex };
+
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
+  revalidatePath("/boarding");
+  return { ok: true as const, id: result.id, code: result.code };
+}
+
+/** รายละเอียดคำขอจองของตัวเอง — สถานะ รายการ ยอด และ QR ล่าสุด (เช็คว่าเป็นของลูกค้าคนนี้จริง) */
+export async function liffGetBookingRequest(idToken: string, requestId: string) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชันหมดอายุ กรุณาเปิดลิงก์นี้ใหม่จาก LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const req = await prisma.bookingRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      customer: { select: { lineUserId: true } },
+      orders: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          total: true,
+          depositAmount: true,
+          appointmentAt: true,
+          queueType: true,
+          checkInAt: true,
+          checkOutAt: true,
+          groomingStyleNote: true,
+          pet: { select: { id: true, name: true, species: true } },
+          room: { select: { name: true, category: { select: { name: true } } } },
+          items: { orderBy: { createdAt: "asc" }, select: { name: true, subtotal: true, itemType: true, refId: true } },
+        },
+      },
+      payments: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          qrPayload: true,
+          expiresAt: true,
+          rejectReason: true,
+          bankAccount: { select: { bankName: true, accountName: true, accountNumber: true } },
+        },
+      },
+    },
+  });
+  if (!req || req.customer.lineUserId !== identity.userId) {
+    return { ok: false as const, error: "ไม่พบคำขอจองนี้" };
+  }
+  const iso = (d: Date | null) => d?.toISOString() ?? null;
+  return {
+    ok: true as const,
+    id: req.id,
+    code: req.code,
+    status: req.status,
+    rescheduleReason: req.rescheduleReason,
+    orders: req.orders.map((o) => ({
+      ...o,
+      appointmentAt: iso(o.appointmentAt),
+      checkInAt: iso(o.checkInAt),
+      checkOutAt: iso(o.checkOutAt),
+      dueNow: amountDueNow(o),
+    })),
+    payment: req.payments[0]
+      ? { ...req.payments[0], expiresAt: iso(req.payments[0].expiresAt) }
+      : null,
+  };
+}
+
+const rescheduleSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        orderId: z.string().min(1),
+        appointmentDate: z.string().optional(),
+        appointmentTime: z.string().optional(),
+        checkInDate: z.string().optional(),
+        checkInTime: z.string().optional(),
+        checkOutDate: z.string().optional(),
+        checkOutTime: z.string().optional(),
+      })
+    )
+    .min(1),
+});
+
+/**
+ * คิวไม่ว่าง → ลูกค้าเลือกวันเวลาใหม่ให้รายการเดิม (สัตว์เลี้ยงและบริการคงเดิมทั้งหมด) แล้วส่งกลับให้แอดมินตรวจอีกครั้ง
+ * เช็คทุกรายการผ่านก่อน แล้วค่อยบันทึกพร้อมกัน — ไม่ให้เหลือบางรายการย้ายแล้ว บางรายการยังไม่ย้าย
+ */
+export async function liffRescheduleBookingRequest(idToken: string, requestId: string, input: unknown) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const parsed = rescheduleSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+
+  const req = await prisma.bookingRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      customer: { select: { id: true, lineUserId: true } },
+      orders: { where: { status: "RESCHEDULE_REQUIRED" }, include: { items: true, pet: { select: { vaccineComplete: true } } } },
+    },
+  });
+  if (!req || req.customer.lineUserId !== identity.userId) return { ok: false as const, error: "ไม่พบคำขอจองนี้" };
+  if (req.status !== "NEEDS_RESCHEDULE") return { ok: false as const, error: "คำขอนี้ไม่ได้รอเลือกวันเวลาใหม่" };
+
+  const changes = new Map(parsed.data.items.map((i) => [i.orderId, i]));
+  const plans: { orderId: string; plan: Extract<Awaited<ReturnType<typeof buildOrderPlan>>, { ok: true }> }[] = [];
+  for (const o of req.orders) {
+    const c = changes.get(o.id);
+    if (!c) return { ok: false as const, error: "กรุณาเลือกวันเวลาใหม่ให้ครบทุกรายการ" };
+    const boarding = !!o.roomId;
+    const planInput: OrderFormData = {
+      customerId: req.customer.id,
+      petId: o.petId,
+      roomId: o.roomId,
+      checkInDate: boarding ? c.checkInDate : undefined,
+      checkInTime: boarding ? c.checkInTime : undefined,
+      checkOutDate: boarding ? c.checkOutDate : undefined,
+      checkOutTime: boarding ? c.checkOutTime : undefined,
+      nannyType: o.nannyType,
+      cctvRequested: o.cctvRequested,
+      depositAmount: 0,
+      vaccineComplete: o.pet?.vaccineComplete ?? false,
+      note: o.note ?? undefined,
+      serviceIds: o.items.filter((it) => it.itemType === "SERVICE" && it.refId).map((it) => it.refId!),
+      productLines: [],
+      appointmentDate: boarding ? undefined : c.appointmentDate,
+      appointmentTime: boarding ? undefined : c.appointmentTime,
+      queueType: o.queueType === "OTHER" ? "OTHER" : "BATH",
+    };
+    const plan = await buildOrderPlan(planInput, o.id);
+    if (!plan.ok) return { ok: false as const, error: plan.error, orderId: o.id };
+    plans.push({ orderId: o.id, plan });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const { orderId, plan } of plans) {
+      await tx.orderItem.deleteMany({ where: { orderId } });
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "PENDING_APPROVAL",
+          appointmentAt: plan.appointmentAt,
+          checkInAt: plan.checkInAt,
+          checkOutAt: plan.checkOutAt,
+          nights: plan.nights,
+          depositAmount: plan.depositAmount,
+          holidaySurcharge: plan.holidaySurcharge,
+          holidayLabel: plan.holidayLabel,
+          subtotal: plan.subtotal,
+          total: plan.subtotal + plan.holidaySurcharge,
+          items: { create: plan.items },
+        },
+      });
+      await tx.orderActivityLog.create({ data: { orderId, action: "ลูกค้าเลือกวันเวลาใหม่ ส่งให้ตรวจสอบคิวอีกครั้ง" } });
+    }
+    await tx.bookingRequest.update({
+      where: { id: requestId },
+      data: { status: "PENDING_APPROVAL", submittedAt: new Date() },
+    });
+  });
+
+  revalidatePath("/orders/bath");
+  revalidatePath("/orders/other");
+  revalidatePath("/boarding");
+  return { ok: true as const };
 }

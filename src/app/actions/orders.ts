@@ -9,7 +9,7 @@ import { sendLinePush, buildLiffDeepLink } from "@/lib/line";
 import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
 import { formatBaht } from "@/lib/format";
 import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder, isBeforeServiceDay } from "@/lib/order-kind";
-import { buildOrderPlan, createOrderSchema, persistOrder, parseFleaTickDate } from "@/lib/order-plan";
+import { buildOrderPlan, createOrderSchema, persistOrder, petFleaTickSnapshot } from "@/lib/order-plan";
 import type { Role } from "@/generated/prisma/enums";
 import type { ActionResult } from "./customers";
 
@@ -139,7 +139,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   if (!plan.ok) return plan;
 
   const total = plan.subtotal + plan.holidaySurcharge;
-  const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
+  const fleaTick = await petFleaTickSnapshot(data.petId);
 
   await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
@@ -161,8 +161,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
         holidaySurcharge: plan.holidaySurcharge,
         holidayLabel: plan.holidayLabel,
         vaccineComplete: data.vaccineComplete,
-        lastFleaTickAt,
-        fleaTickMedicine: data.fleaTickMedicine || null,
+        ...fleaTick,
         subtotal: plan.subtotal,
         total,
         note: data.note || null,
@@ -175,11 +174,7 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   if (data.petId) {
     await prisma.pet.update({
       where: { id: data.petId },
-      data: {
-        vaccineComplete: data.vaccineComplete,
-        lastFleaTickAt,
-        fleaTickMedicine: data.fleaTickMedicine || null,
-      },
+      data: { vaccineComplete: data.vaccineComplete },
     });
   }
 
@@ -493,6 +488,7 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.bookingRequestId) return { ok: false, error: "ออเดอร์นี้อยู่ในคำขอจอง กรุณาอนุมัติที่กล่องคำขอจอง" };
   if (order.status !== "PENDING_APPROVAL") {
     return { ok: false, error: "ออเดอร์นี้ยืนยันคิวไปแล้ว" };
   }
@@ -523,6 +519,7 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  if (order.bookingRequestId) return { ok: false, error: "ออเดอร์นี้อยู่ในคำขอจอง กรุณาจัดการที่กล่องคำขอจอง" };
   if (order.status !== "PENDING_APPROVAL") {
     return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ระหว่างรอเช็คคิว" };
   }

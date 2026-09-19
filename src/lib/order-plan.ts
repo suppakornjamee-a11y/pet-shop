@@ -28,8 +28,6 @@ export const createOrderSchema = z.object({
   cctvRequested: z.coerce.boolean().default(false),
   depositAmount: z.coerce.number().int().min(0).default(0),
   vaccineComplete: z.coerce.boolean().default(false),
-  lastFleaTickDate: z.string().optional(),
-  fleaTickMedicine: z.string().optional(),
   note: z.string().optional(),
   serviceIds: z.array(z.string()).default([]),
   productLines: z
@@ -284,8 +282,20 @@ export async function buildOrderPlan(
 
 type OrderPlanOk = Extract<Awaited<ReturnType<typeof buildOrderPlan>>, { ok: true }>;
 
-export function parseFleaTickDate(dateStr: string | undefined): Date | null {
-  return dateStr && isValidDateStr(dateStr) ? buildSlotDate(dateStr, "00:00") : null;
+/**
+ * ข้อมูลยาเห็บหมัด ณ ตอนจอง — ดึงจากข้อมูลสัตว์เลี้ยง (ที่เดียวที่ลูกค้า/พนักงานกรอก) เก็บลงออเดอร์ไว้เป็นประวัติ
+ * ใช้ชื่อยาในฐานข้อมูลถ้าจับคู่แล้ว ไม่งั้นใช้ข้อความที่พิมพ์ไว้ — ออเดอร์ไม่เขียนทับข้อมูลสัตว์เลี้ยงอีกแล้ว
+ */
+export async function petFleaTickSnapshot(petId: string | null | undefined) {
+  if (!petId) return { lastFleaTickAt: null, fleaTickMedicine: null };
+  const pet = await prisma.pet.findUnique({
+    where: { id: petId },
+    select: { lastFleaTickAt: true, fleaTickMedicine: true, fleaTickProduct: { select: { name: true } } },
+  });
+  return {
+    lastFleaTickAt: pet?.lastFleaTickAt ?? null,
+    fleaTickMedicine: pet?.fleaTickProduct?.name ?? pet?.fleaTickMedicine ?? null,
+  };
 }
 
 /**
@@ -296,10 +306,18 @@ export function parseFleaTickDate(dateStr: string | undefined): Date | null {
 export async function persistOrder(
   plan: OrderPlanOk,
   data: OrderFormData,
-  meta: { createdById: string | null; createdVia: CreationChannel }
+  meta: {
+    createdById: string | null;
+    createdVia: CreationChannel;
+    /** ออเดอร์ที่มาจากตะกร้าใน LINE — ผูกคำขอจอง ตั้งสถานะเริ่มต้น และเก็บรายละเอียดทรงขน */
+    bookingRequestId?: string;
+    status?: "PENDING_APPROVAL" | "PENDING_PAYMENT";
+    groomingStyleNote?: string | null;
+    groomingStyleImages?: string[];
+  }
 ): Promise<{ ok: true; id: string; total: number } | { ok: false; error: string }> {
   const total = plan.subtotal + plan.holidaySurcharge;
-  const lastFleaTickAt = parseFleaTickDate(data.lastFleaTickDate);
+  const fleaTick = await petFleaTickSnapshot(data.petId);
 
   let order: { id: string } | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -322,15 +340,18 @@ export async function persistOrder(
           holidaySurcharge: plan.holidaySurcharge,
           holidayLabel: plan.holidayLabel,
           vaccineComplete: data.vaccineComplete,
-          lastFleaTickAt,
-          fleaTickMedicine: data.fleaTickMedicine || null,
+          ...fleaTick,
           subtotal: plan.subtotal,
           total,
           note: data.note || null,
           createdById: meta.createdById,
           updatedById: meta.createdById,
           createdVia: meta.createdVia,
-          status: "PENDING_PAYMENT",
+          status: meta.status ?? "PENDING_PAYMENT",
+          bookingRequestId: meta.bookingRequestId ?? null,
+          groomingStyleNote: meta.groomingStyleNote || null,
+          groomingStyleImages: meta.groomingStyleImages ?? [],
+          groomingStyleImagesAt: meta.groomingStyleImages?.length ? new Date() : null,
           items: { create: plan.items },
         },
       });
@@ -346,11 +367,7 @@ export async function persistOrder(
   if (data.petId) {
     await prisma.pet.update({
       where: { id: data.petId },
-      data: {
-        vaccineComplete: data.vaccineComplete,
-        lastFleaTickAt,
-        fleaTickMedicine: data.fleaTickMedicine || null,
-      },
+      data: { vaccineComplete: data.vaccineComplete },
     });
   }
 

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { petSchema, petRegisterSchema, petCreateData, customerSchema } from "@/lib/customer-schema";
+import { petSchema, petRegisterSchema, customerSchema } from "@/lib/customer-schema";
+import { petCreateInput, petUpdateInput } from "@/lib/pet-write";
 
 export type ActionResult =
   | { ok: true; id?: string; message?: string }
@@ -33,7 +34,7 @@ export async function createCustomerWithPets(input: {
     data: {
       ...customer.data,
       pets: {
-        create: petsParsed.data.map(petCreateData),
+        create: await Promise.all(petsParsed.data.map((p) => petCreateInput(prisma, p))),
       },
     },
   });
@@ -70,9 +71,9 @@ export async function updateCustomerWithPets(input: {
 
     for (const p of petsParsed.data) {
       if (p.id) {
-        await tx.pet.update({ where: { id: p.id }, data: petCreateData(p) });
+        await tx.pet.update({ where: { id: p.id }, data: await petUpdateInput(tx, p.id, p) });
       } else {
-        await tx.pet.create({ data: { customerId: input.customerId, ...petCreateData(p) } });
+        await tx.pet.create({ data: { customerId: input.customerId, ...(await petCreateInput(tx, p)) } });
       }
     }
   });
@@ -91,7 +92,7 @@ export async function addPet(input: {
   if (!pet.success) return { ok: false, error: pet.error.issues[0].message };
 
   await prisma.pet.create({
-    data: { customerId: input.customerId, ...petCreateData(pet.data) },
+    data: { customerId: input.customerId, ...(await petCreateInput(prisma, pet.data)) },
   });
 
   revalidatePath(`/customers/${input.customerId}`);
@@ -136,7 +137,7 @@ export async function updatePet(input: {
 
   await prisma.pet.update({
     where: { id: input.id },
-    data: petCreateData(parsed.data),
+    data: await petUpdateInput(prisma, input.id, parsed.data),
   });
 
   revalidatePath(`/customers/${input.customerId}`);

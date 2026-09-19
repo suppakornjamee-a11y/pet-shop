@@ -1,6 +1,7 @@
 import type { OrderStatus, PaymentStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import {
+  SLOT_CAPACITY,
   TIME_SLOTS,
   buildSlotDate,
   isPastSlot,
@@ -22,7 +23,8 @@ export type OrderForHold = {
  * - ยกเลิก หรือไม่มี payment ไหนกันคิวอยู่เลย → ไม่กัน (คืนคิว)
  */
 export function isSlotHolding(o: OrderForHold, now: Date = new Date()): boolean {
-  if (o.status === "CANCELLED") return false;
+  // ยกเลิก / รอเลือกวันเวลาใหม่ (แอดมินแจ้งคิวไม่ว่าง) — ไม่กันคิว ให้คนอื่นจองช่วงนั้นได้
+  if (o.status === "CANCELLED" || o.status === "RESCHEDULE_REQUIRED") return false;
   if (
     // รอเช็คคิว = ลูกค้าจองไว้แล้วรอพนักงานยืนยัน ต้องกันคิวไว้ ไม่งั้นคนอื่นจองทับระหว่างรอ
     o.status === "PENDING_APPROVAL" ||
@@ -45,7 +47,7 @@ export function isSlotHolding(o: OrderForHold, now: Date = new Date()): boolean 
 }
 
 /**
- * เช็คว่า slot คิวส่วนกลางนี้ว่างไหม (ไม่มีออเดอร์ที่ "กันคิว" อยู่)
+ * เช็คว่า slot คิวส่วนกลางนี้ยังรับได้ไหม — ออเดอร์ที่ "กันคิว" อยู่ยังไม่ครบ SLOT_CAPACITY ตัว
  * แยกพูลคิวตาม queueType (BATH = จองอาบน้ำ, OTHER = จองบริการอื่นๆ) ไม่แย่งเวลากัน
  * ออเดอร์เก่าก่อนมีฟีเจอร์นี้ (queueType เป็น null) ถือเป็นพูล BATH
  */
@@ -68,11 +70,11 @@ export async function isSlotAvailable(
       payments: { select: { status: true, expiresAt: true } },
     },
   });
-  return !orders.some((o) => isSlotHolding(o));
+  return orders.filter((o) => isSlotHolding(o)).length < SLOT_CAPACITY;
 }
 
 /**
- * ช่วงเวลาสำเร็จรูป "แรกของวันนั้น" ที่ยังจองได้ — ไม่ผ่านมาแล้ว และไม่มีใครกันคิวไว้
+ * ช่วงเวลาสำเร็จรูป "แรกของวันนั้น" ที่ยังจองได้ — ไม่ผ่านมาแล้ว และคิวที่กันไว้ยังไม่ครบ SLOT_CAPACITY
  * คืน null ถ้าเต็มหมดทั้งวัน
  *
  * ใช้เป็นเวลาตั้งต้นให้ปุ่มเปิดออเดอร์ในหน้าปฏิทิน เพราะ /orders/new บังคับว่าต้องมีทั้งวันและเวลา
@@ -98,8 +100,13 @@ export async function firstOpenSlot(
       payments: { select: { status: true, expiresAt: true } },
     },
   });
-  const taken = new Set(
-    orders.filter((o) => isSlotHolding(o)).map((o) => toThaiTimeStr(o.appointmentAt!))
+  const taken = new Map<string, number>();
+  for (const o of orders) {
+    if (!isSlotHolding(o)) continue;
+    const time = toThaiTimeStr(o.appointmentAt!);
+    taken.set(time, (taken.get(time) ?? 0) + 1);
+  }
+  return (
+    TIME_SLOTS.find((slot) => (taken.get(slot) ?? 0) < SLOT_CAPACITY && !isPastSlot(dateStr, slot)) ?? null
   );
-  return TIME_SLOTS.find((slot) => !taken.has(slot) && !isPastSlot(dateStr, slot)) ?? null;
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidDateStr, toThaiDateStr } from "@/lib/slots";
 
 export const petSchema = z.object({
   name: z.string().min(1, "กรุณากรอกชื่อสัตว์เลี้ยง"),
@@ -13,8 +14,16 @@ export const petSchema = z.object({
   allergies: z.string().optional(),
   vaccine5in1Date: z.string().optional(),
   rabiesVaccineDate: z.string().optional(),
-  lastFleaTickDate: z.string().optional(),
+  // วันที่ให้ยาจริง — วันในอนาคตยังไม่ใช่ประวัติการให้ยา จึงไม่รับ
+  lastFleaTickDate: z
+    .string()
+    .optional()
+    .refine((v) => !v || !isValidDateStr(v) || v <= toThaiDateStr(new Date()), {
+      message: "วันที่ให้ยาเห็บหมัดต้องไม่เป็นวันในอนาคต",
+    }),
   fleaTickMedicine: z.string().optional(),
+  fleaTickProductId: z.string().nullable().optional(),
+  fleaTickEvidenceUrls: z.array(z.string()).max(3, "แนบหลักฐานได้ไม่เกิน 3 รูป").default([]),
   foodNote: z.string().optional(),
   medicationNote: z.string().optional(),
   neutered: z.coerce.boolean().default(false),
@@ -62,9 +71,12 @@ export function petCreateData(p: z.infer<typeof petSchema>) {
     vaccine5in1At: p.vaccine5in1Date ? new Date(p.vaccine5in1Date) : null,
     rabiesVaccineAt: p.rabiesVaccineDate ? new Date(p.rabiesVaccineDate) : null,
     lastFleaTickAt: p.lastFleaTickDate ? new Date(p.lastFleaTickDate) : null,
-    fleaTickMedicine: p.fleaTickMedicine || null,
+    fleaTickMedicine: p.fleaTickMedicine?.trim() || null,
+    fleaTickEvidenceUrls: p.fleaTickEvidenceUrls,
   };
 }
+
+export type PetInput = z.infer<typeof petSchema>;
 
 export const customerSchema = z.object({
   name: z.string().min(1, "กรุณากรอกชื่อเจ้าของ"),
