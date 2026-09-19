@@ -20,6 +20,7 @@ import { customerSchema, petRegisterSchema } from "@/lib/customer-schema";
 import { petCreateInput, petUpdateInput } from "@/lib/pet-write";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
 import { amountDueNow, cartItemSchema, createBookingRequest } from "@/lib/booking-request";
+import { fleaTickUpdateSchema, fleaTickWriteData, quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
 import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
@@ -884,5 +885,146 @@ export async function liffRescheduleBookingRequest(idToken: string, requestId: s
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
   revalidatePath("/boarding");
+  return { ok: true as const };
+}
+
+/* ---------- หน้าจองแบบใหม่: ข้อมูลตั้งต้น + ฟอร์มสั้น ---------- */
+
+/**
+ * ข้อมูลตั้งต้นของหน้าจอง — ยังไม่เคยมีข้อมูลก็เปิดหน้าจองได้เลย (ไม่บังคับไปหน้าลงทะเบียนก่อน)
+ * มีข้อมูลแล้ว: ส่งข้อมูลสุขภาพ/ข้อควรระวัง/ยาเห็บหมัดของสัตว์แต่ละตัว ให้ลูกค้าตรวจและแก้ก่อนจอง
+ */
+export async function liffGetBookingContext(idToken: string) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const customer = await prisma.customer.findUnique({
+    where: { lineUserId: identity.userId },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      petInstagram: true,
+      pets: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          species: true,
+          breed: true,
+          birthDate: true,
+          weightKg: true,
+          allergies: true,
+          groomingCautions: true,
+          hasChronicDisease: true,
+          chronicDiseaseNote: true,
+          fleaTickMedicine: true,
+          fleaTickProductId: true,
+          fleaTickSource: true,
+          lastFleaTickAt: true,
+        },
+      },
+    },
+  });
+  if (!customer) return { ok: true as const, linked: false as const, displayName: identity.name ?? null };
+  return {
+    ok: true as const,
+    linked: true as const,
+    customer: {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      petInstagram: customer.petInstagram,
+    },
+    pets: customer.pets.map((p) => ({
+      ...p,
+      birthDate: p.birthDate ? toThaiDateStr(p.birthDate) : "",
+      lastFleaTickAt: p.lastFleaTickAt ? toThaiDateStr(p.lastFleaTickAt) : "",
+    })),
+  };
+}
+
+const quickProfileSchema = z.object({
+  customer: z
+    .object({
+      name: z.string().trim().min(1, "กรุณากรอกชื่อ–นามสกุลเจ้าของ"),
+      phone: z.string().trim().min(6, "กรุณากรอกเบอร์โทรศัพท์"),
+      petInstagram: z.string().trim().optional(),
+    })
+    .optional(),
+  pets: z.array(quickPetSchema).max(10),
+});
+
+/**
+ * บันทึกฟอร์มสั้น — ยังไม่มีข้อมูล: สร้างลูกค้า (ผูก LINE นี้) + สัตว์เลี้ยง, มีแล้ว: เพิ่ม/แก้สัตว์เลี้ยง
+ * แก้เฉพาะช่องในฟอร์มสั้น ช่องอื่นของสัตว์เลี้ยงไม่ถูกแตะ และแก้ได้เฉพาะสัตว์ของตัวเอง
+ */
+export async function liffSaveQuickProfile(idToken: string, input: unknown) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const parsed = quickProfileSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+  const { customer: customerInput, pets } = parsed.data;
+
+  let customer = await prisma.customer.findUnique({ where: { lineUserId: identity.userId }, select: { id: true } });
+  if (!customer) {
+    if (!customerInput) return { ok: false as const, error: "กรุณากรอกข้อมูลเจ้าของ" };
+    if (pets.length === 0) return { ok: false as const, error: "กรุณาเพิ่มสัตว์เลี้ยงอย่างน้อย 1 ตัว" };
+    customer = await prisma.customer.create({
+      data: {
+        name: customerInput.name,
+        phone: customerInput.phone,
+        petInstagram: customerInput.petInstagram || null,
+        lineUserId: identity.userId,
+        createdVia: "LIFF",
+      },
+      select: { id: true },
+    });
+  } else if (customerInput) {
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { name: customerInput.name, phone: customerInput.phone, petInstagram: customerInput.petInstagram || null },
+    });
+  }
+
+  const ownerId = customer.id;
+  const editIds = pets.map((p) => p.id).filter((id): id is string => !!id);
+  if (editIds.length > 0) {
+    const owned = await prisma.pet.count({ where: { id: { in: editIds }, customerId: ownerId } });
+    if (owned !== editIds.length) return { ok: false as const, error: "ไม่พบสัตว์เลี้ยงนี้ในบัญชีของคุณ" };
+  }
+
+  const savedIds = await prisma.$transaction(async (tx) => {
+    const ids: string[] = [];
+    for (const p of pets) {
+      const data = await quickPetWriteData(tx, p);
+      if (p.id) {
+        await tx.pet.update({ where: { id: p.id }, data });
+        ids.push(p.id);
+      } else {
+        const created = await tx.pet.create({ data: { ...data, customerId: ownerId } });
+        ids.push(created.id);
+      }
+    }
+    return ids;
+  });
+
+  return { ok: true as const, petIds: savedIds };
+}
+
+/** อัปเดตข้อมูลยาเห็บหมัดของสัตว์ตัวเดียว (จากหน้าจองคิว ตอนเทียบกับวันเข้าใช้บริการ) */
+export async function liffUpdatePetFleaTick(idToken: string, petId: string, input: unknown) {
+  const identity = await verifyLiffIdToken(idToken);
+  if (!identity) {
+    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
+  }
+  const parsed = fleaTickUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+  const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { customer: { select: { lineUserId: true } } } });
+  if (!pet || pet.customer.lineUserId !== identity.userId) return { ok: false as const, error: "ไม่พบสัตว์เลี้ยงนี้ในบัญชีของคุณ" };
+  await prisma.pet.update({ where: { id: petId }, data: await fleaTickWriteData(prisma, petId, parsed.data) });
   return { ok: true as const };
 }

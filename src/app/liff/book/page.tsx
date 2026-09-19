@@ -1,5 +1,5 @@
-import { LiffBookingForm } from "@/components/liff-booking-form";
+import { LiffBookingApp } from "@/components/liff-booking/booking-app";
 
 export default function Page() {
-  return <LiffBookingForm />;
+  return <LiffBookingApp />;
 }
