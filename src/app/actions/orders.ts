@@ -10,6 +10,7 @@ import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
 import { formatBaht } from "@/lib/format";
 import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder, isBeforeServiceDay } from "@/lib/order-kind";
 import { buildOrderPlan, createOrderSchema, persistOrder, petFleaTickSnapshot } from "@/lib/order-plan";
+import { REQUEST_PAYMENT_TTL_MS, syncBookingRequestForOrder, syncBookingRequestStatus } from "@/lib/booking-request";
 import type { Role } from "@/generated/prisma/enums";
 import type { ActionResult } from "./customers";
 
@@ -199,12 +200,13 @@ async function defaultPromptPayAccount() {
 async function insertPayment(
   orderId: string,
   amount: number,
-  purpose: "DEPOSIT" | "BALANCE"
+  purpose: "DEPOSIT" | "BALANCE",
+  ttlMs = PAYMENT_TTL_MS
 ) {
   const account = await defaultPromptPayAccount();
   const qrPayload =
     account?.promptpayId ? buildPromptPayPayload(account.promptpayId, amount) : null;
-  const expiresAt = new Date(Date.now() + PAYMENT_TTL_MS);
+  const expiresAt = new Date(Date.now() + ttlMs);
 
   return prisma.payment.create({
     data: {
@@ -221,12 +223,16 @@ async function insertPayment(
 }
 
 /** สร้าง payment แรกของออเดอร์ — ถ้ามีมัดจำ สร้างแค่ยอดมัดจำก่อน ถ้าไม่มีมัดจำ สร้างเต็มยอด */
-export async function createInitialPayments(orderId: string, total: number, depositAmount: number) {
+export async function createInitialPayments(
+  orderId: string,
+  total: number,
+  depositAmount: number,
+  ttlMs = PAYMENT_TTL_MS
+) {
   if (depositAmount > 0) {
-    await insertPayment(orderId, depositAmount, "DEPOSIT");
-  } else {
-    await insertPayment(orderId, total, "BALANCE");
+    return insertPayment(orderId, depositAmount, "DEPOSIT", ttlMs);
   }
+  return insertPayment(orderId, total, "BALANCE", ttlMs);
 }
 
 /** เก็บส่วนที่เหลือ (หลังมัดจำยืนยันแล้ว) */
@@ -405,6 +411,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
 
   revalidatePath(`/orders/${orderId}`);
   if (!result.ok) return result;
+  await syncBookingRequestForOrder(orderId);
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");
   revalidatePath("/orders/boarding");
@@ -460,6 +467,7 @@ export async function rejectPayment(paymentId: string, reason: string): Promise<
   // ไม่ส่งข้อความ LINE แล้ว — หน้าชำระเงินของลูกค้าถามสถานะเองเป็นรอบ พอสลิปถูกปฏิเสธ
   // หน้าจอจะขึ้นเหตุผลพร้อมช่องแนบสลิปใหม่ให้เอง
 
+  await syncBookingRequestForOrder(payment.orderId);
   revalidateOrderViews(payment.orderId);
   return { ok: true, message: "ปฏิเสธสลิปแล้ว" };
 }
@@ -488,7 +496,6 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  if (order.bookingRequestId) return { ok: false, error: "ออเดอร์นี้อยู่ในคำขอจอง กรุณาอนุมัติที่กล่องคำขอจอง" };
   if (order.status !== "PENDING_APPROVAL") {
     return { ok: false, error: "ออเดอร์นี้ยืนยันคิวไปแล้ว" };
   }
@@ -503,8 +510,23 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
     }),
   ]);
 
-  // ไม่ต้องส่งลิงก์ชำระเงินทาง LINE แล้ว — หน้าจองของลูกค้าคอยถามสถานะเองอยู่
+  // ไม่ต้องส่งลิงก์ชำระเงินทาง LINE สำหรับออเดอร์เดี่ยว — หน้าจองของลูกค้าคอยถามสถานะเองอยู่
   // พอพนักงานกดยืนยันคิว หน้าจอจะพาไปขั้นชำระเงินต่อให้เอง
+  // ออเดอร์ในคำขอจอง (ตะกร้า) ยังไม่มี QR — ออกให้ตอนอนุมัติ (ทีละรายการ) แล้วส่งลิงก์ชำระทาง LINE
+  // เพราะลูกค้าส่งคำขอแล้วมักปิดแอปไป ไม่ได้เปิดหน้าค้างรอ
+  if (order.bookingRequestId) {
+    const payment = await createInitialPayments(order.id, order.total, order.depositAmount, REQUEST_PAYMENT_TTL_MS);
+    await syncBookingRequestStatus(order.bookingRequestId);
+    const pet = await prisma.order.findUnique({ where: { id: orderId }, select: { pet: { select: { name: true } } } });
+    const link = buildLiffDeepLink(`/requests/${order.bookingRequestId}?order=${orderId}`);
+    await notifyCustomerLine(
+      orderId,
+      `✅ คิวว่างแล้วค่ะ${pet?.pet ? `
+น้อง${pet.pet.name}` : ""}
+ยอดชำระ : ${formatBaht(payment.amount)}${link ? `
+ชำระเงินที่ : ${link}` : ""}`
+    );
+  }
 
   revalidateOrderViews(orderId);
   return { ok: true, message: "ยืนยันคิวแล้ว" };
@@ -519,7 +541,6 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
-  if (order.bookingRequestId) return { ok: false, error: "ออเดอร์นี้อยู่ในคำขอจอง กรุณาจัดการที่กล่องคำขอจอง" };
   if (order.status !== "PENDING_APPROVAL") {
     return { ok: false, error: "ออเดอร์นี้ไม่ได้อยู่ระหว่างรอเช็คคิว" };
   }
@@ -528,6 +549,25 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
   // ด่านนี้กันกรณีเรียกมาจากที่อื่นหรือหน้าจอค้างเวอร์ชันเก่า)
   const note = reason.trim();
   if (!note) return { ok: false, error: "กรุณาระบุเหตุผลที่ปฏิเสธคิว" };
+
+  // ออเดอร์ในคำขอจอง: ไม่ยกเลิก — ให้ลูกค้าเลือกวันเวลาใหม่ของรายการนี้แล้วส่งกลับ (สัตว์/บริการคงเดิม ไม่กันคิว)
+  if (order.bookingRequestId) {
+    await prisma.$transaction([
+      prisma.order.update({ where: { id: orderId }, data: { status: "RESCHEDULE_REQUIRED", updatedById: user.id } }),
+      prisma.orderActivityLog.create({
+        data: { orderId, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: user.id },
+      }),
+      prisma.bookingRequest.update({ where: { id: order.bookingRequestId }, data: { rescheduleReason: note } }),
+    ]);
+    await syncBookingRequestStatus(order.bookingRequestId);
+    const link = buildLiffDeepLink(`/requests/${order.bookingRequestId}?order=${orderId}`);
+    await notifyCustomerLine(orderId, `คิวที่เลือกไม่ว่างค่ะ
+เหตุผล : ${note}${link ? `
+เลือกวันเวลาใหม่ที่ : ${link}` : ""}`);
+    revalidateOrderViews(orderId);
+    return { ok: true, message: "แจ้งลูกค้าให้เลือกวันเวลาใหม่แล้ว" };
+  }
+
   await prisma.$transaction([
     prisma.order.update({
       where: { id: orderId },
@@ -624,6 +664,8 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
       }`
     );
   }
+
+  if (order.bookingRequestId) await syncBookingRequestForOrder(orderId);
 
   const cctvReminder = target === "COMPLETED" && orderKind === "BOARDING" && order.cctvRequested;
   const message = joinedOnly ? `บันทึกแล้ว: ${user.name} เข้าร่วมงานนี้ด้วย` : "อัปเดตสถานะเรียบร้อย";

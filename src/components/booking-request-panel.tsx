@@ -4,12 +4,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Ban, CalendarClock, CalendarX, CheckCircle2, Loader2 } from "lucide-react";
-import {
-  approveBookingRequest,
-  cancelBookingRequest,
-  requestBookingReschedule,
-} from "@/app/actions/booking-requests";
+import { Ban, CalendarClock, Loader2 } from "lucide-react";
+import { cancelBookingRequest } from "@/app/actions/booking-requests";
 import { formatBaht } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
@@ -20,6 +16,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+type OrderStatus =
+  | "PENDING_APPROVAL"
+  | "RESCHEDULE_REQUIRED"
+  | "PENDING_PAYMENT"
+  | "DEPOSIT_PAID"
+  | "PAID"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
 
 type RequestStatus =
   | "PENDING_APPROVAL"
@@ -47,6 +53,7 @@ export type BookingRequestView = {
     total: number;
     dueNow: number;
     cancelled: boolean;
+    status: OrderStatus;
   }[];
 };
 
@@ -60,14 +67,15 @@ const TONE: Record<RequestStatus, string> = {
 };
 
 /**
- * กล่องคำขอจองบนหน้าออเดอร์ — แสดงทุกรายการในคำขอ (ทุกตัว ทุกบริการ) และให้แอดมินตัดสินใจทั้งคำขอทีเดียว
+ * กล่องคำขอจองบนหน้าออเดอร์ — แสดงทุกรายการในคำขอ (ทุกตัว ทุกบริการ) พร้อมสถานะของแต่ละรายการ
+ * อนุมัติคิว / คิวไม่ว่าง ทำทีละรายการด้วยปุ่มเดิมของออเดอร์ กล่องนี้มีแค่ยกเลิกทั้งคำขอ
  * ช่างอาบน้ำไม่เห็นปุ่ม (เซิร์ฟเวอร์ก็กันไว้แล้ว)
  */
 export function BookingRequestPanel({ request, canManage }: { request: BookingRequestView; canManage: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [dialog, setDialog] = useState<"reschedule" | "cancel" | null>(null);
+  const [dialog, setDialog] = useState<"cancel" | null>(null);
   const [reason, setReason] = useState("");
 
   function run(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>) {
@@ -84,8 +92,6 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
       notifyStaffAlertsChanged();
     });
   }
-
-  const awaiting = request.status === "PENDING_APPROVAL";
 
   return (
     <Card>
@@ -105,16 +111,6 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2">
-            {awaiting && (
-              <>
-                <Button variant="outline" size="sm" disabled={isPending} onClick={() => setDialog("reschedule")}>
-                  <CalendarX /> {t.bookingRequest.queueUnavailable}
-                </Button>
-                <Button size="sm" disabled={isPending} onClick={() => run(() => approveBookingRequest(request.id))}>
-                  {isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} {t.bookingRequest.approve}
-                </Button>
-              </>
-            )}
             {request.status !== "CANCELLED" && request.status !== "CONFIRMED" && (
               <Button variant="ghost" size="sm" disabled={isPending} onClick={() => setDialog("cancel")}>
                 <Ban /> {t.bookingRequest.cancel}
@@ -140,6 +136,9 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
                   {it.species && <SpeciesIcon species={it.species} className="h-4 w-4" />}
                   {it.petName ?? "-"}
                   <span className="font-normal text-muted-foreground">· {it.orderCode}</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-normal">
+                    {t.labels.orderStatus[it.status]}
+                  </span>
                 </div>
                 <div className="truncate text-xs text-muted-foreground">{it.summary}</div>
                 <div className="flex items-center gap-1 text-xs">
@@ -169,9 +168,7 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
       <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {dialog === "reschedule" ? t.bookingRequest.queueUnavailable : t.bookingRequest.cancel}
-            </DialogTitle>
+            <DialogTitle>{t.bookingRequest.cancel}</DialogTitle>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="br-reason" className="text-xs">
@@ -184,15 +181,9 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
               {t.common.cancel}
             </Button>
             <Button
-              variant={dialog === "cancel" ? "destructive" : "default"}
+              variant="destructive"
               disabled={isPending || !reason.trim()}
-              onClick={() =>
-                run(() =>
-                  dialog === "reschedule"
-                    ? requestBookingReschedule(request.id, reason)
-                    : cancelBookingRequest(request.id, reason)
-                )
-              }
+              onClick={() => run(() => cancelBookingRequest(request.id, reason))}
             >
               {isPending && <Loader2 className="animate-spin" />}
               {t.common.confirm}

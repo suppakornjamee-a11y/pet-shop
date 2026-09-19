@@ -19,7 +19,13 @@ import { verifyLiffIdToken } from "@/lib/line";
 import { customerSchema, petRegisterSchema } from "@/lib/customer-schema";
 import { petCreateInput, petUpdateInput } from "@/lib/pet-write";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
-import { amountDueNow, cartItemSchema, createBookingRequest } from "@/lib/booking-request";
+import {
+  amountDueNow,
+  cartItemSchema,
+  createBookingRequest,
+  syncBookingRequestForOrder,
+  syncBookingRequestStatus,
+} from "@/lib/booking-request";
 import { fleaTickUpdateSchema, fleaTickWriteData, quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
 import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
@@ -601,6 +607,7 @@ export async function liffSubmitPaymentSlip(
     data: { slipUrl, status: "SUBMITTED", submittedAt: new Date() },
   });
 
+  await syncBookingRequestForOrder(payment.order.id);
   revalidatePath(`/orders/${payment.order.id}`);
   return { ok: true, message: "ส่งสลิปเรียบร้อย รอร้านตรวจสอบ" };
 }
@@ -660,6 +667,8 @@ export async function liffCancelOrder(
       },
     }),
   ]);
+
+  await syncBookingRequestForOrder(orderId);
 
   // ล้างหน้าฝั่งพนักงานให้ตรงกับความจริงทันที รวมถึงกระดิ่งแจ้งเตือนที่นับคิวรอยืนยันอยู่
   for (const p of ["/orders/" + orderId, "/orders/bath", "/orders/other", "/boarding", "/calendar", "/calendar-other", "/"]) {
@@ -747,19 +756,13 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
           pet: { select: { id: true, name: true, species: true } },
           room: { select: { name: true, category: { select: { name: true } } } },
           items: { orderBy: { createdAt: "asc" }, select: { name: true, subtotal: true, itemType: true, refId: true } },
-        },
-      },
-      payments: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          id: true,
-          amount: true,
-          status: true,
-          qrPayload: true,
-          expiresAt: true,
-          rejectReason: true,
-          bankAccount: { select: { bankName: true, accountName: true, accountNumber: true } },
+          payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
+          activityLogs: {
+            where: { action: { startsWith: QUEUE_REJECT_LOG_PREFIX } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { action: true },
+          },
         },
       },
     },
@@ -774,16 +777,15 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
     code: req.code,
     status: req.status,
     rescheduleReason: req.rescheduleReason,
-    orders: req.orders.map((o) => ({
+    orders: req.orders.map(({ payments, activityLogs, ...o }) => ({
       ...o,
       appointmentAt: iso(o.appointmentAt),
       checkInAt: iso(o.checkInAt),
       checkOutAt: iso(o.checkOutAt),
       dueNow: amountDueNow(o),
+      paymentStatus: payments[0]?.status ?? null,
+      queueRejectReason: activityLogs[0]?.action.slice(QUEUE_REJECT_LOG_PREFIX.length) ?? null,
     })),
-    payment: req.payments[0]
-      ? { ...req.payments[0], expiresAt: iso(req.payments[0].expiresAt) }
-      : null,
   };
 }
 
@@ -805,7 +807,7 @@ const rescheduleSchema = z.object({
 
 /**
  * คิวไม่ว่าง → ลูกค้าเลือกวันเวลาใหม่ให้รายการเดิม (สัตว์เลี้ยงและบริการคงเดิมทั้งหมด) แล้วส่งกลับให้แอดมินตรวจอีกครั้ง
- * เช็คทุกรายการผ่านก่อน แล้วค่อยบันทึกพร้อมกัน — ไม่ให้เหลือบางรายการย้ายแล้ว บางรายการยังไม่ย้าย
+ * ส่งมาทีละรายการหรือหลายรายการก็ได้ — เช็คทุกรายการที่ส่งมาผ่านก่อน แล้วค่อยบันทึกพร้อมกัน
  */
 export async function liffRescheduleBookingRequest(idToken: string, requestId: string, input: unknown) {
   const identity = await verifyLiffIdToken(idToken);
@@ -823,13 +825,15 @@ export async function liffRescheduleBookingRequest(idToken: string, requestId: s
     },
   });
   if (!req || req.customer.lineUserId !== identity.userId) return { ok: false as const, error: "ไม่พบคำขอจองนี้" };
-  if (req.status !== "NEEDS_RESCHEDULE") return { ok: false as const, error: "คำขอนี้ไม่ได้รอเลือกวันเวลาใหม่" };
+  if (req.orders.length === 0) return { ok: false as const, error: "คำขอนี้ไม่มีรายการที่รอเลือกวันเวลาใหม่" };
 
   const changes = new Map(parsed.data.items.map((i) => [i.orderId, i]));
   const plans: { orderId: string; plan: Extract<Awaited<ReturnType<typeof buildOrderPlan>>, { ok: true }> }[] = [];
-  for (const o of req.orders) {
-    const c = changes.get(o.id);
-    if (!c) return { ok: false as const, error: "กรุณาเลือกวันเวลาใหม่ให้ครบทุกรายการ" };
+  // แอดมินแจ้งคิวไม่ว่างทีละรายการ ลูกค้าจึงส่งวันเวลาใหม่มาเฉพาะรายการที่แก้ก็ได้
+  const targets = req.orders.filter((o) => changes.has(o.id));
+  if (targets.length === 0) return { ok: false as const, error: "ไม่พบรายการที่รอเลือกวันเวลาใหม่" };
+  for (const o of targets) {
+    const c = changes.get(o.id)!;
     const boarding = !!o.roomId;
     const planInput: OrderFormData = {
       customerId: req.customer.id,
@@ -876,11 +880,9 @@ export async function liffRescheduleBookingRequest(idToken: string, requestId: s
       });
       await tx.orderActivityLog.create({ data: { orderId, action: "ลูกค้าเลือกวันเวลาใหม่ ส่งให้ตรวจสอบคิวอีกครั้ง" } });
     }
-    await tx.bookingRequest.update({
-      where: { id: requestId },
-      data: { status: "PENDING_APPROVAL", submittedAt: new Date() },
-    });
+    await tx.bookingRequest.update({ where: { id: requestId }, data: { submittedAt: new Date() } });
   });
+  await syncBookingRequestStatus(requestId);
 
   revalidatePath("/orders/bath");
   revalidatePath("/orders/other");

@@ -3,20 +3,21 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bath, Home, Loader2, Scissors } from "lucide-react";
+import { Bath, Check, Home, Loader2, Scissors, XCircle } from "lucide-react";
 import { liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
 import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { toThaiDateStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
+import { LiffPaymentBody } from "@/components/liff-payment-view";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SlotPicker } from "./item-detail";
 import { newItemDraft, type ItemDraft } from "./cart";
-import { Stepper, todayStr, type Kind, type Step } from "./shared";
+import { Stepper, todayStr, type Kind, type Step, type T } from "./shared";
 
 type RequestData = Extract<Awaited<ReturnType<typeof liffGetBookingRequest>>, { ok: true }>;
 type RequestOrder = RequestData["orders"][number];
@@ -24,14 +25,17 @@ type RequestOrder = RequestData["orders"][number];
 const POLL_MS = 8000;
 const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Bath, OTHER: Scissors };
 
-const STEP_BY_STATUS: Record<RequestData["status"], Step> = {
-  PENDING_APPROVAL: 2,
-  NEEDS_RESCHEDULE: 2,
-  PENDING_DEPOSIT: 3,
-  DEPOSIT_SUBMITTED: 3,
-  CONFIRMED: 4,
-  CANCELLED: 2,
-};
+/** ขั้นของแถบด้านบน ตามสถานะของรายการที่กำลังดู — แต่ละรายการเดินหน้าแยกกัน (แอดมินอนุมัติทีละรายการ) */
+function stepOf(o: RequestOrder): Step {
+  if (o.status === "PENDING_PAYMENT") return 3;
+  if (o.status === "PENDING_APPROVAL" || o.status === "RESCHEDULE_REQUIRED" || o.status === "CANCELLED") return 2;
+  return 4;
+}
+
+/** รายการที่ลูกค้าต้องลงมือก่อน (เลือกวันใหม่ / ชำระเงินที่ยังไม่ส่งสลิป) — ใช้เลือกแท็บเริ่มต้น */
+function needsAction(o: RequestOrder): boolean {
+  return o.status === "RESCHEDULE_REQUIRED" || (o.status === "PENDING_PAYMENT" && o.paymentStatus !== "SUBMITTED");
+}
 
 function orderKind(o: RequestOrder): Kind {
   if (o.room) return "BOARDING";
@@ -42,12 +46,112 @@ function timeOf(iso: string) {
   return formatTime(new Date(iso));
 }
 
-function RequestBody({ requestId }: { requestId: string }) {
+function draftFor(o: RequestOrder): ItemDraft {
+  const kind = orderKind(o);
+  const d = newItemDraft(kind, o.pet?.id ?? "");
+  if (kind === "BOARDING" && o.checkInAt && o.checkOutAt) {
+    d.date = toThaiDateStr(new Date(o.checkInAt));
+    d.checkInTime = timeOf(o.checkInAt);
+    d.checkOutDate = toThaiDateStr(new Date(o.checkOutAt));
+    d.checkOutTime = timeOf(o.checkOutAt);
+  } else if (o.appointmentAt) {
+    const day = toThaiDateStr(new Date(o.appointmentAt));
+    d.date = day < todayStr() ? todayStr() : day;
+  }
+  return d;
+}
+
+/** การ์ดสรุปรายการ — หน้าตาเดียวกับหน้าจองแบบเดิม */
+function SummaryCard({ order, t }: { order: RequestOrder; t: T }) {
+  const kind = orderKind(order);
+  const Icon = KIND_ICONS[kind];
+  const names = [
+    ...(order.room ? [`${order.room.category.name} · ${order.room.name}`] : []),
+    ...order.items
+      .filter((it) => it.itemType === "SERVICE")
+      .sort((a, b) => b.subtotal - a.subtotal)
+      .map((it) => it.name),
+  ];
+  return (
+    <div className="rounded-2xl border bg-card p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
+          <Icon className="h-5 w-5 text-primary" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{[t.liffBook.kind[kind], ...names].join(" · ")}</div>
+          {order.pet && <div className="text-xs text-muted-foreground">{order.pet.name}</div>}
+          {order.groomingStyleNote && (
+            <div className="text-xs text-muted-foreground">
+              {t.liffBook.styleTitle}: {order.groomingStyleNote}
+            </div>
+          )}
+        </div>
+        <div className="font-semibold text-primary">{formatBaht(order.total)}</div>
+      </div>
+
+      <div className="my-4 border-t border-dashed" />
+
+      <dl className="space-y-2.5 text-sm">
+        {kind === "BOARDING" && order.checkInAt && order.checkOutAt ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.orders.form.checkInLabel}</dt>
+              <dd className="text-right font-medium">
+                {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryCheckOutLabel}</dt>
+              <dd className="text-right font-medium">
+                {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
+              </dd>
+            </div>
+          </>
+        ) : order.appointmentAt ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryDateLabel}</dt>
+              <dd className="text-right font-medium">{formatDateLong(order.appointmentAt)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted-foreground">{t.liff.summaryTimeLabel}</dt>
+              <dd className="text-right font-medium">
+                {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
+              </dd>
+            </div>
+          </>
+        ) : null}
+      </dl>
+    </div>
+  );
+}
+
+function StatusHero({ tone, title, children }: { tone: "ok" | "bad"; title: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-3 pt-2 text-center">
+      <div className={cn("flex h-16 w-16 items-center justify-center rounded-full", tone === "bad" ? "bg-destructive/15" : "bg-accent/40")}>
+        <span className={cn("flex h-11 w-11 items-center justify-center rounded-full", tone === "bad" ? "bg-destructive" : "bg-primary")}>
+          {tone === "bad" ? (
+            <XCircle className="h-5 w-5 text-primary-foreground" />
+          ) : (
+            <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
+          )}
+        </span>
+      </div>
+      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+      {children}
+    </div>
+  );
+}
+
+function RequestBody({ requestId, initialOrderId }: { requestId: string; initialOrderId?: string }) {
   const { t } = useI18n();
   const router = useRouter();
   const { idToken } = useLiff();
   const [data, setData] = useState<RequestData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialOrderId ?? null);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>({});
   const [isPending, startTransition] = useTransition();
 
@@ -73,52 +177,43 @@ function RequestBody({ requestId }: { requestId: string }) {
     };
   }, [load]);
 
-  // เตรียมวันเวลาเดิมของแต่ละรายการไว้ให้แก้ เมื่อแอดมินแจ้งคิวไม่ว่าง (ทำครั้งเดียวต่อรายการ)
-  const rescheduleOrders = data?.status === "NEEDS_RESCHEDULE" ? data.orders.filter((o) => o.status === "RESCHEDULE_REQUIRED") : [];
-  const missing = rescheduleOrders.filter((o) => !drafts[o.id]);
-  if (missing.length > 0) {
-    const next = { ...drafts };
-    for (const o of missing) {
-      const kind = orderKind(o);
-      const d = newItemDraft(kind, o.pet?.id ?? "");
-      if (kind === "BOARDING" && o.checkInAt && o.checkOutAt) {
-        d.date = toThaiDateStr(new Date(o.checkInAt));
-        d.checkInTime = timeOf(o.checkInAt);
-        d.checkOutDate = toThaiDateStr(new Date(o.checkOutAt));
-        d.checkOutTime = timeOf(o.checkOutAt);
-      } else if (o.appointmentAt) {
-        const day = toThaiDateStr(new Date(o.appointmentAt));
-        d.date = day < todayStr() ? todayStr() : day;
-      }
-      next[o.id] = d;
-    }
-    setDrafts(next);
+  const selected =
+    data?.orders.find((o) => o.id === selectedId) ??
+    data?.orders.find(needsAction) ??
+    data?.orders.find((o) => o.status !== "CANCELLED") ??
+    data?.orders[0] ??
+    null;
+
+  // เตรียมวันเวลาเดิมไว้ให้แก้ เมื่อแอดมินแจ้งคิวไม่ว่าง (ครั้งเดียวต่อรายการ)
+  if (selected?.status === "RESCHEDULE_REQUIRED" && !drafts[selected.id]) {
+    setDrafts({ ...drafts, [selected.id]: draftFor(selected) });
   }
 
-  function resubmit() {
-    if (!idToken) return;
+  function resubmit(o: RequestOrder) {
+    const d = drafts[o.id];
+    if (!idToken || !d) return;
     startTransition(async () => {
       const res = await liffRescheduleBookingRequest(idToken, requestId, {
-        items: rescheduleOrders.map((o) => {
-          const d = drafts[o.id];
-          return d.kind === "BOARDING"
+        items: [
+          d.kind === "BOARDING"
             ? { orderId: o.id, checkInDate: d.date, checkInTime: d.checkInTime, checkOutDate: d.checkOutDate, checkOutTime: d.checkOutTime }
-            : { orderId: o.id, appointmentDate: d.date, appointmentTime: d.time };
-        }),
+            : { orderId: o.id, appointmentDate: d.date, appointmentTime: d.time },
+        ],
       });
       if (!res.ok) {
         handleLiffAuthExpiry(res);
-        const o = "orderId" in res ? rescheduleOrders.find((x) => x.id === res.orderId) : undefined;
-        toast.error(o?.pet ? `${o.pet.name}: ${res.error}` : res.error);
+        toast.error(res.error);
         return;
       }
-      setDrafts({});
+      const next = { ...drafts };
+      delete next[o.id];
+      setDrafts(next);
       await load();
     });
   }
 
   if (error) return <p className="py-16 text-center text-sm text-muted-foreground">{error}</p>;
-  if (!data) {
+  if (!data || !selected) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -126,165 +221,109 @@ function RequestBody({ requestId }: { requestId: string }) {
     );
   }
 
-  const active = data.orders.filter((o) => o.status !== "CANCELLED");
-  const totalEstimate = active.reduce((s, o) => s + o.total, 0);
-  const totalDue = active.reduce((s, o) => s + o.dueNow, 0);
-  const hasBath = active.some((o) => orderKind(o) === "BATH");
-  const canResubmit =
-    rescheduleOrders.length > 0 &&
-    rescheduleOrders.every((o) => {
-      const d = drafts[o.id];
-      return d && (d.kind === "BOARDING" ? !!d.date && !!d.checkOutDate : !!d.time);
-    });
+  const draft = drafts[selected.id];
+  const isBath = orderKind(selected) === "BATH";
+  const setDraft = (patch: Partial<ItemDraft>) =>
+    setDrafts((cur) => ({ ...cur, [selected.id]: { ...cur[selected.id], ...patch } }));
+  const canResubmit = !!draft && (draft.kind === "BOARDING" ? !!draft.date && !!draft.checkOutDate : !!draft.time);
 
   return (
-    <div className={cn("space-y-4", data.status === "NEEDS_RESCHEDULE" && "pb-28")}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="mx-auto h-16 w-auto" />
-      <Stepper step={STEP_BY_STATUS[data.status]} t={t} />
+    <div className={cn("space-y-5 py-2", selected.status === "RESCHEDULE_REQUIRED" && "pb-28")}>
+      <Stepper step={stepOf(selected)} t={t} />
 
-      <div className="space-y-1 text-center">
-        <h1 className="text-lg font-bold">{t.liffBook.requestTitle(data.code)}</h1>
-        <span
-          className={cn(
-            "inline-block rounded-full px-3 py-1 text-xs font-medium",
-            data.status === "NEEDS_RESCHEDULE" || data.status === "CANCELLED"
-              ? "bg-destructive/10 text-destructive"
-              : "bg-accent/40 text-primary"
-          )}
-        >
-          {t.labels.bookingRequestStatus[data.status]}
-        </span>
-      </div>
-
-      {data.status === "NEEDS_RESCHEDULE" && data.rescheduleReason && (
-        <p className="rounded-2xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {t.liffBook.rescheduleReason(data.rescheduleReason)}
-        </p>
+      {data.orders.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {data.orders.map((o) => {
+            const active = o.id === selected.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setSelectedId(o.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  active ? "border-primary bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted",
+                  o.status === "CANCELLED" && "opacity-50"
+                )}
+              >
+                {o.pet && <SpeciesIcon species={o.pet.species} className="h-4 w-4" />}
+                {o.pet?.name} · {t.liffBook.kind[orderKind(o)]}
+                {needsAction(o) && <span className="h-2 w-2 rounded-full bg-destructive" />}
+              </button>
+            );
+          })}
+        </div>
       )}
 
-      <div className="space-y-3">
-        {data.orders.map((o) => {
-          const kind = orderKind(o);
-          const Icon = KIND_ICONS[kind];
-          const draft = drafts[o.id];
-          const editing = o.status === "RESCHEDULE_REQUIRED" && data.status === "NEEDS_RESCHEDULE" && draft;
-          return (
-            <div key={o.id} className={cn("space-y-3 rounded-2xl border bg-card p-4", o.status === "CANCELLED" && "opacity-50")}>
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/40">
-                  <Icon className="h-5 w-5 text-primary" />
-                </span>
-                <div className="min-w-0 flex-1 space-y-0.5 text-sm">
-                  <div className="flex items-center gap-1 font-semibold">
-                    {o.pet && <SpeciesIcon species={o.pet.species} className="h-4 w-4" />} {o.pet?.name} · {t.liffBook.kind[kind]}
+      {selected.status === "PENDING_PAYMENT" ? (
+        <>
+          {/* หน้าชำระเงินแบบเดิมของออเดอร์ — ถามสถานะเองทุก 8 วินาที อัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
+          <LiffPaymentBody key={selected.id} orderId={selected.id} />
+          {isBath && <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>}
+        </>
+      ) : selected.status === "RESCHEDULE_REQUIRED" ? (
+        <>
+          <StatusHero tone="bad" title={t.liff.queueRejectedTitle}>
+            {selected.queueRejectReason && (
+              <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                {t.liff.slipRejectedReason(selected.queueRejectReason)}
+              </p>
+            )}
+          </StatusHero>
+          <SummaryCard order={selected} t={t} />
+          {draft &&
+            (draft.kind === "BOARDING" ? (
+              <div className="grid gap-3 rounded-2xl border bg-card p-4 lg:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t.orders.form.checkInLabel}</Label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input type="date" className="min-w-0" min={todayStr()} value={draft.date} onChange={(e) => setDraft({ date: e.target.value })} />
+                    <Input type="time" className="w-28" value={draft.checkInTime} onChange={(e) => setDraft({ checkInTime: e.target.value })} />
                   </div>
-                  {o.room && (
-                    <div>
-                      {o.room.category.name} · {o.room.name}
-                    </div>
-                  )}
-                  <div className="text-muted-foreground">
-                    {o.items
-                      .filter((it) => it.itemType === "SERVICE")
-                      .sort((a, b) => b.subtotal - a.subtotal)
-                      .map((it) => it.name)
-                      .join(" · ")}
-                  </div>
-                  {o.groomingStyleNote && (
-                    <div className="text-muted-foreground">
-                      {t.liffBook.styleTitle}: {o.groomingStyleNote}
-                    </div>
-                  )}
-                  {!editing &&
-                    (kind === "BOARDING" && o.checkInAt && o.checkOutAt ? (
-                      <>
-                        <div>{t.liff.confirmCheckInLine(formatDateLong(o.checkInAt), timeOf(o.checkInAt))}</div>
-                        <div>{t.liff.confirmCheckOutLine(formatDateLong(o.checkOutAt), timeOf(o.checkOutAt))}</div>
-                      </>
-                    ) : o.appointmentAt ? (
-                      <div>
-                        {formatDateLong(o.appointmentAt)} {timeOf(o.appointmentAt)} {t.liff.timeUnitSuffix}
-                      </div>
-                    ) : null)}
                 </div>
-                <div className="shrink-0 text-right text-sm font-semibold">{formatBaht(o.total)}</div>
-              </div>
-
-              {editing &&
-                (draft.kind === "BOARDING" ? (
-                  <div className="grid gap-3 border-t pt-3 lg:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t.orders.form.checkInLabel}</Label>
-                      <div className="grid grid-cols-[1fr_auto] gap-2">
-                        <Input
-                          type="date"
-                          className="min-w-0"
-                          min={todayStr()}
-                          value={draft.date}
-                          onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...draft, date: e.target.value } })}
-                        />
-                        <Input
-                          type="time"
-                          className="w-28"
-                          value={draft.checkInTime}
-                          onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...draft, checkInTime: e.target.value } })}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t.orders.form.checkOutLabel}</Label>
-                      <div className="grid grid-cols-[1fr_auto] gap-2">
-                        <Input
-                          type="date"
-                          className="min-w-0"
-                          min={draft.date}
-                          value={draft.checkOutDate}
-                          onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...draft, checkOutDate: e.target.value } })}
-                        />
-                        <Input
-                          type="time"
-                          className="w-28"
-                          value={draft.checkOutTime}
-                          onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...draft, checkOutTime: e.target.value } })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 border-t pt-3">
-                    <SlotPicker
-                      draft={draft}
-                      set={(patch) => setDrafts((cur) => ({ ...cur, [o.id]: { ...cur[o.id], ...patch } }))}
-                      t={t}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{t.orders.form.checkOutLabel}</Label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input
+                      type="date"
+                      className="min-w-0"
+                      min={draft.date}
+                      value={draft.checkOutDate}
+                      onChange={(e) => setDraft({ checkOutDate: e.target.value })}
                     />
+                    <Input type="time" className="w-28" value={draft.checkOutTime} onChange={(e) => setDraft({ checkOutTime: e.target.value })} />
                   </div>
-                ))}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="space-y-2 rounded-2xl border bg-card p-4 text-sm">
-        <div className="flex justify-between gap-3">
-          <span>{t.liffBook.estimate}</span>
-          <span className="font-semibold">{formatBaht(totalEstimate)}</span>
-        </div>
-        <div className="flex justify-between gap-3">
-          <span>{t.liffBook.dueAfterApproval}</span>
-          <span className="text-lg font-bold text-primary">{formatBaht(totalDue)}</span>
-        </div>
-        {hasBath && <p className="text-xs text-muted-foreground">{t.liffBook.depositNote}</p>}
-      </div>
-
-      {data.status === "NEEDS_RESCHEDULE" ? (
-        <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-          <Button className="h-14 w-full rounded-2xl text-base" disabled={!canResubmit || isPending} onClick={resubmit}>
-            {isPending && <Loader2 className="animate-spin" />}
-            {t.liffBook.resubmit}
-          </Button>
-        </div>
+                </div>
+              </div>
+            ) : (
+              <SlotPicker key={selected.id} draft={draft} set={setDraft} t={t} />
+            ))}
+          <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+            <Button className="h-14 w-full rounded-2xl text-base" disabled={!canResubmit || isPending} onClick={() => resubmit(selected)}>
+              {isPending && <Loader2 className="animate-spin" />}
+              {t.liffBook.resubmit}
+            </Button>
+          </div>
+        </>
+      ) : selected.status === "PENDING_APPROVAL" ? (
+        <>
+          <StatusHero tone="ok" title={t.liff.checkingQueueTitle} />
+          <SummaryCard order={selected} t={t} />
+        </>
+      ) : selected.status === "CANCELLED" ? (
+        <>
+          <StatusHero tone="bad" title={t.labels.orderStatus.CANCELLED} />
+          <SummaryCard order={selected} t={t} />
+        </>
       ) : (
+        <>
+          <StatusHero tone="ok" title={t.liff.inProgressTitle} />
+          <SummaryCard order={selected} t={t} />
+          {isBath && <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>}
+        </>
+      )}
+
+      {selected.status !== "RESCHEDULE_REQUIRED" && (
         <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={() => router.push("/liff/book")}>
           {t.liffBook.newBooking}
         </Button>
@@ -293,10 +332,10 @@ function RequestBody({ requestId }: { requestId: string }) {
   );
 }
 
-export function LiffRequestView({ requestId }: { requestId: string }) {
+export function LiffRequestView({ requestId, initialOrderId }: { requestId: string; initialOrderId?: string }) {
   return (
     <LiffGate>
-      <RequestBody requestId={requestId} />
+      <RequestBody requestId={requestId} initialOrderId={initialOrderId} />
     </LiffGate>
   );
 }

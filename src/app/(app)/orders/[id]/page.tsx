@@ -115,7 +115,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
     ),
   ];
   const intlLocale = locale === "th" ? "th-TH" : "en-US";
-  // คำขอจองจาก LINE ที่ออเดอร์นี้อยู่ — แสดงทุกรายการในคำขอ ให้แอดมินตัดสินใจทั้งคำขอทีเดียว
+  // คำขอจองจาก LINE ที่ออเดอร์นี้อยู่ — แสดงทุกรายการในคำขอ (อนุมัติคิวทีละรายการด้วยปุ่มของออเดอร์)
   const requestView: BookingRequestView | null = order.bookingRequest
     ? (() => {
         const live = order.bookingRequest.orders.filter((o) => o.status !== "CANCELLED");
@@ -143,6 +143,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
             total: o.total,
             dueNow: amountDueNow(o),
             cancelled: o.status === "CANCELLED",
+            status: o.status,
           })),
         };
       })()
@@ -224,7 +225,6 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                 roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
                 iHaveStartedNotFinished={iHaveStartedNotFinished}
                 badgeInfo={badgeInfo}
-                inBookingRequest={!!order.bookingRequestId}
                 beforeServiceDay={isBeforeServiceDay(order)}
               />
             </CardHeader>

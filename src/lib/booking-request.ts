@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { buildPromptPayPayload } from "@/lib/promptpay";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
 
 /**
  * คำขอจองจาก LINE (ตะกร้า) — ลูกค้าเลือกหลายรายการ แล้วส่งครั้งเดียว แต่ละรายการคือ Order หนึ่งใบ
- * อนุมัติ / แจ้งคิวไม่ว่าง / ชำระมัดจำ ทำทีเดียวทั้งคำขอ
+ * แอดมินอนุมัติ / แจ้งคิวไม่ว่าง ทีละรายการ และลูกค้าชำระแยกตามรายการ (หน้าชำระเงินเดิมของออเดอร์)
  */
 
 /** รหัสคำขอจอง BK-YYYYMMDD-NNNN (running ต่อวันตามเวลาไทย) */
@@ -36,33 +35,45 @@ export function amountDueNow(order: { depositAmount: number; total: number }): n
   return order.depositAmount > 0 ? order.depositAmount : order.total;
 }
 
-export async function defaultPromptPayAccount() {
-  return (
-    (await prisma.bankAccount.findFirst({ where: { type: "PROMPTPAY", active: true, isDefault: true } })) ??
-    (await prisma.bankAccount.findFirst({ where: { type: "PROMPTPAY", active: true } }))
-  );
-}
+/** QR ของรายการในคำขอจอง — 30 นาทีนับจากแอดมินอนุมัติคิว (ร้านกำหนด) */
+export const REQUEST_PAYMENT_TTL_MS = 30 * 60 * 1000;
 
-/** QR ของคำขอจอง — นานกว่าออเดอร์เดี่ยว เพราะลูกค้าเปิดจากข้อความ LINE ทีหลัง ไม่ได้ยืนรออยู่หน้าร้าน */
-export const REQUEST_PAYMENT_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** ออก QR ชำระของทั้งคำขอ — ยอด = ผลรวมยอดที่ต้องจ่ายตอนนี้ของทุกรายการที่ยังไม่ยกเลิก */
-export async function createRequestPayment(requestId: string) {
+/**
+ * สถานะรวมของคำขอจอง คำนวณจากสถานะของแต่ละรายการ (แอดมินอนุมัติ/แจ้งคิวไม่ว่างทีละรายการ)
+ * เรียกทุกครั้งหลังรายการในคำขอเปลี่ยนสถานะ หรือมีการส่ง/ตรวจสลิป
+ * ลำดับ: มีรายการรอเลือกวันใหม่ → รอเลือกวันเวลาใหม่ / มีรายการรอตรวจคิว → รอตรวจสอบคิว /
+ * มีรายการรอชำระ → รอชำระมัดจำ (ถ้าทุกรายการที่รอชำระส่งสลิปแล้ว → รอตรวจสอบมัดจำ) / ยกเลิกหมด → ยกเลิก / นอกนั้น → ยืนยันแล้ว
+ */
+export async function syncBookingRequestStatus(requestId: string) {
   const orders = await prisma.order.findMany({
-    where: { bookingRequestId: requestId, status: { not: "CANCELLED" } },
-    select: { depositAmount: true, total: true },
-  });
-  const amount = orders.reduce((sum, o) => sum + amountDueNow(o), 0);
-  const account = await defaultPromptPayAccount();
-  return prisma.bookingRequestPayment.create({
-    data: {
-      requestId,
-      amount,
-      bankAccountId: account?.id ?? null,
-      qrPayload: account?.promptpayId ? buildPromptPayPayload(account.promptpayId, amount) : null,
-      expiresAt: new Date(Date.now() + REQUEST_PAYMENT_TTL_MS),
+    where: { bookingRequestId: requestId },
+    select: {
+      status: true,
+      payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
     },
   });
+  if (orders.length === 0) return;
+  const live = orders.filter((o) => o.status !== "CANCELLED");
+  const awaitingPayment = live.filter((o) => o.status === "PENDING_PAYMENT");
+  const status =
+    live.length === 0
+      ? "CANCELLED"
+      : live.some((o) => o.status === "RESCHEDULE_REQUIRED")
+        ? "NEEDS_RESCHEDULE"
+        : live.some((o) => o.status === "PENDING_APPROVAL")
+          ? "PENDING_APPROVAL"
+          : awaitingPayment.length > 0
+            ? awaitingPayment.every((o) => o.payments[0]?.status === "SUBMITTED")
+              ? "DEPOSIT_SUBMITTED"
+              : "PENDING_DEPOSIT"
+            : "CONFIRMED";
+  await prisma.bookingRequest.update({ where: { id: requestId }, data: { status } });
+}
+
+/** เรียกจากจุดที่รู้แค่ออเดอร์ — ออเดอร์ที่ไม่ได้อยู่ในคำขอจองไม่ทำอะไร */
+export async function syncBookingRequestForOrder(orderId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { bookingRequestId: true } });
+  if (order?.bookingRequestId) await syncBookingRequestStatus(order.bookingRequestId);
 }
 
 /* ---------- รายการในตะกร้า ---------- */

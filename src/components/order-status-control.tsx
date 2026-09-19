@@ -38,7 +38,6 @@ export function OrderStatusControl({
   badgeInfo,
   beforeServiceDay = false,
   isShopOrder = false,
-  inBookingRequest = false,
 }: {
   orderId: string;
   status: OrderStatus;
@@ -53,7 +52,6 @@ export function OrderStatusControl({
   /** บิลร้านอาหารไม่มีขั้นตอนดำเนินการ/เช็คเอ้าท์ — เหลือแค่ยกเลิกบิล */
   isShopOrder?: boolean;
   /** ออเดอร์ที่อยู่ในคำขอจอง — อนุมัติ/แจ้งคิวไม่ว่างทำที่กล่องคำขอจองทั้งคำขอ ไม่ใช่ทีละใบ */
-  inBookingRequest?: boolean;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -150,7 +148,7 @@ export function OrderStatusControl({
       {!hideActionsForFinishedGroomer && (
         <div className="flex flex-wrap items-start justify-end gap-2">
           {/* ลูกค้าจองเองผ่าน LINE — ต้องกดยืนยันคิวก่อน ลูกค้าถึงจะเข้าหน้าชำระเงินได้ */}
-          {awaitingApproval && !inBookingRequest && role !== "GROOMER" && (
+          {awaitingApproval && role !== "GROOMER" && (
             <>
               <Button
                 variant="outline"
