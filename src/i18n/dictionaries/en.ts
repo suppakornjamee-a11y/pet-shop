@@ -307,7 +307,7 @@ const en: Dictionary = {
     titleBoarding: "Hotel Booking History",
     bookOrder: "Book / Create Order",
     filterAll: "All",
-    filterAwaitingApproval: "Pending Queue Check",
+    filterAwaitingApproval: "Pending review",
     filterPending: "Pending Payment",
     filterPaid: "Paid",
     filterInProgress: "In Progress",

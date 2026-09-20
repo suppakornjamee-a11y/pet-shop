@@ -234,11 +234,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="whitespace-nowrap text-base">{t.orders.orderDetails}</CardTitle>
-                  {badgeInfo.kind === "PLAIN" && badgeInfo.status === "PENDING_APPROVAL" ? (
-                    <SealLabel passed={false}>{t.orders.pendingReview}</SealLabel>
-                  ) : (
-                    <OrderStatusBadges info={badgeInfo} t={t} />
-                  )}
+                  <OrderStatusBadges info={badgeInfo} t={t} />
                 </div>
                 <OrderStatusControl
                   isShopOrder={isShopOrder}
@@ -384,7 +380,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                                 <Bug className="h-3.5 w-3.5" />
                               </span>
                               <h4 className="text-sm font-semibold">{t.fleaTick.title}</h4>
-                              {fleaPassed && <SealLabel passed>{t.liffBook.fleaPassed}</SealLabel>}
+                              {fleaPassed && <SealLabel>{t.liffBook.fleaPassed}</SealLabel>}
                             </div>
                             <FleaTickStatusBlock
                               className="mt-0"

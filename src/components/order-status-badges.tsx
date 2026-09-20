@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { PendingReviewIcon, PendingReviewMark } from "@/components/pending-review-icon";
 import { cn } from "@/lib/utils";
 import { orderStatusColor, paymentStatusColor } from "@/lib/labels";
 import type { StatusBadgeInfo } from "@/lib/order-kind";
@@ -26,7 +27,8 @@ export function OrderStatusBadges({
 
   if (info.kind === "SLIP_SUBMITTED") {
     return (
-      <Badge variant="outline" className={cn(textSize, paymentStatusColor.SUBMITTED)}>
+      <Badge variant="outline" className={cn(textSize, "gap-1", paymentStatusColor.SUBMITTED)}>
+        <PendingReviewIcon className="h-3.5 w-3.5" />
         {t.orders.slipPendingReviewBadge}
       </Badge>
     );
@@ -59,6 +61,10 @@ export function OrderStatusBadges({
         </Badge>
       </div>
     );
+  }
+
+  if (info.status === "PENDING_APPROVAL") {
+    return <PendingReviewMark size={size}>{t.orders.pendingReview}</PendingReviewMark>;
   }
 
   return (

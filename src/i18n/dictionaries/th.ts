@@ -320,7 +320,7 @@ const th = {
     titleBoarding: "ประวัติจองโรงแรม",
     bookOrder: "จองคิว / สร้างออเดอร์",
     filterAll: "ทั้งหมด",
-    filterAwaitingApproval: "รอเช็คคิว",
+    filterAwaitingApproval: "รอตรวจสอบ",
     filterPending: "รอชำระเงิน",
     filterPaid: "ชำระแล้ว",
     filterInProgress: "กำลังดำเนินการ",

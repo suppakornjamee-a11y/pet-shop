@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { useI18n } from "@/components/i18n-provider";
 import { SpeciesIcon } from "@/components/species-icon";
-import { SealLabel } from "@/components/verify-seal";
+import { PendingReviewMark } from "@/components/pending-review-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -101,7 +101,7 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             {t.bookingRequest.title} {request.code}
             {request.status === "PENDING_APPROVAL" ? (
-              <SealLabel passed={false}>{t.orders.pendingReview}</SealLabel>
+              <PendingReviewMark>{t.orders.pendingReview}</PendingReviewMark>
             ) : (
               <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", TONE[request.status])}>
                 {t.labels.bookingRequestStatus[request.status]}
@@ -141,9 +141,13 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
                   {it.species && <SpeciesIcon species={it.species} className="h-4 w-4" />}
                   {it.petName ?? "-"}
                   <span className="font-normal text-muted-foreground">· {it.orderCode}</span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-normal">
-                    {t.labels.orderStatus[it.status]}
-                  </span>
+                  {it.status === "PENDING_APPROVAL" ? (
+                    <PendingReviewMark size="xs">{t.orders.pendingReview}</PendingReviewMark>
+                  ) : (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-normal">
+                      {t.labels.orderStatus[it.status]}
+                    </span>
+                  )}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">{it.summary}</div>
                 <div className="flex items-center gap-1 text-xs">
