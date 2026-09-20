@@ -505,12 +505,12 @@ function BookingBody() {
         {cart.length > 0 && (
           <div className="space-y-3 rounded-2xl border bg-card p-4">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm">{t.liffBook.estimate}</span>
-              <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 border-t pt-3">
               <span className="text-sm text-muted-foreground">{t.liffBook.dueAfterApproval}</span>
               <span className="font-semibold tabular-nums">{formatBaht(totalDue)}</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 border-t pt-3">
+              <span className="text-sm">{t.liffBook.estimate}</span>
+              <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
             </div>
           </div>
         )}

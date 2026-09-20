@@ -24,6 +24,7 @@ export function FleaTickStatusBlock({
   pet,
   serviceDate,
   alwaysShow = false,
+  className,
 }: {
   t: Dictionary;
   pet: {
@@ -35,6 +36,7 @@ export function FleaTickStatusBlock({
   };
   serviceDate: string;
   alwaysShow?: boolean;
+  className?: string;
 }) {
   const hasData = !!(pet.lastFleaTickAt || pet.fleaTickMedicine || pet.fleaTickProduct);
   if (!hasData && !alwaysShow) return null;
@@ -46,7 +48,7 @@ export function FleaTickStatusBlock({
   });
 
   return (
-    <div className="mt-1.5 space-y-1 text-xs">
+    <div className={cn("mt-1.5 space-y-1 text-xs", className)}>
       <div className="flex flex-wrap items-center gap-1.5">
         <Bug className="h-3.5 w-3.5 text-muted-foreground" />
         <span className={cn("rounded-full px-2 py-0.5 font-medium", TONE[status.kind])}>

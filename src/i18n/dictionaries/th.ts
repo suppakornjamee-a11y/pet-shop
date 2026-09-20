@@ -915,7 +915,6 @@ const th = {
     payPageTitle: "ชำระเงิน",
     orderCodeLabel: (code: string) => `เลขที่การจอง ${code}`,
     attachSlipButton: "แนบสลิปการโอนเงิน",
-    reselectSlipButton: "เลือกรูปใหม่",
     confirmSlipButton: "ยืนยันรายการ",
     slipUploadFailed: "ส่งสลิปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
     slipSubmittedNotice: "ส่งสลิปแล้ว รอร้านตรวจสอบ",

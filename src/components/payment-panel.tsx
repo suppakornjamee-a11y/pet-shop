@@ -23,6 +23,7 @@ import {
 import type { PaymentStatus, PaymentPurpose, OrderStatus } from "@/generated/prisma/enums";
 import { formatBaht } from "@/lib/format";
 import { paymentStatusColor } from "@/lib/labels";
+import { parseSlipUrls } from "@/lib/slip-urls";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -108,11 +109,11 @@ export function PaymentPanel({
 
   return (
     <Card className="lg:sticky lg:top-20">
-      <CardHeader className="flex-row items-center justify-between">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2 text-base">
           {t.orders.payment.title}
         </CardTitle>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {paymentsWithSlip.length > 0 && <SlipViewerDialog payments={paymentsWithSlip} />}
           {activePayment && (
             <Badge variant="outline" className={cn("text-xs", paymentStatusColor[activePayment.status])}>
@@ -193,6 +194,30 @@ export function PaymentPanel({
   );
 }
 
+/** สลิปของรายการชำระเงินเดียว — รูปเดียวแสดงเต็มความกว้างเหมือนเดิม · หลายรูป (โอนหลายรอบ) เรียงเป็นตารางพร้อมลำดับ */
+function SlipImages({ raw, alt, single, multi }: { raw: string | null; alt: string; single: string; multi: string }) {
+  const urls = parseSlipUrls(raw);
+  if (urls.length <= 1) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={urls[0]} alt={alt} className={cn("mx-auto w-full rounded-lg border object-contain", single)} />
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {urls.map((src, i) => (
+        <figure key={i} className="space-y-1">
+          <figcaption className="text-[11px] text-muted-foreground">
+            {i + 1}/{urls.length}
+          </figcaption>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={alt} className={cn("w-full rounded-lg border bg-muted/30 object-contain", multi)} />
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 function SlipViewerDialog({ payments }: { payments: PaymentRow[] }) {
   const { t } = useI18n();
   const showPurposeLabel = payments.length > 1;
@@ -218,12 +243,7 @@ function SlipViewerDialog({ payments }: { payments: PaymentRow[] }) {
                   {t.labels.paymentPurpose[p.purpose]} · {formatBaht(p.amount)}
                 </div>
               )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.slipUrl!}
-                alt={t.orders.payment.slipFromCustomer}
-                className="mx-auto w-full rounded-lg border object-contain"
-              />
+              <SlipImages raw={p.slipUrl} alt={t.orders.payment.slipFromCustomer} single="" multi="max-h-[45vh]" />
             </div>
           ))}
         </div>
@@ -442,12 +462,7 @@ function ActivePaymentPanel({
       {payment.slipUrl && (
         <div className="space-y-1.5">
           <div className="text-xs font-medium text-muted-foreground">{t.orders.payment.slipFromCustomer}</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={payment.slipUrl}
-            alt={t.orders.payment.slipFromCustomer}
-            className="mx-auto max-h-80 w-full rounded-lg border object-contain"
-          />
+          <SlipImages raw={payment.slipUrl} alt={t.orders.payment.slipFromCustomer} single="max-h-80" multi="max-h-56" />
         </div>
       )}
 

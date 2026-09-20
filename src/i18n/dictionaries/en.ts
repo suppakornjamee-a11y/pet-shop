@@ -900,7 +900,6 @@ const en: Dictionary = {
     payPageTitle: "Payment",
     orderCodeLabel: (code: string) => `Booking ${code}`,
     attachSlipButton: "Attach payment slip",
-    reselectSlipButton: "Choose a different photo",
     confirmSlipButton: "Confirm",
     slipUploadFailed: "Could not send the slip. Please try again.",
     slipSubmittedNotice: "Slip submitted — waiting for the shop to review",

@@ -40,6 +40,7 @@ export function FleaCheckPanel({
   evidence,
   checked,
   canAct,
+  className,
 }: {
   orderId: string;
   level: FleaCheckLogLevel;
@@ -47,6 +48,7 @@ export function FleaCheckPanel({
   evidence: string[];
   checked: boolean;
   canAct: boolean;
+  className?: string;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -69,7 +71,7 @@ export function FleaCheckPanel({
   }
 
   return (
-    <div className={cn("mt-2 space-y-2 rounded-lg border p-2.5 text-xs", tone.box)}>
+    <div className={cn("mt-2 space-y-2 rounded-lg border p-2.5 text-xs", tone.box, className)}>
       <div className="flex flex-wrap items-center gap-1.5">
         <span className={cn("rounded-full px-2 py-0.5 font-medium", tone.pill)}>{t.fleaTick.check.level[level]}</span>
         {checked && (

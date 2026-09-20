@@ -1,6 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, PawPrint, Pencil, CalendarClock, BedDouble, Syringe, UserCheck, Video } from "lucide-react";
+import {
+  ArrowLeft,
+  BedDouble,
+  Bug,
+  CalendarClock,
+  PawPrint,
+  Pencil,
+  ReceiptText,
+  Scissors,
+  Syringe,
+  UserCheck,
+  UserRound,
+  Video,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { allergyText } from "@/lib/pet-notes";
 import { requireUser } from "@/lib/auth-helpers";
@@ -14,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { DetailSection } from "@/components/order-detail-section";
 import { CustomerPreviewButton } from "@/components/customer-preview-dialog";
 import { FleaTickStatusBlock } from "@/components/flea-tick-status";
 import { BookingRequestPanel, type BookingRequestView } from "@/components/booking-request-panel";
@@ -154,6 +168,11 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   // ผลตรวจยาเห็บหมัดที่ระบบสรุปไว้ตอนลูกค้าจอง (ประวัติเรียงใหม่สุดก่อน จึงเจอรายการล่าสุดก่อน)
   const fleaCheck = order.activityLogs.map((l) => parseFleaCheckLog(l.action)).find((c) => c !== null) ?? null;
   const fleaStaffChecked = order.activityLogs.some((l) => l.action === FLEA_STAFF_CHECKED_LOG);
+  // ส่วน "ยาเห็บหมัด" แสดงเมื่อมีอะไรให้โชว์จริง: บล็อกสถานะยา (มีข้อมูลยา หรือรอเช็คคิวของงานคิว) และ/หรือผลตรวจตอนจอง
+  const fleaAlwaysShow = order.status === "PENDING_APPROVAL" && !order.roomId;
+  const fleaStatusShown =
+    !!order.pet && (!!(order.pet.lastFleaTickAt || order.pet.fleaTickMedicine || order.pet.fleaTickProduct) || fleaAlwaysShow);
+  const showFleaSection = fleaStatusShown || !!fleaCheck;
   const backHref = order.roomId
     ? "/boarding"
     : order.queueType === "OTHER"
@@ -199,11 +218,11 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         <div className={cn("space-y-6", !isGroomer && "lg:col-span-2")}>
           {requestView && <BookingRequestPanel request={requestView} canManage={!isGroomer} />}
           <Card>
-            <CardHeader className="flex flex-wrap items-start justify-between gap-2">
+            <CardHeader className="gap-3">
+              {/* แถวบน: ชื่อ + ป้ายช่องทาง/สถานะ · แถวล่าง: ปุ่มดำเนินการชิดขวา — แยกสองแถวเสมอ ไม่บีบชื่อหัวข้อจนขึ้นสองบรรทัด */}
               <div>
-                {/* หัวข้อ + ป้ายช่องทาง + ป้ายสถานะ อยู่บรรทัดเดียวกัน ตกบรรทัดเองถ้าจอแคบ */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <CardTitle className="text-base">{t.orders.orderDetails}</CardTitle>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <CardTitle className="whitespace-nowrap text-base">{t.orders.orderDetails}</CardTitle>
                   {order.createdVia === "LIFF" && (
                     <Badge
                       variant="outline"
@@ -297,88 +316,94 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               )}
               {/* บิลร้านอาหารเป็น walk-in ไม่ผูกลูกค้า/สัตว์เลี้ยง จึงไม่ต้องมีบล็อกนี้ */}
               {!isShopOrder && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold">{t.orders.owner}</span>
-                    {order.customer && (
-                      <CustomerPreviewButton customerId={order.customer.id} highlightPetId={order.pet?.id ?? null} />
-                    )}
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <DetailSection title={t.orders.owner} icon={UserRound}>
+                      <div className="text-sm font-medium">{order.customer?.name ?? "-"}</div>
+                      <div className="mt-0.5 text-sm text-muted-foreground">{order.customer?.phone}</div>
+                      {order.customer && (
+                        <div className="mt-3">
+                          <CustomerPreviewButton customerId={order.customer.id} highlightPetId={order.pet?.id ?? null} />
+                        </div>
+                      )}
+                    </DetailSection>
+
+                    <DetailSection title={t.orders.pet} icon={PawPrint}>
+                      {order.pet ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                            <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
+                            {allergyText(order.pet.allergies) && (
+                              <span className="text-xs font-normal text-rose-600">({allergyText(order.pet.allergies)})</span>
+                            )}
+                          </div>
+                          {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}
+                          <dl className="mt-2 space-y-1 text-xs">
+                            {order.pet.weightKg ? (
+                              <div>
+                                <dt className="inline text-muted-foreground">{t.liffBook.weight}: </dt>
+                                <dd className="inline">{order.pet.weightKg}</dd>
+                              </div>
+                            ) : null}
+                            {allergyText(order.pet.groomingCautions) && (
+                              <div>
+                                <dt className="inline text-muted-foreground">{t.liffBook.cautions}: </dt>
+                                <dd className="inline">{allergyText(order.pet.groomingCautions)}</dd>
+                              </div>
+                            )}
+                            {order.pet.hasChronicDisease && (
+                              <div>
+                                <dt className="inline text-muted-foreground">{t.liffBook.disease}: </dt>
+                                <dd className="inline">{order.pet.chronicDiseaseNote || t.liffBook.diseaseYes}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </>
+                      ) : (
+                        <div className="text-sm">-</div>
+                      )}
+                    </DetailSection>
                   </div>
-                  <div className="text-xs">{order.customer?.name ?? "-"}</div>
-                  <div className="text-xs text-muted-foreground">{order.customer?.phone}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-bold">{t.orders.pet}</div>
-                  <div className="text-xs">
-                    {order.pet ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
-                        {allergyText(order.pet.allergies) && (
-                          <span className="text-rose-600">({allergyText(order.pet.allergies)})</span>
+
+                  {showFleaSection && order.pet && (
+                    <DetailSection title={t.fleaTick.title} icon={Bug}>
+                      <div className={cn("grid gap-3", fleaStatusShown && fleaCheck && "md:grid-cols-2")}>
+                        <FleaTickStatusBlock
+                          className="mt-0"
+                          t={t}
+                          pet={order.pet}
+                          serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
+                          alwaysShow={fleaAlwaysShow}
+                        />
+                        {fleaCheck && (
+                          <FleaCheckPanel
+                            className="mt-0"
+                            orderId={order.id}
+                            level={fleaCheck.level}
+                            text={fleaCheck.text}
+                            evidence={fleaCheck.level === "GREEN" ? [] : (order.pet.fleaTickEvidenceUrls ?? [])}
+                            checked={fleaStaffChecked}
+                            canAct={!isGroomer && order.status !== "CANCELLED" && fleaCheck.level !== "GREEN"}
+                          />
                         )}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </div>
-                  {order.pet && (
-                    <FleaTickStatusBlock
-                      t={t}
-                      pet={order.pet}
-                      serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
-                      alwaysShow={order.status === "PENDING_APPROVAL" && !order.roomId}
-                    />
+                      </div>
+                    </DetailSection>
                   )}
-                  {fleaCheck && (
-                    <FleaCheckPanel
-                      orderId={order.id}
-                      level={fleaCheck.level}
-                      text={fleaCheck.text}
-                      evidence={fleaCheck.level === "GREEN" ? [] : (order.pet?.fleaTickEvidenceUrls ?? [])}
-                      checked={fleaStaffChecked}
-                      canAct={!isGroomer && order.status !== "CANCELLED" && fleaCheck.level !== "GREEN"}
-                    />
-                  )}
-                  {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}
-                  {order.pet && (
-                    <dl className="mt-1.5 space-y-0.5 text-xs">
-                      {order.pet.weightKg ? (
-                        <div>
-                          <dt className="inline text-muted-foreground">{t.liffBook.weight}: </dt>
-                          <dd className="inline">{order.pet.weightKg}</dd>
-                        </div>
-                      ) : null}
-                      {allergyText(order.pet.groomingCautions) && (
-                        <div>
-                          <dt className="inline text-muted-foreground">{t.liffBook.cautions}: </dt>
-                          <dd className="inline">{allergyText(order.pet.groomingCautions)}</dd>
-                        </div>
-                      )}
-                      {order.pet.hasChronicDisease && (
-                        <div>
-                          <dt className="inline text-muted-foreground">{t.liffBook.disease}: </dt>
-                          <dd className="inline">{order.pet.chronicDiseaseNote || t.liffBook.diseaseYes}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  )}
-                </div>
-              </div>
+                </>
               )}
 
               {/* ทรงที่ลูกค้าต้องการ (จองอาบน้ำผ่าน LINE) — ข้อความ + ภาพตัวอย่างที่แนบมา */}
               {(order.groomingStyleNote || order.groomingStyleImages.length > 0) && (
-                <div className="space-y-2 rounded-lg border p-3">
-                  <div className="text-sm font-bold">{t.liffBook.styleTitle}</div>
-                  {order.groomingStyleNote && <p className="whitespace-pre-wrap text-xs">{order.groomingStyleNote}</p>}
+                <DetailSection title={t.liffBook.styleTitle} icon={Scissors} className="space-y-2">
+                  {order.groomingStyleNote && <p className="whitespace-pre-wrap text-sm">{order.groomingStyleNote}</p>}
                   {order.groomingStyleImages.length > 0 && (
                     <StyleImagesViewer images={order.groomingStyleImages} title={t.liffBook.styleImages} />
                   )}
-                </div>
+                </DetailSection>
               )}
 
-              <div className="overflow-hidden rounded-lg border">
+              <DetailSection title={t.orders.columnItem} icon={ReceiptText}>
+              <div className="overflow-hidden rounded-lg border bg-card">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-muted-foreground">
                     <tr>
@@ -425,6 +450,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   </tfoot>
                 </table>
               </div>
+              </DetailSection>
 
               {order.note && (
                 <div className="rounded-lg bg-muted/40 p-3 text-sm">

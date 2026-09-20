@@ -11,10 +11,13 @@ import {
   QrCode,
   PartyPopper,
   Paperclip,
+  Plus,
+  X,
 } from "lucide-react";
 import { getLiffOrderPaymentStatus, liffSubmitPaymentSlip } from "@/app/actions/liff";
 import { formatBaht } from "@/lib/format";
 import { compressImageToDataUrl } from "@/lib/file";
+import { MAX_SLIPS } from "@/lib/slip-urls";
 import { allergyText } from "@/lib/pet-notes";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
@@ -81,7 +84,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   const { idToken } = useLiff();
   const remaining = useCountdown(payment.expiresAt);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [slipPreview, setSlipPreview] = useState<string | null>(null);
+  const [slips, setSlips] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const rejectedRef = useRef<HTMLDivElement>(null);
@@ -97,26 +100,29 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
     setSeenStatus(payment.status);
     if (payment.status === "REJECTED") {
       setJustSubmitted(false);
-      setSlipPreview(null);
+      setSlips([]);
       setRejectNoticeOpen(true);
     }
   }
 
-  // เลือกรูปแค่พรีวิวไว้ก่อน ยังไม่ส่งจนกว่าจะกดยืนยัน — เผื่อเลือกรูปผิดจะได้เปลี่ยนก่อนส่งจริง
-  async function handleSlipFileSelect(file: File) {
+  // เลือกรูปแค่พรีวิวไว้ก่อน ยังไม่ส่งจนกว่าจะกดยืนยัน — เผื่อเลือกรูปผิดจะได้เอาออกก่อนส่งจริง
+  // แนบได้หลายรูป (เช่น โอนรอบแรกยอดไม่ครบแล้วโอนเพิ่มอีกรอบ)
+  async function handleSlipFiles(files: File[]) {
+    const picked = files.slice(0, MAX_SLIPS - slips.length);
+    if (picked.length === 0) return;
     try {
-      const dataUrl = await compressImageToDataUrl(file);
-      setSlipPreview(dataUrl);
+      const urls = await Promise.all(picked.map((f) => compressImageToDataUrl(f)));
+      setSlips((cur) => [...cur, ...urls].slice(0, MAX_SLIPS));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t.liff.errorTitle);
     }
   }
 
   async function confirmSlip() {
-    if (!idToken || !slipPreview) return;
+    if (!idToken || slips.length === 0) return;
     setUploading(true);
     try {
-      const res = await liffSubmitPaymentSlip(idToken, payment.id, slipPreview);
+      const res = await liffSubmitPaymentSlip(idToken, payment.id, slips);
       if (!res.ok) {
         handleLiffAuthExpiry(res);
         toast.error(res.error);
@@ -273,46 +279,70 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
         </div>
       )}
 
-      {!isUnusable && !isSubmitted && slipPreview && (
+      {!isUnusable && !isSubmitted && (
         <div className="space-y-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slipPreview} alt={t.liff.attachSlipButton} className="mx-auto h-40 w-40 rounded-lg border object-cover" />
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border p-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent/50">
-              {t.liff.reselectSlipButton}
+          {slips.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {slips.map((src, i) => (
+                <div key={i} className="relative aspect-square overflow-hidden rounded-lg border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={t.liff.attachSlipButton} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    aria-label={t.common.delete}
+                    disabled={uploading}
+                    onClick={() => setSlips(slips.filter((_, j) => j !== i))}
+                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              {slips.length < MAX_SLIPS && (
+                <label
+                  aria-label={t.liff.attachSlipButton}
+                  className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-accent/50"
+                >
+                  <Plus className="h-6 w-6" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = "";
+                      void handleSlipFiles(files);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+          {slips.length === 0 ? (
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground transition-colors hover:bg-accent/50">
+              <Paperclip className="h-4 w-4" />
+              {t.liff.attachSlipButton}
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
-                disabled={uploading}
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleSlipFileSelect(file);
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = "";
+                  void handleSlipFiles(files);
                 }}
               />
             </label>
-            <Button onClick={confirmSlip} disabled={uploading}>
+          ) : (
+            <Button className="w-full" onClick={confirmSlip} disabled={uploading}>
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {t.liff.confirmSlipButton}
             </Button>
-          </div>
+          )}
         </div>
-      )}
-
-      {!isUnusable && !isSubmitted && !slipPreview && (
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground transition-colors hover:bg-accent/50">
-          <Paperclip className="h-4 w-4" />
-          {t.liff.attachSlipButton}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleSlipFileSelect(file);
-            }}
-          />
-        </label>
       )}
 
       {isExpired ? (
@@ -331,11 +361,12 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
         ref={slipInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleSlipFileSelect(file);
+          const files = Array.from(e.target.files ?? []);
           e.target.value = "";
+          void handleSlipFiles(files);
         }}
       />
 

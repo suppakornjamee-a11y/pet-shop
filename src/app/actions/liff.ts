@@ -31,6 +31,7 @@ import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
 import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
+import { MAX_SLIPS, encodeSlipUrls, parseSlipUrls } from "@/lib/slip-urls";
 import { isPastSlot, isValidDateStr, isValidTimeStr, buildSlotDate, toThaiDateStr } from "@/lib/slots";
 import type { ActionResult } from "./customers";
 
@@ -588,13 +589,15 @@ export async function getLiffOrderPaymentStatus(idToken: string, orderId: string
 export async function liffSubmitPaymentSlip(
   idToken: string,
   paymentId: string,
-  slipUrl: string
+  slipUrls: string[]
 ): Promise<ActionResult> {
   const identity = await verifyLiffIdToken(idToken);
   if (!identity) {
     return { ok: false, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" };
   }
-  if (!slipUrl) return { ok: false, error: "กรุณาแนบรูปสลิป" };
+  const newSlips = Array.isArray(slipUrls) ? slipUrls.filter((u) => typeof u === "string" && u.length > 0) : [];
+  if (newSlips.length === 0) return { ok: false, error: "กรุณาแนบรูปสลิป" };
+  if (newSlips.length > MAX_SLIPS) return { ok: false, error: `แนบสลิปได้ไม่เกิน ${MAX_SLIPS} รูป` };
 
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -613,9 +616,12 @@ export async function liffSubmitPaymentSlip(
     return { ok: false, error: "การจองนี้ยังรอเจ้าหน้าที่ยืนยันคิว กรุณารอลิงก์ชำระเงินทาง LINE" };
   }
 
+  // สลิปที่ถูกปฏิเสธมักเพราะยอดยังไม่ครบ — แนบใหม่ให้ต่อท้ายของเดิม พนักงานจะได้เห็นทุกรอบที่โอนมา
+  const slips =
+    payment.status === "REJECTED" ? [...parseSlipUrls(payment.slipUrl), ...newSlips].slice(-MAX_SLIPS) : newSlips;
   await prisma.payment.update({
     where: { id: paymentId },
-    data: { slipUrl, status: "SUBMITTED", submittedAt: new Date() },
+    data: { slipUrl: encodeSlipUrls(slips), status: "SUBMITTED", submittedAt: new Date() },
   });
 
   await syncBookingRequestForOrder(payment.order.id);

@@ -146,7 +146,7 @@ export function OrderStatusControl({
   return (
     <>
       {!hideActionsForFinishedGroomer && (
-        <div className="flex flex-wrap items-start justify-end gap-2">
+        <div className="flex flex-wrap items-start justify-start gap-2 md:justify-end">
           {/* ลูกค้าจองเองผ่าน LINE — ต้องกดยืนยันคิวก่อน ลูกค้าถึงจะเข้าหน้าชำระเงินได้ */}
           {awaitingApproval && role !== "GROOMER" && (
             <>
@@ -217,7 +217,7 @@ export function OrderStatusControl({
           </ConfirmButton>
           )}
           {notYet && (
-            <p className="w-full text-right text-xs text-muted-foreground">
+            <p className="w-full text-xs text-muted-foreground md:text-right">
               {t.orders.startBlockedNotServiceDay}
             </p>
           )}
