@@ -54,9 +54,9 @@ export function FleaTickStatusBlock({
         <span className={cn("rounded-full px-2 py-0.5 font-medium", TONE[status.kind])}>
           {t.fleaTick.status[status.kind]}
         </span>
-        {hasData && (
+        {hasData && pet.fleaTickSource === "STAFF_CHECKED" && (
           <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
-            {t.fleaTick.source[pet.fleaTickSource]}
+            {t.fleaTick.source.STAFF_CHECKED}
           </span>
         )}
       </div>
@@ -65,8 +65,8 @@ export function FleaTickStatusBlock({
       )}
       {hasData && (
         <div className="text-muted-foreground">
-          {pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}
-          {pet.lastFleaTickAt && ` · ${formatDate(pet.lastFleaTickAt)}`}
+          <div>{pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}</div>
+          {pet.lastFleaTickAt && <div>{t.fleaTick.lastGiven(formatDate(pet.lastFleaTickAt))}</div>}
         </div>
       )}
       {pet.fleaTickProduct?.bathNote && (

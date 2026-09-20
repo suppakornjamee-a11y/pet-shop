@@ -6,6 +6,7 @@ import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, validateFleaDeclaration } from "@/lib/flea-tick-check";
 import { cn } from "@/lib/utils";
 import { MedicineNameField } from "@/components/medicine-name-field";
+import { VerifySeal } from "@/components/verify-seal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,41 +44,6 @@ export function validateFleaForDraft(
     today,
   });
   return error ? declarationError(error, stored, t) : null;
-}
-
-/** เส้นขอบของตรา: วงกลมที่ขอบเป็นคลื่น 8 กลีบ (แบบตราไอคอนยืนยันของ IG/Facebook) คำนวณครั้งเดียวตอนโหลดโมดูล */
-const SEAL_PATH = (() => {
-  const points: string[] = [];
-  const steps = 160;
-  for (let i = 0; i <= steps; i++) {
-    const theta = (i / steps) * Math.PI * 2;
-    const r = 9.7 + 1.1 * Math.cos(8 * theta);
-    points.push(`${(12 + r * Math.cos(theta)).toFixed(2)} ${(12 + r * Math.sin(theta)).toFixed(2)}`);
-  }
-  return `M${points.join("L")}Z`;
-})();
-
-/** ตราแบบไอคอนยืนยันของ IG/Facebook — เขียว + เครื่องหมายถูก = ผ่าน · เหลืองอำพัน + นาฬิกา = รอแอดมินตรวจสอบ */
-function Seal({ passed, label }: { passed: boolean; label: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      role="img"
-      aria-label={label}
-      className={cn("h-6 w-6 shrink-0 drop-shadow-sm", passed ? "text-emerald-500" : "text-amber-500")}
-    >
-      <title>{label}</title>
-      <path d={SEAL_PATH} fill="currentColor" />
-      {passed ? (
-        <path d="M8.3 12.4l2.6 2.6 4.9-5.3" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      ) : (
-        <>
-          <circle cx="12" cy="12" r="4.3" fill="none" stroke="white" strokeWidth="1.8" />
-          <path d="M12 9.9V12l1.5 1" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </>
-      )}
-    </svg>
-  );
 }
 
 /**
@@ -127,12 +93,12 @@ export function FleaTickSection({
       titleExtra={
         passed ? (
           <span className="inline-flex items-center gap-1">
-            <Seal passed label={t.liffBook.fleaPassed} />
+            <VerifySeal passed label={t.liffBook.fleaPassed} />
             <span className="text-xs font-medium text-emerald-700">{t.liffBook.fleaPassed}</span>
           </span>
         ) : (
           <span className="inline-flex items-center gap-1">
-            <Seal passed={false} label={t.fleaTick.pending} />
+            <VerifySeal passed={false} label={t.fleaTick.pending} />
             <span className="text-xs font-medium text-amber-700">{t.fleaTick.pending}</span>
           </span>
         )

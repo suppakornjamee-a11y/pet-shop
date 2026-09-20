@@ -30,6 +30,8 @@ import { OrderStatusControl } from "@/components/order-status-control";
 import { DetailSection } from "@/components/order-detail-section";
 import { CustomerPreviewButton } from "@/components/customer-preview-dialog";
 import { FleaTickStatusBlock } from "@/components/flea-tick-status";
+import { VerifySeal } from "@/components/verify-seal";
+import { computeFleaTickStatus } from "@/lib/flea-tick";
 import { BookingRequestPanel, type BookingRequestView } from "@/components/booking-request-panel";
 import { amountDueNow } from "@/lib/booking-request";
 import { toThaiDateStr } from "@/lib/slots";
@@ -173,6 +175,15 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
   const fleaStatusShown =
     !!order.pet && (!!(order.pet.lastFleaTickAt || order.pet.fleaTickMedicine || order.pet.fleaTickProduct) || fleaAlwaysShow);
   const showFleaSection = fleaStatusShown || !!fleaCheck;
+  // ตราไอคอนยืนยันที่หัวข้อ "ยาเห็บหมัด" — ขึ้นเมื่อสถานะยาของสัตว์ตัวนี้ครอบคลุมถึงวันบริการ (ข้อความเดียวกับป้าย "ผ่านการตรวจสอบ")
+  const fleaPassed =
+    !!order.pet &&
+    computeFleaTickStatus({
+      givenAt: order.pet.lastFleaTickAt,
+      product: order.pet.fleaTickProduct,
+      petSpecies: order.pet.species,
+      serviceDate: toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date()),
+    }).kind === "COVERED";
   const backHref = order.roomId
     ? "/boarding"
     : order.queueType === "OTHER"
@@ -218,40 +229,32 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         <div className={cn("space-y-6", !isGroomer && "lg:col-span-2")}>
           {requestView && <BookingRequestPanel request={requestView} canManage={!isGroomer} />}
           <Card>
-            <CardHeader className="gap-3">
-              {/* แถวบน: ชื่อ + ป้ายช่องทาง/สถานะ · แถวล่าง: ปุ่มดำเนินการชิดขวา — แยกสองแถวเสมอ ไม่บีบชื่อหัวข้อจนขึ้นสองบรรทัด */}
-              <div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <CardHeader>
+              {/* ชื่อ + ป้ายสถานะอยู่ซ้าย ปุ่มดำเนินการชิดขวาในแถวเดียวกัน · จอแคบ: ปุ่มลงมาอยู่ใต้ชื่อ ชิดซ้าย */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="whitespace-nowrap text-base">{t.orders.orderDetails}</CardTitle>
-                  {order.createdVia === "LIFF" && (
-                    <Badge
-                      variant="outline"
-                      className="border-green-300 text-green-700 dark:border-green-900 dark:text-green-400"
-                    >
-                      {t.orders.bookedViaLiff}
-                    </Badge>
-                  )}
                   <OrderStatusBadges info={badgeInfo} t={t} />
                 </div>
-                {orderKind === "BATH" && activeWorkers.length > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t.orders.activeWorkersLabel}:{" "}
-                    <span className="font-medium text-foreground">{activeWorkers.join(", ")}</span>
-                  </p>
-                )}
+                <OrderStatusControl
+                  isShopOrder={isShopOrder}
+                  orderId={order.id}
+                  status={order.status}
+                  role={user.role}
+                  orderKind={orderKind}
+                  isFullyPaid={isFullyPaid}
+                  roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
+                  iHaveStartedNotFinished={iHaveStartedNotFinished}
+                  badgeInfo={badgeInfo}
+                  beforeServiceDay={isBeforeServiceDay(order)}
+                />
               </div>
-              <OrderStatusControl
-                isShopOrder={isShopOrder}
-                orderId={order.id}
-                status={order.status}
-                role={user.role}
-                orderKind={orderKind}
-                isFullyPaid={isFullyPaid}
-                roomLabel={order.room ? `${order.room.category.name} · ${order.room.name}` : null}
-                iHaveStartedNotFinished={iHaveStartedNotFinished}
-                badgeInfo={badgeInfo}
-                beforeServiceDay={isBeforeServiceDay(order)}
-              />
+              {orderKind === "BATH" && activeWorkers.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t.orders.activeWorkersLabel}:{" "}
+                  <span className="font-medium text-foreground">{activeWorkers.join(", ")}</span>
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {order.appointmentAt && (
@@ -366,7 +369,11 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   </div>
 
                   {showFleaSection && order.pet && (
-                    <DetailSection title={t.fleaTick.title} icon={Bug}>
+                    <DetailSection
+                      title={t.fleaTick.title}
+                      icon={Bug}
+                      titleExtra={fleaPassed && <VerifySeal passed label={t.fleaTick.status.COVERED} />}
+                    >
                       <div className={cn("grid gap-3", fleaStatusShown && fleaCheck && "md:grid-cols-2")}>
                         <FleaTickStatusBlock
                           className="mt-0"

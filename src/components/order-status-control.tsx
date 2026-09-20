@@ -139,14 +139,11 @@ export function OrderStatusControl({
   const checkoutBlocked = badgeInfo.kind === "AWAITING_PAYMENT";
 
   const startBlocked = showStart && orderKind === "BOARDING" && !isFullyPaid;
-  // ทุกตำแหน่งต้องรอถึงวันใช้บริการก่อน ทั้งปุ่มเริ่ม, ช่างกดเสร็จ และทำรายการเสร็จสิ้น
-  // (ฝั่ง server ก็กันซ้ำไว้แล้ว) — ปุ่มยกเลิกไม่โดนล็อก
-  const notYet = beforeServiceDay && (showStart || showFinishMyWork || showCheckout);
 
   return (
     <>
       {!hideActionsForFinishedGroomer && (
-        <div className="flex flex-wrap items-start justify-start gap-2 md:justify-end">
+        <div className="flex flex-wrap items-start justify-start gap-2 md:ml-auto md:justify-end">
           {/* ลูกค้าจองเองผ่าน LINE — ต้องกดยืนยันคิวก่อน ลูกค้าถึงจะเข้าหน้าชำระเงินได้ */}
           {awaitingApproval && role !== "GROOMER" && (
             <>
@@ -215,11 +212,6 @@ export function OrderStatusControl({
           >
             <Ban /> {t.orders.cancelOrder}
           </ConfirmButton>
-          )}
-          {notYet && (
-            <p className="w-full text-xs text-muted-foreground md:text-right">
-              {t.orders.startBlockedNotServiceDay}
-            </p>
           )}
         </div>
       )}

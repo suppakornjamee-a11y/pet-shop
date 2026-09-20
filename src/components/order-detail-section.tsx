@@ -5,12 +5,15 @@ import { cn } from "@/lib/utils";
 export function DetailSection({
   title,
   icon: Icon,
+  titleExtra,
   action,
   className,
   children,
 }: {
   title: string;
   icon: LucideIcon;
+  /** ต่อท้ายชื่อหัวข้อ เช่น ตราไอคอนยืนยัน */
+  titleExtra?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
@@ -22,6 +25,7 @@ export function DetailSection({
           <Icon className="h-4 w-4" />
         </span>
         <h3 className="text-sm font-semibold">{title}</h3>
+        {titleExtra}
         {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
