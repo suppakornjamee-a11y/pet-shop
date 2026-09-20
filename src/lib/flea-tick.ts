@@ -2,13 +2,17 @@
  * ระบบตรวจข้อมูลยาเห็บหมัด — ตรรกะล้วน ใช้ได้ทั้งฝั่งเซิร์ฟเวอร์และเบราว์เซอร์
  *
  * หลักสำคัญ:
- * - ระยะคุ้มครองมาจากฐานข้อมูลยาที่ผู้จัดการ "ยืนยันแล้ว" เท่านั้น ไม่เดา ไม่ประมาณ
+ * - ระยะคุ้มครองมาจากฐานข้อมูลยาของร้านเท่านั้น (ยาที่กรอกระยะเห็บและหมัดครบ) ไม่เดา ไม่ประมาณ
+ *   ยาที่ยังไม่ได้กดยืนยันก็ใช้คำนวณได้ — ถ้าอยากให้ต้องยืนยันก่อนให้เปิด REQUIRE_VERIFIED_PRODUCTS
  * - เห็บกับหมัดคิดแยกกัน ถ้าฉลากไม่ได้ระบุอย่างใดอย่างหนึ่ง = ข้อมูลไม่ครบ (ไม่ถือว่าคุ้มครอง)
  * - สัปดาห์นับเป็นวันพอดี (12 สัปดาห์ = 84 วัน) เดือนนับตามปฏิทิน
  * - วันที่ให้ยาในอนาคตไม่ใช่ประวัติการให้ยา
  * - ผ่านเกณฑ์ = ข้อมูลที่บันทึกไว้ครอบคลุมถึงวันบริการ ไม่ใช่การรับรองว่าปลอดเห็บหมัด
  */
 import { addDaysThai, toThaiDateStr } from "@/lib/slots";
+
+/** true = นับเฉพาะยาที่ผู้จัดการกดยืนยันแล้ว (ยาที่ยังรอตรวจสอบจะถือว่าคำนวณไม่ได้) · false = ยาในระบบที่ตัวเลขครบใช้ได้เลย */
+export const REQUIRE_VERIFIED_PRODUCTS = false;
 
 export type DurationUnit = "DAY" | "WEEK" | "MONTH";
 export type Species = "DOG" | "CAT";
@@ -88,7 +92,7 @@ export function computeFleaTickStatus(input: {
   const p = input.product;
   if (!p) reasons.push("NO_PRODUCT");
   else {
-    if (p.status !== "VERIFIED") reasons.push("PRODUCT_NOT_VERIFIED");
+    if (REQUIRE_VERIFIED_PRODUCTS && p.status !== "VERIFIED") reasons.push("PRODUCT_NOT_VERIFIED");
     if (p.species && p.species !== input.petSpecies) reasons.push("SPECIES_MISMATCH");
     if (!p.tickValue || !p.tickUnit) reasons.push("NO_TICK_PERIOD");
     if (!p.fleaValue || !p.fleaUnit) reasons.push("NO_FLEA_PERIOD");

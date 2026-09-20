@@ -3,18 +3,18 @@
  * (เซิร์ฟเวอร์ตัดสินซ้ำเสมอ ไม่เชื่อผลจากหน้าจอ)
  *
  * แบ่งผลเป็นสามระดับ:
- *  เขียว  ผ่านเอง — ยาอยู่ในฐานข้อมูลที่ยืนยันแล้ว ตรงชนิดสัตว์ วันที่สมเหตุสมผล และคุ้มครองถึงวันบริการ
- *  เหลือง ลูกค้าถูกถามเพิ่มแล้วแจ้งข้อมูลใหม่พร้อมหลักฐาน — พนักงานดูหลักฐานได้ ไม่ต้องตัดสินใจ
- *  แดง    พนักงานต้องตัดสินใจตอนเช็คคิว — ไม่มีข้อมูล/ไม่ครบ วันที่ผิดปกติ ลูกค้าตอบว่ายังไม่ได้ให้ยา ฯลฯ
+ *  เขียว  ผ่านเอง — ยาอยู่ในฐานข้อมูลของร้าน ตรงชนิดสัตว์ วันที่สมเหตุสมผล และ "วันที่ให้ยา + ระยะคุ้มครองของยา" ยังครอบคลุมวันบริการ
+ *         (เช่น NexGard คุ้มครอง 1 เดือน ให้ยา 15 ก.ย. → ครอบคลุมถึงก่อน 15 ต.ค.)
+ *  เหลือง ลูกค้าแจ้งข้อมูลยาใหม่ (ฟอร์ม "มีข้อมูลอัปเดต") พร้อมหลักฐาน และข้อมูลใหม่ผ่านเกณฑ์ — พนักงานดูหลักฐานได้ ไม่ต้องตัดสินใจ
+ *  แดง    รอแอดมินตรวจตอนเช็คคิว — ยาหมดช่วงคุ้มครองก่อนวันบริการ ไม่มีข้อมูล/ไม่ครบ ยาไม่อยู่ในระบบ ยาไม่ตรงชนิดสัตว์ วันที่ผิดปกติ
  *
- * "ต้องถามลูกค้า" (ASK) เป็นสถานะก่อนตอบเท่านั้น: ครบกำหนดก่อนวันบริการ / ยาไม่ตรงชนิดสัตว์ —
- * ตอบแล้วจะกลายเป็นเหลืองหรือแดง
- * ยาที่ยังไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว (หรือข้อมูลไม่ครบ) ไม่ถามลูกค้า: แสดงป้าย "รอตรวจสอบ" แล้วให้พนักงานตรวจตอนเช็คคิว
+ * ไม่ถามอะไรลูกค้าในหน้าเลือกวันเวลา: ผ่านก็แสดงตราเขียว ไม่ผ่านก็แสดงตรารอตรวจสอบ แล้วให้แอดมินตัดสินใจ
  *
  * ระบบพิสูจน์ไม่ได้ว่าให้ยาจริง — ตรวจได้แค่ความขัดกันของข้อมูลและเก็บหลักฐาน การตรวจเห็บหมัดจริงยังเป็นหน้าที่พนักงาน
  */
 import { isValidDateStr } from "@/lib/slots";
 import {
+  REQUIRE_VERIFIED_PRODUCTS,
   computeFleaTickStatus,
   normalizeMedicineName,
   type FleaTickProductInfo,
@@ -23,13 +23,11 @@ import {
 } from "@/lib/flea-tick";
 
 export type FleaLevel = "GREEN" | "YELLOW" | "RED";
-export type FleaAsk = "EXPIRED" | "SPECIES_MISMATCH";
 export type FleaRed =
   | "NO_DATA"
   | "INCOMPLETE"
   | "DATE_BEFORE_BIRTH"
-  | "NOT_RENEWED"
-  | "UNSURE"
+  | "EXPIRED"
   | "NOT_COVERED"
   | "NOT_IN_DB"
   | "SPECIES_MISMATCH";
@@ -46,14 +44,13 @@ export type FleaPetData = {
 
 export type FleaAssessment =
   | { level: "GREEN"; status: FleaTickStatus }
-  | { level: "ASK"; ask: FleaAsk; status: FleaTickStatus }
   | { level: "RED"; reasons: FleaRed[]; status: FleaTickStatus };
 
 function findProduct(data: FleaPetData, catalog: FleaTickProductInfo[]) {
   return data.productId ? (catalog.find((p) => p.id === data.productId) ?? null) : null;
 }
 
-/** ประเมินข้อมูลยาที่บันทึกไว้เทียบกับวันบริการ (ก่อนที่ลูกค้าจะตอบอะไรเพิ่ม) */
+/** ประเมินข้อมูลยาเทียบกับวันบริการ: ผ่าน (เขียว) หรือรอแอดมินตรวจ (แดง) */
 export function assessFleaTick(
   data: FleaPetData,
   catalog: FleaTickProductInfo[],
@@ -75,18 +72,18 @@ export function assessFleaTick(
   if (hasMedicine !== hasDate) return { level: "RED", reasons: ["INCOMPLETE"], status };
   if (data.birthDate && data.givenAt! < data.birthDate) return { level: "RED", reasons: ["DATE_BEFORE_BIRTH"], status };
   if (status.reasons.includes("FUTURE_DATE")) return { level: "RED", reasons: ["INCOMPLETE"], status };
-  if (status.reasons.includes("SPECIES_MISMATCH")) return { level: "ASK", ask: "SPECIES_MISMATCH", status };
+  if (status.reasons.includes("SPECIES_MISMATCH")) return { level: "RED", reasons: ["SPECIES_MISMATCH"], status };
   const unusable = status.reasons.some(
     (r) => r === "PRODUCT_NOT_VERIFIED" || r === "NO_TICK_PERIOD" || r === "NO_FLEA_PERIOD" || r === "NO_PRODUCT"
   );
   if (!product || unusable) return { level: "RED", reasons: ["NOT_IN_DB"], status };
-  if (status.kind === "DUE_BEFORE_SERVICE") return { level: "ASK", ask: "EXPIRED", status };
+  if (status.kind === "DUE_BEFORE_SERVICE") return { level: "RED", reasons: ["EXPIRED"], status };
   return { level: "GREEN", status };
 }
 
 /* ---------- คำตอบของลูกค้า ---------- */
 
-/** declare = แจ้งข้อมูลยาใหม่/แก้ไข, none = ยังไม่ได้ให้ยาครั้งใหม่ / ไม่แน่ใจ (ให้ร้านตรวจสอบ) */
+/** declare = แจ้งข้อมูลยาใหม่/แก้ไข · none = ค่าเก่าจากตะกร้าที่เก็บไว้ในเครื่อง (ไม่ใช้แล้ว รับไว้เฉยๆ ไม่ให้ตะกร้าเก่าพัง) */
 export type FleaAnswer = "declare" | "none";
 
 export type FleaDeclaration = {
@@ -127,8 +124,8 @@ export function fleaInfoChanged(stored: FleaPetData, next: FleaDeclaration): boo
 }
 
 /**
- * ต้องแนบรูปหลักฐาน (กล่องยา / ใบเสร็จ / สมุดสัตวแพทย์) เมื่อ: ถูกถามเพิ่ม, เปลี่ยนยา หรือยาที่แจ้งไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว
- * (ครบกำหนดแล้วบอกว่าให้ยาใหม่ = ถูกถามเพิ่ม จึงต้องมีหลักฐานเสมอ)
+ * ต้องแนบรูปหลักฐาน (กล่องยา / ใบเสร็จ / สมุดสัตวแพทย์) เมื่อ: ยาเดิมหมดช่วงคุ้มครองหรือไม่ตรงชนิดสัตว์แล้วแจ้งข้อมูลใหม่,
+ * เปลี่ยนยา หรือยาที่แจ้งไม่อยู่ในฐานข้อมูลของร้าน
  */
 export function evidenceRequired(
   pre: FleaAssessment,
@@ -136,10 +133,10 @@ export function evidenceRequired(
   next: Pick<FleaDeclaration, "medicine" | "productId">,
   catalog: FleaTickProductInfo[]
 ): boolean {
-  if (pre.level === "ASK") return true;
+  if (pre.level === "RED" && pre.reasons.some((r) => r === "EXPIRED" || r === "SPECIES_MISMATCH")) return true;
   if (medicineChanged(stored, next)) return true;
   const product = next.productId ? catalog.find((p) => p.id === next.productId) : null;
-  return !product || product.status !== "VERIFIED";
+  return !product || (REQUIRE_VERIFIED_PRODUCTS && product.status !== "VERIFIED");
 }
 
 /** ตรวจคำตอบแบบ "แจ้งข้อมูลใหม่" — คืนข้อผิดพลาดแรกที่เจอ หรือ null ถ้าใช้ได้ */
@@ -158,7 +155,7 @@ export function validateFleaDeclaration(input: {
   // เปลี่ยนยาแล้วแต่ยังเป็นวันที่เดิม = วันที่ของยาตัวเก่า ถ้าปล่อยผ่านจะเอาไปนับระยะคุ้มครองของยาตัวใหม่ผิด
   if (medicineChanged(stored, d) && stored.givenAt && d.date === stored.givenAt) return "DATE_UNCHANGED";
   // ครบกำหนดแล้วบอกว่าให้ยาครั้งใหม่ วันที่ต้องใหม่กว่าที่บันทึกไว้เดิม ไม่งั้นก็คือข้อมูลเก่าชุดเดิม
-  if (pre.level === "ASK" && pre.ask === "EXPIRED" && stored.givenAt && d.date <= stored.givenAt) return "DATE_NOT_NEWER";
+  if (pre.level === "RED" && pre.reasons.includes("EXPIRED") && stored.givenAt && d.date <= stored.givenAt) return "DATE_NOT_NEWER";
   if (evidenceRequired(pre, stored, d, catalog) && d.evidence.length === 0) return "EVIDENCE";
   return null;
 }
@@ -169,8 +166,7 @@ export type FleaResult = { level: FleaLevel; reasons: FleaRed[] };
 
 /**
  * สรุประดับสุดท้ายที่พนักงานจะเห็น
- * - ไม่ต้องถามและไม่ได้แจ้งอะไรเพิ่ม → ตามการประเมินเดิม (เขียว / แดง)
- * - ตอบว่ายังไม่ได้ให้ยา/ไม่แน่ใจ → แดง
+ * - ไม่ได้แจ้งข้อมูลใหม่ → ตามการประเมินเดิม (เขียว / แดง)
  * - แจ้งข้อมูลใหม่ → ประเมินข้อมูลใหม่ (post): ผ่านเกณฑ์ = เหลือง (มีหลักฐานแนบ) ไม่ผ่าน = แดงพร้อมเหตุผล
  */
 export function resolveFleaResult(
@@ -178,18 +174,13 @@ export function resolveFleaResult(
   answer: FleaAnswer | null,
   post: FleaAssessment | null
 ): FleaResult {
-  if (answer === "none" && pre.level === "ASK") {
-    return { level: "RED", reasons: [pre.ask === "EXPIRED" ? "NOT_RENEWED" : "UNSURE"] };
-  }
   if (answer === "declare" && post) {
     if (post.level === "GREEN") return { level: "YELLOW", reasons: [] };
-    if (post.level === "RED") return { level: "RED", reasons: post.reasons };
-    return { level: "RED", reasons: [post.ask === "EXPIRED" ? "NOT_COVERED" : post.ask] };
+    // ยาที่แจ้งใหม่ยังไม่ครอบคลุมวันบริการ = "ยาที่ลูกค้าแจ้งใหม่ยังครบกำหนดก่อนวันบริการ"
+    return { level: "RED", reasons: post.reasons.map((r) => (r === "EXPIRED" ? "NOT_COVERED" : r)) };
   }
   if (pre.level === "GREEN") return { level: "GREEN", reasons: [] };
-  if (pre.level === "RED") return { level: "RED", reasons: pre.reasons };
-  // ต้องถามแต่ไม่มีคำตอบ — ไม่ควรมาถึงตรงนี้ (เซิร์ฟเวอร์บังคับให้ตอบก่อน) ถือเป็นแดงเพื่อความปลอดภัย
-  return { level: "RED", reasons: [pre.ask === "EXPIRED" ? "NOT_RENEWED" : "UNSURE"] };
+  return { level: "RED", reasons: pre.reasons };
 }
 
 /** ข้อความอธิบายเหตุผลระดับแดง — ใช้เขียนลงประวัติออเดอร์ให้พนักงานอ่าน */
@@ -197,11 +188,10 @@ export const FLEA_RED_TEXT: Record<FleaRed, string> = {
   NO_DATA: "ยังไม่มีข้อมูลยาเห็บหมัด",
   INCOMPLETE: "ข้อมูลยาเห็บหมัดไม่ครบ (ขาดชื่อยาหรือวันที่ให้ยา)",
   DATE_BEFORE_BIRTH: "วันที่ให้ยาเห็บหมัดอยู่ก่อนวันเกิดของสัตว์เลี้ยง",
-  NOT_RENEWED: "ลูกค้าแจ้งว่ายังไม่ได้ให้ยาครั้งใหม่ ยาที่แจ้งไว้ครบกำหนดก่อนวันบริการ",
-  UNSURE: "ลูกค้าไม่แน่ใจข้อมูลยา ขอให้ร้านตรวจสอบ",
+  EXPIRED: "ยาที่แจ้งไว้หมดช่วงคุ้มครองก่อนวันบริการ รอพนักงานตรวจสอบ",
   NOT_COVERED: "ยาที่ลูกค้าแจ้งใหม่ยังครบกำหนดก่อนวันบริการ",
-  NOT_IN_DB: "ชื่อยาไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว รอพนักงานตรวจสอบ",
-  SPECIES_MISMATCH: "ยาที่แจ้งไม่ตรงกับชนิดสัตว์เลี้ยง",
+  NOT_IN_DB: "ชื่อยาไม่อยู่ในฐานข้อมูลของร้าน รอพนักงานตรวจสอบ",
+  SPECIES_MISMATCH: "ยาที่แจ้งไม่ตรงกับชนิดสัตว์เลี้ยง รอพนักงานตรวจสอบ",
 };
 
 export const FLEA_GREEN_TEXT = "อยู่ในช่วงคุ้มครองถึงวันบริการตามข้อมูลที่แจ้ง";

@@ -242,9 +242,6 @@ export async function createBookingRequest(
     };
     const pre = assessFleaTick(stored, catalog, item.appointmentDate, today);
     const answer: FleaAnswer | null = item.flea?.answer ?? null;
-    if (pre.level === "ASK" && !answer) {
-      return { ok: false, error: `กรุณาตอบข้อมูลยาเห็บหมัดของน้อง${pet.name}`, itemIndex: i };
-    }
 
     let declaration: FleaDeclaration | null = null;
     let post = null;

@@ -680,7 +680,7 @@ export async function liffCancelOrder(
 /**
  * รายชื่อยาเห็บหมัดที่เปิดใช้งาน สำหรับช่วยจับคู่ชื่อที่ลูกค้าพิมพ์ในฟอร์มข้อมูลสัตว์เลี้ยง
  * ใช้ทั้งฝั่งลูกค้า (LIFF) และฝั่งพนักงาน — ข้อมูลสาธารณะ ไม่ต้องยืนยันตัวตน
- * ระยะคุ้มครองส่งไปด้วยเพื่อคำนวณสถานะบนหน้าจอ แต่สถานะ PENDING จะไม่ถูกนำไปคำนวณ (ดู lib/flea-tick)
+ * ระยะคุ้มครองส่งไปด้วยเพื่อคำนวณสถานะบนหน้าจอ (ดู lib/flea-tick — REQUIRE_VERIFIED_PRODUCTS)
  */
 export async function getFleaTickCatalog() {
   return prisma.fleaTickProduct.findMany({
