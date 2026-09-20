@@ -155,7 +155,6 @@ export function validateExistingPet(
   catalog: FleaTickProductInfo[],
   t: T
 ): FieldError | null {
-  if (!(Number(pet.weightKg) > 0)) return { id: petFieldId(0, "weight"), message: t.liffBook.requiredField(t.liffBook.weight) };
   if (!pet.infoStatus) return { id: petFieldId(0, "info"), message: t.liffBook.infoRequired };
   if (pet.infoStatus !== "update") return null;
   const health = validatePet(pet, 0, t);
@@ -559,10 +558,11 @@ export function ExistingPetFields({
   const id = (f: string) => petFieldId(0, f);
   const bad = (f: string) => invalidId === id(f);
   const age = petAge(pet.birthDate, todayStr());
-  // ข้อมูลสุขภาพเดิมที่ยังไม่เคยกรอกครบ (สัตว์ที่พนักงานลงทะเบียนไว้ก่อนมีช่องเหล่านี้) ยืนยันว่า "ถูกต้อง" ไม่ได้ — ต้องกรอกเพิ่ม
-  const incomplete = !pet.hasAllergies || !pet.hasCautions || !pet.hasChronicDisease;
+  // น้ำหนักหรือข้อมูลสุขภาพเดิมที่ยังไม่เคยกรอกครบ (สัตว์ที่พนักงานลงทะเบียนไว้ก่อนมีช่องเหล่านี้) ยืนยันว่า "ถูกต้อง" ไม่ได้ — ต้องกรอกเพิ่ม
+  const incomplete = !(Number(pet.weightKg) > 0) || !pet.hasAllergies || !pet.hasCautions || !pet.hasChronicDisease;
   const shown = (has: HasDetail, note: string) => (has === "yes" ? note : has === "no" ? t.liffBook.diseaseNo : "-");
   const rows: [string, string][] = [
+    [t.liffBook.weight, pet.weightKg || "-"],
     [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
     [t.liffBook.disease, shown(pet.hasChronicDisease, pet.chronicDiseaseNote)],
     [t.liffBook.cautions, shown(pet.hasCautions, pet.groomingCautions)],
@@ -588,23 +588,9 @@ export function ExistingPetFields({
         </p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor={id("weight")}>{t.liffBook.weight}</Label>
-        <Input
-          id={id("weight")}
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step="0.1"
-          className={cn(FIELD, bad("weight") && INVALID)}
-          value={pet.weightKg}
-          onChange={(e) => onChange({ ...pet, weightKg: e.target.value })}
-        />
-      </div>
-
       {pet.infoStatus !== "update" && (
         <div className="space-y-1 rounded-xl bg-muted/50 p-3 text-sm">
-          <p className="text-xs font-medium text-muted-foreground">{t.liffBook.health}</p>
+          <p className="text-sm font-semibold">{t.liffBook.health}</p>
           {rows.map(([label, value]) => (
             <p key={label}>
               <span className="text-muted-foreground">{label}: </span>
@@ -622,7 +608,9 @@ export function ExistingPetFields({
           value={pet.infoStatus}
           onChange={(e) => onChange({ ...pet, infoStatus: e.target.value as PetDraft["infoStatus"] })}
         >
-          <option value="" disabled />
+          <option value="" disabled>
+            {t.liffBook.infoPlaceholder}
+          </option>
           <option value="same" disabled={incomplete}>
             {t.liffBook.infoSame}
           </option>
@@ -637,7 +625,6 @@ export function ExistingPetFields({
           catalog={catalog}
           onChange={onChange}
           invalidId={invalidId}
-          hideWeight
           showFleaEvidence
           bare
           t={t}

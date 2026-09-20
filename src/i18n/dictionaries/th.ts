@@ -593,6 +593,7 @@ const th = {
     styleImages: "ภาพตัวอย่าง",
     services: "เลือกบริการ",
     infoConfirmLabel: "ยืนยันข้อมูลข้างต้น",
+    infoPlaceholder: "กรุณาเลือกข้อมูล",
     infoSame: "ข้อมูลเดิมยังถูกต้อง",
     infoUpdate: "มีข้อมูลอัปเดต",
     infoRequired: "กรุณาเลือกว่าข้อมูลเดิมยังถูกต้องหรือมีข้อมูลอัปเดต",

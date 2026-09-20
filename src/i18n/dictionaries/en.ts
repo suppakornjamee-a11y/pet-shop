@@ -578,6 +578,7 @@ const en: Dictionary = {
     styleImages: "Example photos",
     services: "Choose services",
     infoConfirmLabel: "Confirm the information above",
+    infoPlaceholder: "Please choose",
     infoSame: "Existing information is still correct",
     infoUpdate: "I have updates",
     infoRequired: "Please choose whether the existing information is still correct or has updates",
