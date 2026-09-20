@@ -395,7 +395,7 @@ export function FleaTickManager({
                   placeholder={t.fleaTick.testPlaceholder}
                   onChange={(e) => setTestQuery(e.target.value)}
                 />
-                {testQuery.trim().length >= 2 &&
+                {testQuery.trim().length >= 1 &&
                   (() => {
                     const hit = testMedicineMatch(testQuery, {
                       name: form.name,

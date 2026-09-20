@@ -146,7 +146,6 @@ function scoreName(q: string, rawName: string): number {
   let best = 0;
   if (n.startsWith(q)) best = 0.95;
   else if (
-    q.length >= 2 &&
     rawName
       .split(WORD_SEPARATORS)
       .map(normalizeMedicineName)
@@ -197,7 +196,7 @@ export function matchMedicine(
   petSpecies: Species | null
 ): MedicineMatch[] {
   const q = normalizeMedicineName(query);
-  if (q.length < 2) return [];
+  if (q.length < 1) return [];
   const out: MedicineMatch[] = [];
   for (const p of products) {
     if (petSpecies && p.species && p.species !== petSpecies) continue;
@@ -210,7 +209,7 @@ export function matchMedicine(
 /** ใช้ทดสอบหลังบ้านว่าคำที่ลูกค้าอาจพิมพ์จะทำให้ยานี้ขึ้นให้เลือกไหม (ตามชื่อหลัก/สูตร/ชื่อใกล้เคียงที่กำลังกรอก) */
 export function testMedicineMatch(query: string, names: NameSet): { score: number; via: string } | null {
   const q = normalizeMedicineName(query);
-  if (q.length < 2) return null;
+  if (q.length < 1) return null;
   const { score, via } = bestNameMatch(q, names);
   return score >= MATCH_THRESHOLD ? { score, via } : null;
 }

@@ -11,8 +11,8 @@ const LIFF_FIELD = "h-11 rounded-xl bg-card";
 const INVALID = "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40";
 
 /**
- * ช่องกรอกชื่อยาเห็บหมัดแบบ autocomplete — แตะช่องแล้วเปิดรายการยาให้เลือกทันที พิมพ์ต่อรายการจะกรองตามที่พิมพ์
- * (พิมพ์แค่ส่วนแรกของชื่อ ชื่อไทย หรือสะกดผิดเล็กน้อยก็เจอ) เลือกด้วยการกดหรือใช้ลูกศร + Enter ก็ได้
+ * ช่องกรอกชื่อยาเห็บหมัดแบบ autocomplete — พิมพ์แล้วรายการแสดงตามที่พิมพ์ (ช่องว่างไม่แสดงอะไร)
+ * พิมพ์แค่ส่วนแรกของชื่อ ชื่อไทย หรือสะกดผิดเล็กน้อยก็เจอ เลือกด้วยการกดหรือใช้ลูกศร + Enter ก็ได้
  *
  * รายการลอยทับเนื้อหาใต้ช่อง (ไม่ดันหน้า) และเลื่อนหน้าให้เห็นเองเมื่อเปิด — บนมือถือรายการที่แสดงต่อท้ายช่องในหน้า
  * มักไปซ่อนอยู่หลังคีย์บอร์ดหรือปุ่มที่แปะด้านล่างจอ
@@ -51,17 +51,13 @@ export function MedicineNameField({
   const [active, setActive] = useState(-1);
 
   const selected = catalog.find((p) => p.id === productId) ?? null;
-  const typed = value.trim().length >= 2;
+  const typed = value.trim().length >= 1;
 
-  const options = useMemo(() => {
-    if (selected) return [];
-    if (typed) return matchMedicine(value, catalog, species).slice(0, 6).map((m) => m.product);
-    // ยังไม่ได้พิมพ์ (หรือพิมพ์ตัวเดียว): แสดงยาทั้งหมดที่ใช้กับสัตว์ชนิดนี้ให้เลือกจากรายการ
-    return catalog
-      .filter((p) => !p.species || p.species === species)
-      .sort((a, b) => a.name.localeCompare(b.name, "th"))
-      .slice(0, 8);
-  }, [selected, typed, value, catalog, species]);
+  // รายการกรองตามที่พิมพ์เท่านั้น — ยังไม่ได้พิมพ์อะไรก็ไม่แสดงรายการ
+  const options = useMemo(
+    () => (selected || !typed ? [] : matchMedicine(value, catalog, species).slice(0, 6).map((m) => m.product)),
+    [selected, typed, value, catalog, species]
+  );
 
   const show = open && !readOnly && options.length > 0;
 
@@ -149,7 +145,7 @@ export function MedicineNameField({
           role="listbox"
           className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 scroll-mb-28 overflow-y-auto rounded-xl border bg-popover p-1 shadow-lg"
         >
-          {typed && <p className="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>}
+          <p className="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>
           {options.map((p, i) => (
             <button
               key={p.id}
