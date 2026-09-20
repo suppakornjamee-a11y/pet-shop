@@ -29,22 +29,25 @@ export function AddOrderItemForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serviceId, setServiceId] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
   function add() {
-    if (!serviceId) return;
+    if (!serviceId || !confirmed) return;
     startTransition(async () => {
-      const res = await addOrderItem(orderId, serviceId);
+      const res = await addOrderItem(orderId, serviceId, confirmed);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
       toast.success(res.message);
       setServiceId("");
+      setConfirmed(false);
       router.refresh();
     });
   }
 
   return (
+    <div className="space-y-2">
     <div className="flex items-center gap-2">
       <Select
         value={serviceId}
@@ -73,10 +76,20 @@ export function AddOrderItemForm({
           <X />
         </Button>
       )}
-      <Button type="button" onClick={add} disabled={isPending || !serviceId}>
+      <Button type="button" onClick={add} disabled={isPending || !serviceId || !confirmed}>
         {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
         {t.orders.addItem.addBtn}
       </Button>
+    </div>
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={confirmed}
+        onChange={(e) => setConfirmed(e.target.checked)}
+        className="h-4 w-4 accent-primary"
+      />
+      {t.orders.customerConfirmed}
+    </label>
     </div>
   );
 }

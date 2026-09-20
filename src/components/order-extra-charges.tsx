@@ -40,11 +40,13 @@ export function OrderExtraCharges({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
   function openAdd() {
     setEditingId(null);
     setAmount("");
     setDescription("");
+    setConfirmed(false);
     setAdding(true);
   }
 
@@ -52,6 +54,7 @@ export function OrderExtraCharges({
     setEditingId(c.id);
     setAmount(String(c.amount));
     setDescription(c.description);
+    setConfirmed(false);
     setAdding(true);
   }
 
@@ -60,13 +63,14 @@ export function OrderExtraCharges({
     setEditingId(null);
     setAmount("");
     setDescription("");
+    setConfirmed(false);
   }
 
   function save() {
     startTransition(async () => {
       const res = editingId
-        ? await updateExtraCharge(editingId, { amount: Number(amount || 0), description })
-        : await addExtraCharge(orderId, { amount: Number(amount || 0), description });
+        ? await updateExtraCharge(editingId, { amount: Number(amount || 0), description, customerConfirmed: confirmed })
+        : await addExtraCharge(orderId, { amount: Number(amount || 0), description, customerConfirmed: confirmed });
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -141,11 +145,20 @@ export function OrderExtraCharges({
                 <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="h-4 w-4 accent-primary"
+              />
+              {t.orders.customerConfirmed}
+            </label>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={closeForm}>
                 {t.common.cancel}
               </Button>
-              <Button size="sm" onClick={save} disabled={isPending || !amount || !description}>
+              <Button size="sm" onClick={save} disabled={isPending || !amount || !description || !confirmed}>
                 {isPending ? <Loader2 className="animate-spin" /> : <Save />}
                 {t.common.save}
               </Button>

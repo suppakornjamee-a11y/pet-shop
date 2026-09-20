@@ -26,7 +26,7 @@ import {
   syncBookingRequestForOrder,
   syncBookingRequestStatus,
 } from "@/lib/booking-request";
-import { fleaTickUpdateSchema, fleaTickWriteData, quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
+import { quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
 import { createInitialPayments } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
@@ -756,7 +756,7 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
           pet: { select: { id: true, name: true, species: true } },
           room: { select: { name: true, category: { select: { name: true } } } },
           items: { orderBy: { createdAt: "asc" }, select: { name: true, subtotal: true, itemType: true, refId: true } },
-          payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true } },
+          payments: { orderBy: { createdAt: "desc" }, select: { status: true, amount: true } },
           activityLogs: {
             where: { action: { startsWith: QUEUE_REJECT_LOG_PREFIX } },
             orderBy: { createdAt: "desc" },
@@ -783,7 +783,9 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
       checkInAt: iso(o.checkInAt),
       checkOutAt: iso(o.checkOutAt),
       dueNow: amountDueNow(o),
+      // payments เรียงใหม่สุดก่อน — ตัวแรกคือรายการชำระล่าสุด
       paymentStatus: payments[0]?.status ?? null,
+      paid: payments.filter((p) => p.status === "VERIFIED").reduce((sum, p) => sum + p.amount, 0),
       queueRejectReason: activityLogs[0]?.action.slice(QUEUE_REJECT_LOG_PREFIX.length) ?? null,
     })),
   };
@@ -955,11 +957,17 @@ const quickProfileSchema = z.object({
       petInstagram: z.string().trim().optional(),
     })
     .optional(),
-  pets: z.array(quickPetSchema).max(10),
+  pets: z.array(quickPetSchema).max(10).default([]),
+  // สัตว์เลี้ยงที่ลูกค้ายืนยันว่า "ข้อมูลเดิมยังถูกต้อง" — อัปเดตเฉพาะน้ำหนักล่าสุด ข้อมูลอื่นไม่ถูกแตะ
+  confirmed: z
+    .array(z.object({ id: z.string().min(1), weightKg: z.coerce.number().gt(0, "กรุณากรอกน้ำหนัก") }))
+    .max(10)
+    .default([]),
 });
 
 /**
  * บันทึกฟอร์มสั้น — ยังไม่มีข้อมูล: สร้างลูกค้า (ผูก LINE นี้) + สัตว์เลี้ยง, มีแล้ว: เพิ่ม/แก้สัตว์เลี้ยง
+ * หรือยืนยันข้อมูลเดิม (confirmed: อัปเดตแค่น้ำหนักล่าสุด)
  * แก้เฉพาะช่องในฟอร์มสั้น ช่องอื่นของสัตว์เลี้ยงไม่ถูกแตะ และแก้ได้เฉพาะสัตว์ของตัวเอง
  */
 export async function liffSaveQuickProfile(idToken: string, input: unknown) {
@@ -969,7 +977,7 @@ export async function liffSaveQuickProfile(idToken: string, input: unknown) {
   }
   const parsed = quickProfileSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
-  const { customer: customerInput, pets } = parsed.data;
+  const { customer: customerInput, pets, confirmed } = parsed.data;
 
   let customer = await prisma.customer.findUnique({ where: { lineUserId: identity.userId }, select: { id: true } });
   if (!customer) {
@@ -993,10 +1001,10 @@ export async function liffSaveQuickProfile(idToken: string, input: unknown) {
   }
 
   const ownerId = customer.id;
-  const editIds = pets.map((p) => p.id).filter((id): id is string => !!id);
+  const editIds = [...pets.map((p) => p.id).filter((id): id is string => !!id), ...confirmed.map((c) => c.id)];
   if (editIds.length > 0) {
     const owned = await prisma.pet.count({ where: { id: { in: editIds }, customerId: ownerId } });
-    if (owned !== editIds.length) return { ok: false as const, error: "ไม่พบสัตว์เลี้ยงนี้ในบัญชีของคุณ" };
+    if (owned !== new Set(editIds).size) return { ok: false as const, error: "ไม่พบสัตว์เลี้ยงนี้ในบัญชีของคุณ" };
   }
 
   const savedIds = await prisma.$transaction(async (tx) => {
@@ -1011,22 +1019,12 @@ export async function liffSaveQuickProfile(idToken: string, input: unknown) {
         ids.push(created.id);
       }
     }
+    for (const c of confirmed) {
+      await tx.pet.update({ where: { id: c.id }, data: { weightKg: c.weightKg } });
+      ids.push(c.id);
+    }
     return ids;
   });
 
   return { ok: true as const, petIds: savedIds };
-}
-
-/** อัปเดตข้อมูลยาเห็บหมัดของสัตว์ตัวเดียว (จากหน้าจองคิว ตอนเทียบกับวันเข้าใช้บริการ) */
-export async function liffUpdatePetFleaTick(idToken: string, petId: string, input: unknown) {
-  const identity = await verifyLiffIdToken(idToken);
-  if (!identity) {
-    return { ok: false as const, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" as const };
-  }
-  const parsed = fleaTickUpdateSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
-  const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { customer: { select: { lineUserId: true } } } });
-  if (!pet || pet.customer.lineUserId !== identity.userId) return { ok: false as const, error: "ไม่พบสัตว์เลี้ยงนี้ในบัญชีของคุณ" };
-  await prisma.pet.update({ where: { id: petId }, data: await fleaTickWriteData(prisma, petId, parsed.data) });
-  return { ok: true as const };
 }

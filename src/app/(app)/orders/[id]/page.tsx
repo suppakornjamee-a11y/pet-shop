@@ -23,6 +23,7 @@ import { OrderStatusBadges } from "@/components/order-status-badges";
 import { OrderExtraCharges } from "@/components/order-extra-charges";
 import { AddOrderItemForm } from "@/components/add-order-item-form";
 import { OrderItemsRows } from "@/components/order-items-rows";
+import { StyleImagesViewer } from "@/components/style-images-viewer";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
@@ -321,10 +322,45 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                       t={t}
                       pet={order.pet}
                       serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
+                      alwaysShow={order.status === "PENDING_APPROVAL" && !order.roomId}
                     />
+                  )}
+                  {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}
+                  {order.pet && (
+                    <dl className="mt-1.5 space-y-0.5 text-xs">
+                      {order.pet.weightKg ? (
+                        <div>
+                          <dt className="inline text-muted-foreground">{t.liffBook.weight}: </dt>
+                          <dd className="inline">{order.pet.weightKg}</dd>
+                        </div>
+                      ) : null}
+                      {allergyText(order.pet.groomingCautions) && (
+                        <div>
+                          <dt className="inline text-muted-foreground">{t.liffBook.cautions}: </dt>
+                          <dd className="inline">{allergyText(order.pet.groomingCautions)}</dd>
+                        </div>
+                      )}
+                      {order.pet.hasChronicDisease && (
+                        <div>
+                          <dt className="inline text-muted-foreground">{t.liffBook.disease}: </dt>
+                          <dd className="inline">{order.pet.chronicDiseaseNote || t.liffBook.diseaseYes}</dd>
+                        </div>
+                      )}
+                    </dl>
                   )}
                 </div>
               </div>
+              )}
+
+              {/* ทรงที่ลูกค้าต้องการ (จองอาบน้ำผ่าน LINE) — ข้อความ + ภาพตัวอย่างที่แนบมา */}
+              {(order.groomingStyleNote || order.groomingStyleImages.length > 0) && (
+                <div className="space-y-2 rounded-lg border p-3">
+                  <div className="text-sm font-bold">{t.liffBook.styleTitle}</div>
+                  {order.groomingStyleNote && <p className="whitespace-pre-wrap text-xs">{order.groomingStyleNote}</p>}
+                  {order.groomingStyleImages.length > 0 && (
+                    <StyleImagesViewer images={order.groomingStyleImages} title={t.liffBook.styleImages} />
+                  )}
+                </div>
               )}
 
               <div className="overflow-hidden rounded-lg border">

@@ -6,8 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import { sendLinePush, buildLiffDeepLink } from "@/lib/line";
-import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
-import { formatBaht } from "@/lib/format";
+import { CUSTOMER_CONFIRMED_LOG_SUFFIX, QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
+import { buildBookingConfirmedText } from "@/lib/booking-messages";
+import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder, isBeforeServiceDay } from "@/lib/order-kind";
 import { buildOrderPlan, createOrderSchema, persistOrder, petFleaTickSnapshot } from "@/lib/order-plan";
 import { REQUEST_PAYMENT_TTL_MS, syncBookingRequestForOrder, syncBookingRequestStatus } from "@/lib/booking-request";
@@ -344,10 +345,13 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       return { ok: false as const, error: "ต้องยืนยันคิวก่อนจึงจะยืนยันการชำระเงินได้" };
     }
 
-    await tx.payment.update({
-      where: { id: paymentId },
+    // ยึดสิทธิ์ยืนยันด้วยเงื่อนไขในคำสั่งอัปเดตเอง (ไม่ใช่แค่เช็คสถานะที่อ่านมาก่อนหน้า) — ถ้ามีสองคนกดยืนยัน
+    // รายการเดียวกันพร้อมกัน คนที่สองจะอัปเดตไม่ได้สักแถว จึงไม่ตัดสต็อก/ส่งข้อความซ้ำ
+    const claimed = await tx.payment.updateMany({
+      where: { id: paymentId, status: { not: "VERIFIED" } },
       data: { status: "VERIFIED", verifiedAt: new Date(), verifiedById: user.id, rejectReason: null },
     });
+    if (claimed.count === 0) return { ok: false as const, error: "ชำระเงินนี้ยืนยันไปแล้ว" };
 
     const order = payment.order;
     // ยอดที่ยืนยันแล้ว "ก่อน" รายการนี้ (order.payments เป็นข้อมูลก่อน update ด้านบน)
@@ -398,6 +402,9 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       justDepositPaid,
       orderCode: order.code,
       petName: order.pet?.name ?? null,
+      // ใช้ตัดสินว่าจะส่งข้อความ "ยืนยันการจอง" (คิวอาบน้ำที่จองผ่านคำขอจองใน LINE) หรือใบเสร็จมัดจำตามปกติ
+      isRequestBath: !!order.bookingRequestId && !order.roomId && order.queueType === "BATH",
+      appointmentAt: order.appointmentAt,
       orderTotal: order.total,
       depositAmount: payment.amount,
       verifiedSum,
@@ -431,6 +438,17 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
         paidLabel: "ชำระแล้ว",
         paidAmount: result.verifiedSum,
         remainingAmount: result.remainingAmount,
+      })
+    );
+  } else if (result.justDepositPaid && result.isRequestBath && result.appointmentAt) {
+    // คำขอจองจาก LINE: รับมัดจำ = ยืนยันการจองแล้ว — ข้อความตามที่ร้านกำหนด
+    void notifyCustomerLine(
+      orderId,
+      buildBookingConfirmedText({
+        petName: result.petName,
+        date: formatDateLong(result.appointmentAt),
+        time: formatTime(result.appointmentAt),
+        depositAmount: result.depositAmount,
       })
     );
   } else if (result.justDepositPaid) {
@@ -764,6 +782,8 @@ async function assertOrderNotFullyPaid(orderId: string): Promise<{ ok: true } | 
 const extraChargeSchema = z.object({
   amount: z.coerce.number().int().min(1, "กรุณากรอกยอดเงิน"),
   description: z.string().min(1, "กรุณากรอกรายละเอียด"),
+  // เพิ่ม/แก้ค่าใช้จ่ายระหว่างทำงานต้องบันทึกว่าลูกค้ารับทราบและยินยอมแล้ว
+  customerConfirmed: z.literal(true, { message: "กรุณายืนยันว่าลูกค้ารับทราบและยินยอมรายการนี้แล้ว" }),
 });
 
 export async function addExtraCharge(orderId: string, input: unknown): Promise<ActionResult> {
@@ -773,14 +793,15 @@ export async function addExtraCharge(orderId: string, input: unknown): Promise<A
   const notFullyPaid = await assertOrderNotFullyPaid(orderId);
   if (!notFullyPaid.ok) return notFullyPaid;
 
+  const charge = { amount: parsed.data.amount, description: parsed.data.description };
   await prisma.$transaction([
     prisma.orderExtraCharge.create({
-      data: { orderId, ...parsed.data, createdById: user.id },
+      data: { orderId, ...charge, createdById: user.id },
     }),
     prisma.orderActivityLog.create({
       data: {
         orderId,
-        action: `เพิ่มค่าเสียหายเพิ่มเติม: ${parsed.data.description} (${formatBaht(parsed.data.amount)})`,
+        action: `เพิ่มค่าเสียหายเพิ่มเติม: ${charge.description} (${formatBaht(charge.amount)})${CUSTOMER_CONFIRMED_LOG_SUFFIX}`,
         createdById: user.id,
       },
     }),
@@ -800,12 +821,13 @@ export async function updateExtraCharge(id: string, input: unknown): Promise<Act
   const notFullyPaid = await assertOrderNotFullyPaid(existing.orderId);
   if (!notFullyPaid.ok) return notFullyPaid;
 
+  const fields = { amount: parsed.data.amount, description: parsed.data.description };
   const [charge] = await prisma.$transaction([
-    prisma.orderExtraCharge.update({ where: { id }, data: parsed.data }),
+    prisma.orderExtraCharge.update({ where: { id }, data: fields }),
     prisma.orderActivityLog.create({
       data: {
         orderId: existing.orderId,
-        action: `แก้ไขค่าเสียหายเพิ่มเติม: ${parsed.data.description} (${formatBaht(parsed.data.amount)})`,
+        action: `แก้ไขค่าเสียหายเพิ่มเติม: ${fields.description} (${formatBaht(fields.amount)})${CUSTOMER_CONFIRMED_LOG_SUFFIX}`,
         createdById: user.id,
       },
     }),
@@ -842,8 +864,13 @@ export async function deleteExtraCharge(id: string): Promise<ActionResult> {
  * ไม่ยุ่งกับ payment ที่มีอยู่แล้ว — ยอดที่เพิ่มจะไปรวมอยู่ในยอดคงเหลือตอนเก็บเงินส่วนที่เหลือ
  * บันทึก log ไว้ทุกครั้งว่าใครเพิ่มอะไร เมื่อไหร่
  */
-export async function addOrderItem(orderId: string, serviceId: string): Promise<ActionResult> {
+export async function addOrderItem(
+  orderId: string,
+  serviceId: string,
+  customerConfirmed: boolean
+): Promise<ActionResult> {
   const user = await requireUser();
+  if (customerConfirmed !== true) return { ok: false, error: "กรุณายืนยันว่าลูกค้ารับทราบและยินยอมรายการนี้แล้ว" };
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
   if (order.status === "CANCELLED") return { ok: false, error: "ออเดอร์นี้ถูกยกเลิกแล้ว" };
@@ -876,7 +903,7 @@ export async function addOrderItem(orderId: string, serviceId: string): Promise<
     prisma.orderActivityLog.create({
       data: {
         orderId,
-        action: `เพิ่มบริการ: ${service.name} (${formatBaht(service.price)})`,
+        action: `เพิ่มบริการ: ${service.name} (${formatBaht(service.price)})${CUSTOMER_CONFIRMED_LOG_SUFFIX}`,
         createdById: user.id,
       },
     }),

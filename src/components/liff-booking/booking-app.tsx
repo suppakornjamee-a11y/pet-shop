@@ -23,12 +23,14 @@ import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import {
   AddPetButton,
+  ExistingPetFields,
   OwnerFields,
   PetFields,
   emptyPetDraft,
   focusField,
   petDraftToInput,
   splitDetail,
+  validateExistingPet,
   validateOwner,
   validatePet,
   type FieldError,
@@ -76,6 +78,7 @@ function petToDraft(p: CtxPet): PetDraft {
     fleaTickMedicine: p.fleaTickMedicine ?? "",
     fleaTickProductId: p.fleaTickProductId,
     lastFleaTickDate: p.lastFleaTickAt,
+    infoStatus: "",
   };
 }
 
@@ -198,8 +201,8 @@ function BookingBody() {
     [draft, servicesByKind, draftPet]
   );
 
-  function openDetail(k: Kind, petId: string) {
-    setDraft(newItemDraft(k, petId));
+  function openDetail(k: Kind, petId: string, petInfo: ItemDraft["petInfo"] = "") {
+    setDraft({ ...newItemDraft(k, petId), petInfo });
     setEditingKey(null);
     setStage("detail");
     window.scrollTo({ top: 0 });
@@ -241,7 +244,7 @@ function BookingBody() {
           return;
         }
         await loadContext();
-        openDetail("BATH", res.petIds[0]);
+        openDetail("BATH", res.petIds[0], "NEW");
       });
       return;
     }
@@ -249,23 +252,31 @@ function BookingBody() {
       if (selectedPetId && selectedPetId !== "new") openDetail(kind, selectedPetId);
       return;
     }
-    const petDraft = selectedPetId === "new" ? newPets[0] : petEdits[selectedPetId];
+    const isNewPet = selectedPetId === "new";
+    const petDraft = isNewPet ? newPets[0] : petEdits[selectedPetId];
     if (!petDraft) return;
-    const petError = validatePet(petDraft, 0, t);
+    const petError = isNewPet ? validatePet(petDraft, 0, t) : validateExistingPet(petDraft, t);
     if (petError) return reject(petError);
+    // สัตว์เดิมที่ลูกค้ายืนยันว่าข้อมูลถูกต้อง: บันทึกแค่น้ำหนักล่าสุด — นอกนั้นบันทึกเต็มชุดเหมือนเดิม
+    const confirmSame = !isNewPet && petDraft.infoStatus === "same";
     startTransition(async () => {
-      const res = await liffSaveQuickProfile(idToken, { pets: [petDraftToInput(petDraft, t.liffBook.diseaseNo)] });
+      const res = await liffSaveQuickProfile(
+        idToken,
+        confirmSame
+          ? { confirmed: [{ id: petDraft.id, weightKg: petDraft.weightKg }] }
+          : { pets: [petDraftToInput(petDraft, t.liffBook.diseaseNo)] }
+      );
       if (!res.ok) {
         handleLiffAuthExpiry(res);
         toast.error(res.error);
         return;
       }
       await loadContext();
-      if (selectedPetId === "new") {
+      if (isNewPet) {
         setNewPets([emptyPetDraft()]);
         setSelectedPetId(res.petIds[0]);
       }
-      openDetail("BATH", res.petIds[0]);
+      openDetail("BATH", res.petIds[0], isNewPet ? "NEW" : confirmSame ? "SAME" : "UPDATED");
     });
   }
 
@@ -342,17 +353,7 @@ function BookingBody() {
           </div>
         </div>
 
-        <ItemDetail
-          draft={draft}
-          onChange={setDraft}
-          pet={draftPet}
-          services={draftServices}
-          rooms={rooms}
-          catalog={catalog}
-          idToken={idToken}
-          onPetUpdated={loadContext}
-          t={t}
-        />
+        <ItemDetail draft={draft} onChange={setDraft} services={draftServices} rooms={rooms} t={t} />
 
         <ReviewDialog
           open={reviewOpen}
@@ -605,10 +606,9 @@ function BookingBody() {
               />
             ) : (
               petEdits[selectedPetId] && (
-                <PetFields
+                <ExistingPetFields
                   key={selectedPetId}
                   pet={petEdits[selectedPetId]}
-                  index={0}
                   catalog={catalog}
                   onChange={(v) => setPetEdits({ ...petEdits, [selectedPetId]: v })}
                   invalidId={invalidId}

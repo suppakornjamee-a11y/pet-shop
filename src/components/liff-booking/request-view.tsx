@@ -62,7 +62,7 @@ function draftFor(o: RequestOrder): ItemDraft {
 }
 
 /** การ์ดสรุปรายการ — หน้าตาเดียวกับหน้าจองแบบเดิม */
-function SummaryCard({ order, t }: { order: RequestOrder; t: T }) {
+function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T; showPaid?: boolean }) {
   const kind = orderKind(order);
   const Icon = KIND_ICONS[kind];
   const names = [
@@ -122,6 +122,31 @@ function SummaryCard({ order, t }: { order: RequestOrder; t: T }) {
             </div>
           </>
         ) : null}
+        {showPaid && (
+          <>
+            <div className="flex items-center justify-between gap-3 border-t border-dashed pt-2.5">
+              <dt className="text-muted-foreground">{t.liffBook.estimate}</dt>
+              <dd className="text-right font-medium">{formatBaht(order.total)}</dd>
+            </div>
+            {order.paid >= order.total ? (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">{t.orders.payment.fullyPaid}</dt>
+                <dd className="text-right font-medium">{formatBaht(order.paid)}</dd>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">{t.liffBook.depositPaid}</dt>
+                  <dd className="text-right font-medium">{formatBaht(order.paid)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">{t.liffBook.remaining}</dt>
+                  <dd className="text-right font-medium">{formatBaht(order.total - order.paid)}</dd>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </dl>
     </div>
   );
@@ -317,9 +342,15 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         </>
       ) : (
         <>
-          <StatusHero tone="ok" title={t.liff.inProgressTitle} />
-          <SummaryCard order={selected} t={t} />
-          {isBath && <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>}
+          <StatusHero tone="ok" title={t.liff.inProgressTitle}>
+            <span className="rounded-full bg-accent/40 px-3 py-1 text-xs font-medium text-primary">
+              {t.labels.bookingRequestStatus.CONFIRMED}
+            </span>
+          </StatusHero>
+          <SummaryCard order={selected} t={t} showPaid />
+          {isBath && selected.paid < selected.total && (
+            <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
+          )}
         </>
       )}
 

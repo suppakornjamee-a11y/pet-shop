@@ -319,6 +319,7 @@ const en: Dictionary = {
     roomBookingBadge: "Room/Cage/Area Booking",
     editTitle: (code: string) => `Edit Order ${code}`,
     editDescription: "Adjust services, rooms, or products, then confirm to generate a new QR (resets 15-minute timer)",
+    customerConfirmed: "Customer confirmed this item",
     detailCreatedAt: (date: string) => `Created ${date}`,
     editOrder: "Edit Order",
     printDocument: "Receipt",
@@ -576,12 +577,17 @@ const en: Dictionary = {
     styleHint: "Describe the style or attach example photos. The groomer will check what suits the coat before starting.",
     styleImages: "Example photos",
     services: "Choose services",
-    fleaTitle: "Flea & tick",
-    fleaUpdate: "New dose details",
-    fleaSave: "Save medicine details",
-    fleaSaved: "Medicine details saved",
-    fleaPendingNotice: "Awaiting check. An admin will review the medicine details.",
+    infoConfirmLabel: "Confirm the information above",
+    infoSame: "Existing information is still correct",
+    infoUpdate: "I have updates",
+    infoRequired: "Please choose whether the existing information is still correct or has updates",
+    age: (years: number, months: number) => {
+      const parts = [years > 0 ? `${years} yr` : null, months > 0 ? `${months} mo` : null].filter(Boolean);
+      return `Age ${parts.length > 0 ? parts.join(" ") : "under 1 month"}`;
+    },
     estimate: "Estimated total",
+    depositPaid: "Deposit received",
+    remaining: "Estimated balance",
     bathDeposit: "Bath booking deposit 300 THB (per pet)",
     priceNote:
       "Estimate based on the weight given. The shop will weigh and assess on the day. To change services, tell the groomer before they start.",

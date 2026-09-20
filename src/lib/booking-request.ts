@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
+import { computeFleaTickStatus } from "@/lib/flea-tick";
+import { formatDateLong } from "@/lib/format";
+import { thaiDayRange } from "@/lib/slots";
 
 /**
  * คำขอจองจาก LINE (ตะกร้า) — ลูกค้าเลือกหลายรายการ แล้วส่งครั้งเดียว แต่ละรายการคือ Order หนึ่งใบ
@@ -93,6 +96,8 @@ export const cartItemSchema = z.object({
   cctvRequested: z.coerce.boolean().default(false),
   note: z.string().max(500).optional(),
   groomingStyleNote: z.string().max(1000).optional(),
+  // ลูกค้ายืนยันข้อมูลสัตว์เลี้ยงเดิม (SAME) หรืออัปเดตข้อมูล (UPDATED) ก่อนจองอาบน้ำ — จดลงประวัติออเดอร์
+  petInfo: z.enum(["NEW", "SAME", "UPDATED"]).optional(),
   groomingStyleImages: z.array(z.string()).max(3, "แนบภาพตัวอย่างได้ไม่เกิน 3 รูป").default([]),
 });
 export type CartItem = z.infer<typeof cartItemSchema>;
@@ -136,7 +141,7 @@ export async function createBookingRequest(
 ): Promise<{ ok: true; id: string; code: string } | { ok: false; error: string; itemIndex?: number }> {
   const pets = await prisma.pet.findMany({
     where: { id: { in: items.map((i) => i.petId) }, customerId },
-    select: { id: true, vaccineComplete: true },
+    select: { id: true, vaccineComplete: true, species: true, weightKg: true, lastFleaTickAt: true, fleaTickProduct: true },
   });
   const petMap = new Map(pets.map((p) => [p.id, p]));
   for (const [i, item] of items.entries()) {
@@ -174,6 +179,39 @@ export async function createBookingRequest(
         return { ok: false, error: result.error, itemIndex: i };
       }
       createdOrderIds.push(result.id);
+
+      if (item.kind === "BATH" && (item.petInfo === "SAME" || item.petInfo === "UPDATED")) {
+        const weight = petMap.get(item.petId)?.weightKg;
+        await prisma.orderActivityLog.create({
+          data: {
+            orderId: result.id,
+            action: `${
+              item.petInfo === "SAME" ? "ลูกค้ายืนยันว่าข้อมูลสัตว์เลี้ยงเดิมยังถูกต้อง" : "ลูกค้าอัปเดตข้อมูลสัตว์เลี้ยงก่อนจอง"
+            }${weight ? ` (น้ำหนัก ${weight} กก.)` : ""}`,
+          },
+        });
+      }
+
+      // จดสถานะยาเห็บหมัดตอนที่ลูกค้าจอง (เทียบกับวันบริการ) ไว้ในประวัติ — พนักงานตรวจซ้ำตอนเช็คคิว
+      if (item.kind === "BATH" && item.appointmentDate) {
+        const pet = petMap.get(item.petId)!;
+        const status = computeFleaTickStatus({
+          givenAt: pet.lastFleaTickAt,
+          product: pet.fleaTickProduct,
+          petSpecies: pet.species,
+          serviceDate: item.appointmentDate,
+        });
+        const due = status.nextDueDate ? ` (ครบกำหนด ${formatDateLong(thaiDayRange(status.nextDueDate).start)})` : "";
+        const text =
+          status.kind === "COVERED"
+            ? `อยู่ในช่วงตามข้อมูลที่ลูกค้าแจ้ง${due}`
+            : status.kind === "DUE_BEFORE_SERVICE"
+              ? `ถึงกำหนดก่อนวันบริการ${due}`
+              : "ข้อมูลไม่ครบหรือรอตรวจสอบ";
+        await prisma.orderActivityLog.create({
+          data: { orderId: result.id, action: `ตรวจยาเห็บหมัดตอนจอง: ${text}` },
+        });
+      }
     }
   } catch (e) {
     await rollback();

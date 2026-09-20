@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Clock, ImagePlus, Loader2, Video, X } from "lucide-react";
-import { getOpenSlots, checkRoomAvailability, liffUpdatePetFleaTick } from "@/app/actions/liff";
-import { computeFleaTickStatus, type FleaTickProductInfo } from "@/lib/flea-tick";
+import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import { compressImageToDataUrl } from "@/lib/file";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
-import { handleLiffAuthExpiry } from "@/components/liff-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MedicineNameField } from "./pet-quick-form";
 import { bathGroups, estimateDraft, type ItemDraft } from "./cart";
 import {
   CCTV_ROOM_RATE,
@@ -92,104 +89,6 @@ function Section({ title, children }: { title?: string; children: React.ReactNod
       {title && <p className="text-sm font-semibold">{title}</p>}
       {children}
     </div>
-  );
-}
-
-/* ---------- ยาเห็บหมัด เทียบกับวันเข้าใช้บริการ ---------- */
-
-function FleaCheck({
-  pet,
-  serviceDate,
-  catalog,
-  idToken,
-  onSaved,
-  t,
-}: {
-  pet: CtxPet;
-  serviceDate: string;
-  catalog: FleaTickProductInfo[];
-  idToken: string;
-  onSaved: () => Promise<void>;
-  t: T;
-}) {
-  const product = catalog.find((p) => p.id === pet.fleaTickProductId) ?? null;
-  const status = computeFleaTickStatus({
-    givenAt: pet.lastFleaTickAt || null,
-    product,
-    petSpecies: pet.species,
-    serviceDate,
-  });
-  const [medicine, setMedicine] = useState({ name: pet.fleaTickMedicine ?? "", productId: pet.fleaTickProductId });
-  const [givenAt, setGivenAt] = useState("");
-  const [isPending, startTransition] = useTransition();
-
-  function save() {
-    startTransition(async () => {
-      const res = await liffUpdatePetFleaTick(idToken, pet.id, {
-        fleaTickMedicine: medicine.name,
-        fleaTickProductId: medicine.productId,
-        lastFleaTickDate: givenAt || undefined,
-      });
-      if (!res.ok) {
-        handleLiffAuthExpiry(res);
-        toast.error(res.error);
-        return;
-      }
-      toast.success(t.liffBook.fleaSaved);
-      setGivenAt("");
-      await onSaved();
-    });
-  }
-
-  const dueLabel = status.nextDueDate ? t.fleaTick.nextDue(formatDateLong(thaiDayRange(status.nextDueDate).start)) : null;
-
-  return (
-    <Section title={t.liffBook.fleaTitle}>
-      {status.kind === "INCOMPLETE" ? (
-        <p className="text-sm text-muted-foreground">{t.liffBook.fleaPendingNotice}</p>
-      ) : (
-        <p className={cn("text-sm", status.kind === "DUE_BEFORE_SERVICE" ? "font-medium text-destructive" : "")}>
-          {dueLabel}
-        </p>
-      )}
-      {status.kind === "DUE_BEFORE_SERVICE" && (
-        <div className="space-y-3 border-t pt-3">
-          <p className="text-sm font-medium">{t.liffBook.fleaUpdate}</p>
-          <div className="space-y-1.5">
-            <Label>{t.liffBook.fleaMedicine}</Label>
-            <MedicineNameField
-              value={medicine.name}
-              productId={medicine.productId}
-              species={pet.species}
-              catalog={catalog}
-              onChange={(patch) =>
-                setMedicine((m) => ({
-                  name: patch.fleaTickMedicine ?? m.name,
-                  productId: patch.fleaTickProductId !== undefined ? patch.fleaTickProductId : m.productId,
-                }))
-              }
-              t={t}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="flea-new-date">{t.liffBook.fleaDate}</Label>
-            <Input
-              id="flea-new-date"
-              type="date"
-              lang="en-GB"
-              max={todayStr()}
-              className="h-11 rounded-xl bg-card"
-              value={givenAt}
-              onChange={(e) => setGivenAt(e.target.value)}
-            />
-          </div>
-          <Button type="button" variant="outline" className="w-full rounded-xl" disabled={isPending || !givenAt} onClick={save}>
-            {isPending && <Loader2 className="animate-spin" />}
-            {t.liffBook.fleaSave}
-          </Button>
-        </div>
-      )}
-    </Section>
   );
 }
 
@@ -504,23 +403,15 @@ function RoomPicker({
 export function ItemDetail({
   draft,
   onChange,
-  pet,
   services,
   rooms,
-  catalog,
-  idToken,
-  onPetUpdated,
   t,
 }: {
   draft: ItemDraft;
   onChange: (d: ItemDraft) => void;
-  pet: CtxPet;
   /** บริการของประเภทนี้ที่กรองชนิดสัตว์แล้ว */
   services: Service[];
   rooms: Room[];
-  catalog: FleaTickProductInfo[];
-  idToken: string;
-  onPetUpdated: () => Promise<void>;
   t: T;
 }) {
   const set = (patch: Partial<ItemDraft>) => onChange({ ...draft, ...patch });
@@ -561,16 +452,6 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <>
-          <FleaCheck
-            key={`${pet.id}|${pet.lastFleaTickAt}|${pet.fleaTickProductId}`}
-            pet={pet}
-            serviceDate={draft.date}
-            catalog={catalog}
-            idToken={idToken}
-            onSaved={onPetUpdated}
-            t={t}
-          />
-
           <Section title={t.liffBook.bathType}>
             <div className="grid gap-2">
               {groups.main.map((s) => (

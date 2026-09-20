@@ -15,11 +15,15 @@ const TONE = {
  * สถานะยาเห็บหมัดของสัตว์เลี้ยงเทียบกับวันบริการ — ใช้ข้อมูลสัตว์เลี้ยงปัจจุบัน (ลูกค้าอัปเดตแล้วเห็นทันที)
  * แสดงแหล่งที่มาของข้อมูลเสมอ ให้พนักงานรู้ว่าเป็นแค่ที่ลูกค้าแจ้ง หรือเห็นหลักฐานแล้ว
  * ผ่านเกณฑ์ไม่ได้แปลว่าปลอดเห็บหมัด — พนักงานยังต้องตรวจตอนรับบริการจริง
+ *
+ * alwaysShow = แสดงแม้สัตว์ยังไม่มีข้อมูลยาเลย (ขึ้นเป็น "ข้อมูลไม่ครบหรือรอตรวจสอบ") — ใช้ตอนพนักงานเช็คคิว
+ * เพราะร้านเป็นคนตรวจยาเห็บหมัดตอนนั้น จะได้ไม่พลาดกรณีลูกค้าไม่ได้กรอกอะไรมาเลย
  */
 export function FleaTickStatusBlock({
   t,
   pet,
   serviceDate,
+  alwaysShow = false,
 }: {
   t: Dictionary;
   pet: {
@@ -30,8 +34,10 @@ export function FleaTickStatusBlock({
     fleaTickProduct: FleaTickProductInfo | null;
   };
   serviceDate: string;
+  alwaysShow?: boolean;
 }) {
-  if (!pet.lastFleaTickAt && !pet.fleaTickMedicine && !pet.fleaTickProduct) return null;
+  const hasData = !!(pet.lastFleaTickAt || pet.fleaTickMedicine || pet.fleaTickProduct);
+  if (!hasData && !alwaysShow) return null;
   const status = computeFleaTickStatus({
     givenAt: pet.lastFleaTickAt,
     product: pet.fleaTickProduct,
@@ -46,17 +52,21 @@ export function FleaTickStatusBlock({
         <span className={cn("rounded-full px-2 py-0.5 font-medium", TONE[status.kind])}>
           {t.fleaTick.status[status.kind]}
         </span>
-        <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
-          {t.fleaTick.source[pet.fleaTickSource]}
-        </span>
+        {hasData && (
+          <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
+            {t.fleaTick.source[pet.fleaTickSource]}
+          </span>
+        )}
       </div>
       {status.nextDueDate && (
         <div>{t.fleaTick.nextDue(formatDate(thaiDayRange(status.nextDueDate).start))}</div>
       )}
-      <div className="text-muted-foreground">
-        {pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}
-        {pet.lastFleaTickAt && ` · ${formatDate(pet.lastFleaTickAt)}`}
-      </div>
+      {hasData && (
+        <div className="text-muted-foreground">
+          {pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}
+          {pet.lastFleaTickAt && ` · ${formatDate(pet.lastFleaTickAt)}`}
+        </div>
+      )}
       {pet.fleaTickProduct?.bathNote && (
         <div className="text-amber-800 dark:text-amber-300">{pet.fleaTickProduct.bathNote}</div>
       )}

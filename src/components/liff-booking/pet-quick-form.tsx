@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { matchMedicine, type FleaTickProductInfo } from "@/lib/flea-tick";
+import { petAge } from "@/lib/pet-age";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ export type PetDraft = {
   fleaTickMedicine: string;
   fleaTickProductId: string | null;
   lastFleaTickDate: string;
+  /** เฉพาะสัตว์ที่มีข้อมูลอยู่แล้ว: ลูกค้ายืนยันว่าข้อมูลเดิมยังถูกต้อง หรือมีข้อมูลอัปเดต */
+  infoStatus: "" | "same" | "update";
 };
 
 export const emptyPetDraft = (): PetDraft => ({
@@ -48,6 +51,7 @@ export const emptyPetDraft = (): PetDraft => ({
   fleaTickMedicine: "",
   fleaTickProductId: null,
   lastFleaTickDate: "",
+  infoStatus: "",
 });
 
 /** ค่าที่เก็บในฐานข้อมูลเป็นข้อความเดียว — "ไม่มี" หรือรายละเอียดที่ลูกค้าระบุ */
@@ -109,6 +113,13 @@ export function validatePet(pet: PetDraft, index: number, t: T): FieldError | nu
   if (pet.hasChronicDisease === "yes" && !pet.chronicDiseaseNote.trim())
     return { id: id("disease-note"), message: t.liffBook.detailPlaceholder };
   return null;
+}
+
+/** สัตว์เลี้ยงที่มีข้อมูลอยู่แล้ว — ต้องมีน้ำหนักล่าสุด และเลือกว่าข้อมูลเดิมถูกต้องหรือมีอัปเดต (ถ้าอัปเดตต้องกรอกครบเหมือนสัตว์ใหม่) */
+export function validateExistingPet(pet: PetDraft, t: T): FieldError | null {
+  if (!(Number(pet.weightKg) > 0)) return { id: petFieldId(0, "weight"), message: t.liffBook.requiredField(t.liffBook.weight) };
+  if (!pet.infoStatus) return { id: petFieldId(0, "info"), message: t.liffBook.infoRequired };
+  return pet.infoStatus === "update" ? validatePet(pet, 0, t) : null;
 }
 
 /** โฟกัสช่องที่ยังไม่ครบและเลื่อนจอไปหา */
@@ -292,7 +303,8 @@ function DetailField({
   );
 }
 
-/** ข้อมูลสัตว์เลี้ยงหนึ่งตัว — ชุดช่องตามที่ร้านกำหนดสำหรับงานอาบน้ำ/กรูมมิ่ง */
+/** ข้อมูลสัตว์เลี้ยงหนึ่งตัว — ชุดช่องตามที่ร้านกำหนดสำหรับงานอาบน้ำ/กรูมมิ่ง
+ * bare = ฝังอยู่ในการ์ดอื่น (ไม่มีกรอบและหัวข้อของตัวเอง), hideWeight = น้ำหนักแสดงที่อื่นในการ์ดแม่แล้ว */
 export function PetFields({
   pet,
   index,
@@ -300,6 +312,8 @@ export function PetFields({
   onChange,
   onRemove,
   invalidId,
+  hideWeight = false,
+  bare = false,
   t,
 }: {
   pet: PetDraft;
@@ -308,22 +322,27 @@ export function PetFields({
   onChange: (p: PetDraft) => void;
   onRemove?: () => void;
   invalidId?: string | null;
+  hideWeight?: boolean;
+  bare?: boolean;
   t: T;
 }) {
   const set = (patch: Partial<PetDraft>) => onChange({ ...pet, ...patch });
   const id = (f: string) => petFieldId(index, f);
   const bad = (f: string) => invalidId === id(f);
+  const age = petAge(pet.birthDate, todayStr());
 
   return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">{t.liffBook.petTitle}</p>
-        {onRemove && (
-          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={onRemove}>
-            <Trash2 className="h-3.5 w-3.5" /> {t.liffBook.removePet}
-          </Button>
-        )}
-      </div>
+    <div className={bare ? "space-y-3 border-t pt-3" : "space-y-3 rounded-2xl border bg-card p-4"}>
+      {!bare && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold">{t.liffBook.petTitle}</p>
+          {onRemove && (
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive" onClick={onRemove}>
+              <Trash2 className="h-3.5 w-3.5" /> {t.liffBook.removePet}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor={id("name")}>{t.liffBook.petName}</Label>
@@ -369,20 +388,23 @@ export function PetFields({
             value={pet.birthDate}
             onChange={(e) => set({ birthDate: e.target.value })}
           />
+          {age && <p className="text-xs text-muted-foreground">{t.liffBook.age(age.years, age.months)}</p>}
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={id("weight")}>{t.liffBook.weight}</Label>
-          <Input
-            id={id("weight")}
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.1"
-            className={cn(FIELD, bad("weight") && INVALID)}
-            value={pet.weightKg}
-            onChange={(e) => set({ weightKg: e.target.value })}
-          />
-        </div>
+        {!hideWeight && (
+          <div className="space-y-1.5">
+            <Label htmlFor={id("weight")}>{t.liffBook.weight}</Label>
+            <Input
+              id={id("weight")}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.1"
+              className={cn(FIELD, bad("weight") && INVALID)}
+              value={pet.weightKg}
+              onChange={(e) => set({ weightKg: e.target.value })}
+            />
+          </div>
+        )}
       </div>
 
       <DetailField
@@ -442,6 +464,95 @@ export function PetFields({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * สัตว์เลี้ยงที่มีข้อมูลอยู่แล้ว — แสดงน้ำหนักเดิมให้ยืนยันหรือแก้เป็นน้ำหนักล่าสุด แสดงประวัติแพ้ โรคประจำตัว
+ * และข้อควรระวังเดิม แล้วให้เลือก "ข้อมูลเดิมยังถูกต้อง" หรือ "มีข้อมูลอัปเดต" (เลือกอัปเดตถึงจะแก้ข้อมูลอื่นได้)
+ */
+export function ExistingPetFields({
+  pet,
+  catalog,
+  onChange,
+  invalidId,
+  t,
+}: {
+  pet: PetDraft;
+  catalog: FleaTickProductInfo[];
+  onChange: (p: PetDraft) => void;
+  invalidId?: string | null;
+  t: T;
+}) {
+  const id = (f: string) => petFieldId(0, f);
+  const bad = (f: string) => invalidId === id(f);
+  const age = petAge(pet.birthDate, todayStr());
+  // ข้อมูลสุขภาพเดิมที่ยังไม่เคยกรอกครบ (สัตว์ที่พนักงานลงทะเบียนไว้ก่อนมีช่องเหล่านี้) ยืนยันว่า "ถูกต้อง" ไม่ได้ — ต้องกรอกเพิ่ม
+  const incomplete = !pet.hasAllergies || !pet.hasCautions || !pet.hasChronicDisease;
+  const shown = (has: HasDetail, note: string) => (has === "yes" ? note : has === "no" ? t.liffBook.diseaseNo : "-");
+  const rows: [string, string][] = [
+    [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
+    [t.liffBook.disease, shown(pet.hasChronicDisease, pet.chronicDiseaseNote)],
+    [t.liffBook.cautions, shown(pet.hasCautions, pet.groomingCautions)],
+  ];
+
+  return (
+    <div className="space-y-3 rounded-2xl border bg-card p-4">
+      <div>
+        <p className="text-sm font-semibold">{pet.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {[t.labels.species[pet.species], pet.breed, age ? t.liffBook.age(age.years, age.months) : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor={id("weight")}>{t.liffBook.weight}</Label>
+        <Input
+          id={id("weight")}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="0.1"
+          className={cn(FIELD, bad("weight") && INVALID)}
+          value={pet.weightKg}
+          onChange={(e) => onChange({ ...pet, weightKg: e.target.value })}
+        />
+      </div>
+
+      {pet.infoStatus !== "update" && (
+        <div className="space-y-1 rounded-xl bg-muted/50 p-3 text-sm">
+          <p className="text-xs font-medium text-muted-foreground">{t.liffBook.health}</p>
+          {rows.map(([label, value]) => (
+            <p key={label}>
+              <span className="text-muted-foreground">{label}: </span>
+              {value}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <Label htmlFor={id("info")}>{t.liffBook.infoConfirmLabel}</Label>
+        <select
+          id={id("info")}
+          className={cn(SELECT, bad("info") && INVALID)}
+          value={pet.infoStatus}
+          onChange={(e) => onChange({ ...pet, infoStatus: e.target.value as PetDraft["infoStatus"] })}
+        >
+          <option value="" disabled />
+          <option value="same" disabled={incomplete}>
+            {t.liffBook.infoSame}
+          </option>
+          <option value="update">{t.liffBook.infoUpdate}</option>
+        </select>
+      </div>
+
+      {pet.infoStatus === "update" && (
+        <PetFields pet={pet} index={0} catalog={catalog} onChange={onChange} invalidId={invalidId} hideWeight bare t={t} />
+      )}
     </div>
   );
 }

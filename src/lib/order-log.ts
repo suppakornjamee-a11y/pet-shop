@@ -13,3 +13,17 @@ export const QUEUE_REJECT_LOG_PREFIX = "ปฏิเสธคิว: ";
  */
 export const CHECKIN_REMINDER_LOG = "ส่ง LINE คอนเฟิร์มเช็คอินล่วงหน้า 1 วัน";
 export const CHECKOUT_REMINDER_LOG = "ส่ง LINE คอนเฟิร์มเช็คเอาท์ล่วงหน้า 1 วัน";
+
+/**
+ * เครื่องหมาย "ส่งแล้ว" ของ LINE เตือนนัดล่วงหน้า 1 วัน (อาบน้ำ/บริการอื่น) — ผูกกับวันนัดไว้ในข้อความ
+ * รันซ้ำวันเดิมไม่ส่งซ้ำ แต่ถ้าร้านย้ายนัดไปวันอื่น วันนัดใหม่จะไม่ตรงกับเครื่องหมายเดิม จึงเตือนรอบใหม่ให้เอง
+ */
+export const APPOINTMENT_REMINDER_LOG_PREFIX = "ส่ง LINE เตือนนัดล่วงหน้า 1 วัน";
+export const appointmentReminderLog = (appointmentDate: string) =>
+  `${APPOINTMENT_REMINDER_LOG_PREFIX} (${appointmentDate})`;
+
+/** ต่อท้ายบันทึกกิจกรรมเมื่อพนักงานเพิ่มบริการ/ค่าใช้จ่ายระหว่างทำงาน — ยืนยันว่าลูกค้ารับทราบและยินยอมแล้ว */
+export const CUSTOMER_CONFIRMED_LOG_SUFFIX = " — ลูกค้ายืนยันแล้ว";
+
+/** บันทึกกิจกรรมตอนระบบลบรูปตัวอย่างทรงขนที่ครบกำหนดเก็บ */
+export const STYLE_IMAGES_PURGED_LOG = "ลบรูปตัวอย่างทรงขนอัตโนมัติ (ครบ 30 วันนับจากวันที่ลูกค้าอัปโหลด)";

@@ -332,6 +332,7 @@ const th = {
     roomBookingBadge: "จองห้อง/คอก/พื้นที่",
     editTitle: (code: string) => `แก้ไขออเดอร์ ${code}`,
     editDescription: "ปรับบริการ ห้องพัก หรือสินค้า แล้วยืนยันเพื่อสร้าง QR ใหม่ (นับเวลา 15 นาทีใหม่)",
+    customerConfirmed: "ลูกค้ายืนยันรายการนี้แล้ว",
     detailCreatedAt: (date: string) => `สร้างเมื่อ ${date}`,
     editOrder: "แก้ไขออเดอร์",
     printDocument: "ใบเสร็จ",
@@ -591,12 +592,17 @@ const th = {
     styleHint: "แจ้งทรงที่ต้องการหรือแนบภาพตัวอย่างได้ ช่างจะประเมินความเหมาะสมจากสภาพขนจริงอีกครั้งก่อนให้บริการ",
     styleImages: "ภาพตัวอย่าง",
     services: "เลือกบริการ",
-    fleaTitle: "ยาเห็บหมัด",
-    fleaUpdate: "ข้อมูลการให้ยาครั้งใหม่",
-    fleaSave: "บันทึกข้อมูลยา",
-    fleaSaved: "บันทึกข้อมูลยาแล้ว",
-    fleaPendingNotice: "รอตรวจสอบ แอดมินจะตรวจสอบข้อมูลยาให้",
+    infoConfirmLabel: "ยืนยันข้อมูลข้างต้น",
+    infoSame: "ข้อมูลเดิมยังถูกต้อง",
+    infoUpdate: "มีข้อมูลอัปเดต",
+    infoRequired: "กรุณาเลือกว่าข้อมูลเดิมยังถูกต้องหรือมีข้อมูลอัปเดต",
+    age: (years: number, months: number) => {
+      const parts = [years > 0 ? `${years} ปี` : null, months > 0 ? `${months} เดือน` : null].filter(Boolean);
+      return `อายุ ${parts.length > 0 ? parts.join(" ") : "ไม่ถึง 1 เดือน"}`;
+    },
     estimate: "ยอดรวมโดยประมาณ",
+    depositPaid: "รับมัดจำแล้ว",
+    remaining: "ยอดคงเหลือโดยประมาณ",
     bathDeposit: "มัดจำการจองอาบน้ำ 300 บาท (ต่อตัว)",
     priceNote:
       "ราคาประมาณการอ้างอิงจากน้ำหนักที่แจ้ง ทางร้านจะชั่งน้ำหนักและประเมินหน้างานอีกครั้ง หากต้องการเปลี่ยนรายการ กรุณาแจ้งช่างก่อนเริ่มบริการ",

@@ -29,6 +29,8 @@ export type ItemDraft = {
   note: string;
   styleNote: string;
   styleImages: string[];
+  /** ที่มาของข้อมูลสัตว์เลี้ยงในรายการนี้ (ยืนยันข้อมูลเดิม / อัปเดต / กรอกใหม่) — ส่งไปจดลงประวัติออเดอร์ */
+  petInfo: "" | "NEW" | "SAME" | "UPDATED";
 };
 
 export function newItemDraft(kind: Kind, petId: string): ItemDraft {
@@ -49,6 +51,7 @@ export function newItemDraft(kind: Kind, petId: string): ItemDraft {
     note: "",
     styleNote: "",
     styleImages: [],
+    petInfo: "",
   };
 }
 
@@ -132,6 +135,7 @@ export function entryToPayload(e: CartEntry) {
     note: d.note || undefined,
     groomingStyleNote: d.kind === "BATH" ? d.styleNote || undefined : undefined,
     groomingStyleImages: d.kind === "BATH" ? d.styleImages : [],
+    petInfo: d.kind === "BATH" && d.petInfo ? d.petInfo : undefined,
   };
 }
 
