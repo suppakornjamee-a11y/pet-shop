@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { matchMedicine, type FleaTickProductInfo } from "@/lib/flea-tick";
+import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
 import { petAge } from "@/lib/pet-age";
 import { formatDateLong } from "@/lib/format";
 import { thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
+import { MedicineNameField } from "@/components/medicine-name-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,82 +181,6 @@ const FIELD = "h-11 rounded-xl bg-card";
 const SELECT = "h-11 w-full rounded-xl border bg-card px-3 text-sm";
 /** ช่องที่ยังไม่ครบ — ขอบและวงโฟกัสเป็นสีแดงจนกว่าจะกรอก */
 const INVALID = "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40";
-
-/** ชื่อยาเห็บหมัด — พิมพ์เอง แล้วระบบแสดงชื่อยาในฐานข้อมูลที่ใกล้เคียงให้กดเลือก (ไม่เลือกให้อัตโนมัติ) */
-export function MedicineNameField({
-  value,
-  productId,
-  species,
-  catalog,
-  onChange,
-  inputId,
-  invalid = false,
-  t,
-}: {
-  value: string;
-  productId: string | null;
-  species: Species;
-  catalog: FleaTickProductInfo[];
-  onChange: (patch: { fleaTickMedicine?: string; fleaTickProductId?: string | null }) => void;
-  inputId?: string;
-  invalid?: boolean;
-  t: T;
-}) {
-  const selected = catalog.find((p) => p.id === productId) ?? null;
-  const matches = useMemo(
-    () => (selected ? [] : matchMedicine(value, catalog, species).slice(0, 5)),
-    [selected, value, catalog, species]
-  );
-  const describe = (p: FleaTickProductInfo) =>
-    [p.formula, p.species ? t.labels.species[p.species] : null, t.fleaTick.form[p.form]].filter(Boolean).join(" · ");
-
-  return (
-    <div className="space-y-1.5">
-      <Input
-        id={inputId}
-        className={cn(FIELD, invalid && INVALID)}
-        value={value}
-        onChange={(e) => onChange({ fleaTickMedicine: e.target.value, fleaTickProductId: null })}
-      />
-      {selected ? (
-        <div className="flex items-start justify-between gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <div className="min-w-0">
-            <div className="font-medium">{selected.name}</div>
-            <div className="text-xs text-muted-foreground">{describe(selected)}</div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 shrink-0 px-2 text-xs"
-            onClick={() => onChange({ fleaTickProductId: null })}
-          >
-            {t.fleaTick.change}
-          </Button>
-        </div>
-      ) : (
-        value.trim().length >= 2 &&
-        matches.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>
-            {matches.map(({ product }) => (
-              <button
-                key={product.id}
-                type="button"
-                // เลือกแล้วเติมชื่อเต็มของยาลงช่องให้เลย (ลูกค้าไม่ต้องเห็นคำที่พิมพ์ค้างไว้แค่บางส่วน)
-                onClick={() => onChange({ fleaTickMedicine: product.name, fleaTickProductId: product.id })}
-                className="flex w-full flex-col items-start rounded-xl border bg-card px-3 py-2 text-left text-sm transition-colors hover:bg-accent/40"
-              >
-                <span className="font-medium">{product.name}</span>
-                <span className="text-xs text-muted-foreground">{describe(product)}</span>
-              </button>
-            ))}
-          </div>
-        )
-      )}
-    </div>
-  );
-}
 
 export function OwnerFields({
   owner,
@@ -505,7 +429,6 @@ export function PetFields({
               onChange={(patch) => set(patch)}
               inputId={id("flea-medicine")}
               invalid={bad("flea-medicine")}
-              t={t}
             />
           </div>
           <div className="space-y-1.5">

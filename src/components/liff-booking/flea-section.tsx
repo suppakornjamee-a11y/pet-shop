@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { EMPTY_FLEA, type FleaDraft, type ItemDraft } from "./cart";
 import { dayLabel, declarationError, fleaDataOf } from "./flea-validation";
 import { ImagePicker } from "./image-picker";
-import { MedicineNameField, type FieldError } from "./pet-quick-form";
+import { MedicineNameField } from "@/components/medicine-name-field";
+import type { FieldError } from "./pet-quick-form";
 import { Section, todayStr, type CtxPet, type T } from "./shared";
 
 const FIELD = "h-11 rounded-xl bg-card";
@@ -159,7 +160,6 @@ export function FleaTickSection({
                   productId: patch.fleaTickProductId !== undefined ? patch.fleaTickProductId : flea.productId,
                 })
               }
-              t={t}
             />
           </div>
           <div className="space-y-1.5">
