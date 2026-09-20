@@ -1,4 +1,3 @@
-import { Bug } from "lucide-react";
 import { computeFleaTickStatus, type FleaTickProductInfo, type Species } from "@/lib/flea-tick";
 import { formatDate } from "@/lib/format";
 import { thaiDayRange } from "@/lib/slots";
@@ -47,27 +46,34 @@ export function FleaTickStatusBlock({
     serviceDate,
   });
 
+  // ผ่านแล้วแสดงเป็นตราที่หัวข้อ "ยาเห็บหมัด" แทน จึงไม่ต้องมีป้ายสถานะซ้ำตรงนี้ · ป้ายแสดงเฉพาะที่ต้องให้ความสนใจ
+  const showStatusPill = status.kind !== "COVERED";
+  const showSourcePill = hasData && pet.fleaTickSource === "STAFF_CHECKED";
+
   return (
     <div className={cn("mt-1.5 space-y-1 text-xs", className)}>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Bug className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className={cn("rounded-full px-2 py-0.5 font-medium", TONE[status.kind])}>
-          {t.fleaTick.status[status.kind]}
-        </span>
-        {hasData && pet.fleaTickSource === "STAFF_CHECKED" && (
-          <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
-            {t.fleaTick.source.STAFF_CHECKED}
-          </span>
-        )}
-      </div>
-      {status.nextDueDate && (
-        <div>{t.fleaTick.nextDue(formatDate(thaiDayRange(status.nextDueDate).start))}</div>
+      {(showStatusPill || showSourcePill) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {showStatusPill && (
+            <span className={cn("rounded-full px-2 py-0.5 font-medium", TONE[status.kind])}>
+              {t.fleaTick.status[status.kind]}
+            </span>
+          )}
+          {showSourcePill && (
+            <span className="rounded-full border px-2 py-0.5 text-muted-foreground">
+              {t.fleaTick.source.STAFF_CHECKED}
+            </span>
+          )}
+        </div>
       )}
       {hasData && (
-        <div className="text-muted-foreground">
-          <div>{pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}</div>
+        <div>
+          <div>{t.fleaTick.medicineName(pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-")}</div>
           {pet.lastFleaTickAt && <div>{t.fleaTick.lastGiven(formatDate(pet.lastFleaTickAt))}</div>}
         </div>
+      )}
+      {status.nextDueDate && (
+        <div>{t.fleaTick.nextDue(formatDate(thaiDayRange(status.nextDueDate).start))}</div>
       )}
       {pet.fleaTickProduct?.bathNote && (
         <div className="text-amber-800 dark:text-amber-300">{pet.fleaTickProduct.bathNote}</div>

@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { PaymentPanel } from "@/components/payment-panel";
 import { OrderStatusControl } from "@/components/order-status-control";
 import { DetailSection } from "@/components/order-detail-section";
-import { CustomerPreviewButton } from "@/components/customer-preview-dialog";
+// import { CustomerPreviewButton } from "@/components/customer-preview-dialog"; // ปิดปุ่ม "ดูข้อมูลลูกค้า" ไว้ก่อน
 import { FleaTickStatusBlock } from "@/components/flea-tick-status";
 import { VerifySeal } from "@/components/verify-seal";
 import { computeFleaTickStatus } from "@/lib/flea-tick";
@@ -320,20 +320,30 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               {/* บิลร้านอาหารเป็น walk-in ไม่ผูกลูกค้า/สัตว์เลี้ยง จึงไม่ต้องมีบล็อกนี้ */}
               {!isShopOrder && (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <DetailSection title={t.orders.owner} icon={UserRound}>
-                      <div className="text-sm font-medium">{order.customer?.name ?? "-"}</div>
-                      <div className="mt-0.5 text-sm text-muted-foreground">{order.customer?.phone}</div>
-                      {order.customer && (
-                        <div className="mt-3">
-                          <CustomerPreviewButton customerId={order.customer.id} highlightPetId={order.pet?.id ?? null} />
-                        </div>
-                      )}
-                    </DetailSection>
+                  <DetailSection title={t.orders.owner} icon={UserRound}>
+                    <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">{t.orders.ownerName}</dt>
+                        <dd className="mt-0.5 font-medium">{order.customer?.name ?? "-"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">{t.orders.ownerPhone}</dt>
+                        <dd className="mt-0.5 font-medium">{order.customer?.phone ?? "-"}</dd>
+                      </div>
+                    </dl>
+                    {/* ปิดปุ่ม "ดูข้อมูลลูกค้า" ไว้ก่อน — เปิดกลับได้โดยเอาคอมเมนต์ออกพร้อม import ด้านบน
+                    {order.customer && (
+                      <div className="mt-3">
+                        <CustomerPreviewButton customerId={order.customer.id} highlightPetId={order.pet?.id ?? null} />
+                      </div>
+                    )} */}
+                  </DetailSection>
 
-                    <DetailSection title={t.orders.pet} icon={PawPrint}>
-                      {order.pet ? (
-                        <>
+                  {/* สัตว์เลี้ยง + ยาเห็บหมัดอยู่ส่วนเดียวกัน: ซ้ายข้อมูลสัตว์ ขวาเรื่องยาเห็บหมัด (จอแคบเรียงต่อกัน) */}
+                  <DetailSection title={t.orders.pet} icon={PawPrint}>
+                    {order.pet ? (
+                      <div className={cn("grid gap-4", showFleaSection && "md:grid-cols-2")}>
+                        <div>
                           <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                             <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
                             {allergyText(order.pet.allergies) && (
@@ -342,12 +352,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                           </div>
                           {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}
                           <dl className="mt-2 space-y-1 text-xs">
-                            {order.pet.weightKg ? (
-                              <div>
-                                <dt className="inline text-muted-foreground">{t.liffBook.weight}: </dt>
-                                <dd className="inline">{order.pet.weightKg}</dd>
-                              </div>
-                            ) : null}
+                            {order.pet.weightKg ? <div>{t.orders.petWeight(order.pet.weightKg)}</div> : null}
                             {allergyText(order.pet.groomingCautions) && (
                               <div>
                                 <dt className="inline text-muted-foreground">{t.liffBook.cautions}: </dt>
@@ -361,41 +366,49 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                               </div>
                             )}
                           </dl>
-                        </>
-                      ) : (
-                        <div className="text-sm">-</div>
-                      )}
-                    </DetailSection>
-                  </div>
+                        </div>
 
-                  {showFleaSection && order.pet && (
-                    <DetailSection
-                      title={t.fleaTick.title}
-                      icon={Bug}
-                      titleExtra={fleaPassed && <VerifySeal passed label={t.fleaTick.status.COVERED} />}
-                    >
-                      <div className={cn("grid gap-3", fleaStatusShown && fleaCheck && "md:grid-cols-2")}>
-                        <FleaTickStatusBlock
-                          className="mt-0"
-                          t={t}
-                          pet={order.pet}
-                          serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
-                          alwaysShow={fleaAlwaysShow}
-                        />
-                        {fleaCheck && (
-                          <FleaCheckPanel
-                            className="mt-0"
-                            orderId={order.id}
-                            level={fleaCheck.level}
-                            text={fleaCheck.text}
-                            evidence={fleaCheck.level === "GREEN" ? [] : (order.pet.fleaTickEvidenceUrls ?? [])}
-                            checked={fleaStaffChecked}
-                            canAct={!isGroomer && order.status !== "CANCELLED" && fleaCheck.level !== "GREEN"}
-                          />
+                        {showFleaSection && (
+                          <div className="space-y-2 border-t pt-4 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                <Bug className="h-3.5 w-3.5" />
+                              </span>
+                              <h4 className="text-sm font-semibold">{t.fleaTick.title}</h4>
+                              {fleaPassed && (
+                                <span className="inline-flex items-center gap-1">
+                                  <VerifySeal passed label={t.liffBook.fleaPassed} />
+                                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                    {t.liffBook.fleaPassed}
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                            <FleaTickStatusBlock
+                              className="mt-0"
+                              t={t}
+                              pet={order.pet}
+                              serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
+                              alwaysShow={fleaAlwaysShow}
+                            />
+                            {fleaCheck && (
+                              <FleaCheckPanel
+                                className="mt-0"
+                                orderId={order.id}
+                                level={fleaCheck.level}
+                                text={fleaCheck.text}
+                                evidence={fleaCheck.level === "GREEN" ? [] : (order.pet.fleaTickEvidenceUrls ?? [])}
+                                checked={fleaStaffChecked}
+                                canAct={!isGroomer && order.status !== "CANCELLED" && fleaCheck.level !== "GREEN"}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
-                    </DetailSection>
-                  )}
+                    ) : (
+                      <div className="text-sm">-</div>
+                    )}
+                  </DetailSection>
                 </>
               )}
 
