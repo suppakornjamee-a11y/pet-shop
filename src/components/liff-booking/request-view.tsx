@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bath, Check, Home, Loader2, Scissors, XCircle } from "lucide-react";
+import { Bath, CalendarDays, Check, Clock, Home, Hourglass, Loader2, LogIn, LogOut, Plus, Scissors, X } from "lucide-react";
 import { liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
 import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { toThaiDateStr } from "@/lib/slots";
@@ -61,7 +61,36 @@ function draftFor(o: RequestOrder): ItemDraft {
   return d;
 }
 
-/** การ์ดสรุปรายการ — หน้าตาเดียวกับหน้าจองแบบเดิม */
+const gradientFill = (color: "primary" | "destructive") =>
+  ({
+    backgroundColor: `var(--${color})`,
+    backgroundImage: `linear-gradient(135deg, var(--${color}), color-mix(in oklab, var(--${color}) 55%, white))`,
+  }) as const;
+
+const softGradient = (color: "primary" | "destructive") =>
+  ({
+    backgroundImage:
+      color === "primary"
+        ? "linear-gradient(135deg, color-mix(in oklab, var(--accent) 45%, white), color-mix(in oklab, var(--primary) 6%, white))"
+        : "linear-gradient(135deg, color-mix(in oklab, var(--destructive) 12%, white), color-mix(in oklab, var(--destructive) 4%, white))",
+  }) as const;
+
+/** แถวข้อมูลในการ์ดสรุป — ไอคอนในช่องสี่เหลี่ยมมนหน้าชื่อหัวข้อ ค่าชิดขวา */
+function InfoRow({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="flex items-center gap-2.5 text-muted-foreground">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/40 text-primary">
+          <Icon className="h-4 w-4" />
+        </span>
+        {label}
+      </dt>
+      <dd className="text-right font-semibold">{children}</dd>
+    </div>
+  );
+}
+
+/** การ์ดสรุปรายการแบบตั๋ว — ส่วนบนบอกบริการ/ราคา ส่วนล่างบอกวันเวลา คั่นด้วยเส้นประและรอยบาก */
 function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T; showPaid?: boolean }) {
   const kind = orderKind(order);
   const Icon = KIND_ICONS[kind];
@@ -73,95 +102,132 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
       .map((it) => it.name),
   ];
   return (
-    <div className="rounded-2xl border bg-card p-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
-          <Icon className="h-5 w-5 text-primary" />
+    <div className="overflow-hidden rounded-3xl border bg-card shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+      <div className="flex items-start gap-3 p-4">
+        <span
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm"
+          style={gradientFill("primary")}
+        >
+          <Icon className="h-6 w-6" />
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{[t.liffBook.kind[kind], ...names].join(" · ")}</div>
-          {order.pet && <div className="text-xs text-muted-foreground">{order.pet.name}</div>}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <div className="font-semibold leading-tight">{t.liffBook.kind[kind]}</div>
+            {order.pet && (
+              <div className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+                <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
+              </div>
+            )}
+          </div>
+          {names.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {names.map((n) => (
+                <span key={n} className="rounded-full bg-accent/30 px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                  {n}
+                </span>
+              ))}
+            </div>
+          )}
           {order.groomingStyleNote && (
             <div className="text-xs text-muted-foreground">
               {t.liffBook.styleTitle}: {order.groomingStyleNote}
             </div>
           )}
         </div>
-        <div className="font-semibold text-primary">{formatBaht(order.total)}</div>
+        <div className="text-lg font-bold tabular-nums text-primary">{formatBaht(order.total)}</div>
       </div>
 
-      <div className="my-4 border-t border-dashed" />
+      <div className="relative">
+        <div className="mx-4 border-t border-dashed" />
+        <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
+        <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
+      </div>
 
-      <dl className="space-y-2.5 text-sm">
+      <dl className="space-y-3 p-4 text-sm">
         {kind === "BOARDING" && order.checkInAt && order.checkOutAt ? (
           <>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.orders.form.checkInLabel}</dt>
-              <dd className="text-right font-medium">
-                {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liff.summaryCheckOutLabel}</dt>
-              <dd className="text-right font-medium">
-                {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
-              </dd>
-            </div>
+            <InfoRow icon={LogIn} label={t.orders.form.checkInLabel}>
+              {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
+            </InfoRow>
+            <InfoRow icon={LogOut} label={t.liff.summaryCheckOutLabel}>
+              {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
+            </InfoRow>
           </>
         ) : order.appointmentAt ? (
           <>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liff.summaryDateLabel}</dt>
-              <dd className="text-right font-medium">{formatDateLong(order.appointmentAt)}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liff.summaryTimeLabel}</dt>
-              <dd className="text-right font-medium">
-                {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
-              </dd>
-            </div>
+            <InfoRow icon={CalendarDays} label={t.liff.summaryDateLabel}>
+              {formatDateLong(order.appointmentAt)}
+            </InfoRow>
+            <InfoRow icon={Clock} label={t.liff.summaryTimeLabel}>
+              {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
+            </InfoRow>
           </>
         ) : null}
         {showPaid && (
-          <>
-            <div className="flex items-center justify-between gap-3 border-t border-dashed pt-2.5">
+          <div className="space-y-2 rounded-2xl bg-accent/20 p-3">
+            <div className="flex items-center justify-between gap-3">
               <dt className="text-muted-foreground">{t.liffBook.estimate}</dt>
-              <dd className="text-right font-medium">{formatBaht(order.total)}</dd>
+              <dd className="text-right font-semibold tabular-nums">{formatBaht(order.total)}</dd>
             </div>
             {order.paid >= order.total ? (
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-muted-foreground">{t.orders.payment.fullyPaid}</dt>
-                <dd className="text-right font-medium">{formatBaht(order.paid)}</dd>
+                <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">{t.liffBook.depositPaid}</dt>
-                  <dd className="text-right font-medium">{formatBaht(order.paid)}</dd>
+                  <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">{t.liffBook.remaining}</dt>
-                  <dd className="text-right font-medium">{formatBaht(order.total - order.paid)}</dd>
+                <div className="flex items-center justify-between gap-3 border-t border-dashed border-primary/30 pt-2">
+                  <dt className="font-medium">{t.liffBook.remaining}</dt>
+                  <dd className="text-right text-base font-bold tabular-nums text-primary">{formatBaht(order.total - order.paid)}</dd>
                 </div>
               </>
             )}
-          </>
+          </div>
         )}
       </dl>
     </div>
   );
 }
 
-function StatusHero({ tone, title, children }: { tone: "ok" | "bad"; title: string; children?: React.ReactNode }) {
+/** ป้ายสถานะใต้หัวเรื่อง — live = จุดกะพริบเบาๆ บอกว่ายังรออยู่ (ไม่กะพริบถ้าผู้ใช้ตั้งลดการเคลื่อนไหว) */
+function StatusPill({ live = false, children }: { live?: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-3 pt-2 text-center">
-      <div className={cn("flex h-16 w-16 items-center justify-center rounded-full", tone === "bad" ? "bg-destructive/15" : "bg-accent/40")}>
-        <span className={cn("flex h-11 w-11 items-center justify-center rounded-full", tone === "bad" ? "bg-destructive" : "bg-primary")}>
-          {tone === "bad" ? (
-            <XCircle className="h-5 w-5 text-primary-foreground" />
-          ) : (
-            <Check className="h-5 w-5 text-primary-foreground" strokeWidth={3} />
-          )}
+    <span className="inline-flex items-center gap-2 rounded-full bg-card px-3.5 py-1.5 text-sm font-medium text-primary shadow-sm ring-1 ring-primary/15">
+      {live && (
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+        </span>
+      )}
+      {children}
+    </span>
+  );
+}
+
+/** หัวหน้าสถานะ — wait = รอแอดมินตรวจสอบ (นาฬิกาทราย + วงคลื่นเบาๆ) · ok = สำเร็จ · bad = มีปัญหา */
+function StatusHero({ tone, title, children }: { tone: "ok" | "wait" | "bad"; title: string; children?: React.ReactNode }) {
+  const bad = tone === "bad";
+  const Icon = bad ? X : tone === "wait" ? Hourglass : Check;
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-3.5 overflow-hidden rounded-3xl border px-4 py-7 text-center",
+        bad ? "border-destructive/20" : "border-primary/20"
+      )}
+      style={softGradient(bad ? "destructive" : "primary")}
+    >
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <span className={cn("absolute inset-0 rounded-full", bad ? "bg-destructive/10" : "bg-primary/10")} />
+        {tone === "wait" && <span className="absolute h-14 w-14 rounded-full bg-primary/25 motion-safe:animate-ping" />}
+        <span
+          className="relative flex h-14 w-14 items-center justify-center rounded-full text-primary-foreground shadow-md ring-4 ring-white/80"
+          style={gradientFill(bad ? "destructive" : "primary")}
+        >
+          <Icon className="h-7 w-7" strokeWidth={tone === "wait" ? 2.25 : 3} />
         </span>
       </div>
       <h1 className="text-xl font-bold tracking-tight">{title}</h1>
@@ -290,7 +356,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         <>
           <StatusHero tone="bad" title={t.liff.queueRejectedTitle}>
             {selected.queueRejectReason && (
-              <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+              <p className="rounded-xl bg-card px-3 py-2 text-sm font-medium text-destructive ring-1 ring-destructive/20">
                 {t.liff.slipRejectedReason(selected.queueRejectReason)}
               </p>
             )}
@@ -332,7 +398,9 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         </>
       ) : selected.status === "PENDING_APPROVAL" ? (
         <>
-          <StatusHero tone="ok" title={t.liff.checkingQueueTitle} />
+          <StatusHero tone="wait" title={t.liff.checkingQueueTitle}>
+            <StatusPill live>{t.labels.bookingRequestStatus.PENDING_APPROVAL}</StatusPill>
+          </StatusHero>
           <SummaryCard order={selected} t={t} />
         </>
       ) : selected.status === "CANCELLED" ? (
@@ -343,9 +411,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
       ) : (
         <>
           <StatusHero tone="ok" title={t.liff.inProgressTitle}>
-            <span className="rounded-full bg-accent/40 px-3 py-1 text-xs font-medium text-primary">
-              {t.labels.bookingRequestStatus.CONFIRMED}
-            </span>
+            <StatusPill>{t.labels.bookingRequestStatus.CONFIRMED}</StatusPill>
           </StatusHero>
           <SummaryCard order={selected} t={t} showPaid />
           {isBath && selected.paid < selected.total && (
@@ -355,7 +421,14 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
       )}
 
       {selected.status !== "RESCHEDULE_REQUIRED" && (
-        <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={() => router.push("/liff/book")}>
+        <Button
+          variant="outline"
+          className="h-12 w-full gap-2 rounded-2xl border-dashed border-primary/40 bg-card text-base font-semibold text-primary hover:bg-accent/30 hover:text-primary"
+          onClick={() => router.push("/liff/book")}
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10">
+            <Plus className="h-3.5 w-3.5" />
+          </span>
           {t.liffBook.newBooking}
         </Button>
       )}
