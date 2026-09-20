@@ -156,12 +156,12 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
           ))}
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{t.bookingRequest.totalEstimate}</span>
-          <span className="font-medium">{formatBaht(request.totalEstimate)}</span>
+          <span className="text-muted-foreground">{t.bookingRequest.dueNowTotal}</span>
+          <span className="font-bold">{formatBaht(request.dueNow)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{t.bookingRequest.dueNowTotal}</span>
-          <span className="font-semibold text-primary">{formatBaht(request.dueNow)}</span>
+          <span className="text-muted-foreground">{t.bookingRequest.totalEstimate}</span>
+          <span className="font-bold text-red-600 dark:text-red-400">{formatBaht(request.totalEstimate)}</span>
         </div>
       </CardContent>
 

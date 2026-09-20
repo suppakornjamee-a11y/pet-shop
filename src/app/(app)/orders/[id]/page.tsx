@@ -323,12 +323,12 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                   <DetailSection title={t.orders.owner} icon={UserRound}>
                     <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                       <div>
-                        <dt className="text-xs text-muted-foreground">{t.orders.ownerName}</dt>
-                        <dd className="mt-0.5 font-medium">{order.customer?.name ?? "-"}</dd>
+                        <dt className="text-xs font-light text-foreground/80">{t.orders.ownerName}</dt>
+                        <dd className="mt-0.5 font-semibold">{order.customer?.name ?? "-"}</dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-muted-foreground">{t.orders.ownerPhone}</dt>
-                        <dd className="mt-0.5 font-medium">{order.customer?.phone ?? "-"}</dd>
+                        <dt className="text-xs font-light text-foreground/80">{t.orders.ownerPhone}</dt>
+                        <dd className="mt-0.5 font-semibold">{order.customer?.phone ?? "-"}</dd>
                       </div>
                     </dl>
                     {/* ปิดปุ่ม "ดูข้อมูลลูกค้า" ไว้ก่อน — เปิดกลับได้โดยเอาคอมเมนต์ออกพร้อม import ด้านบน
@@ -352,17 +352,22 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                           </div>
                           {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}
                           <dl className="mt-2 space-y-1 text-xs">
-                            {order.pet.weightKg ? <div>{t.orders.petWeight(order.pet.weightKg)}</div> : null}
+                            {order.pet.weightKg ? (
+                              <div>
+                                <dt className="inline font-light text-foreground/80">{t.orders.petWeightLabel}</dt>{" "}
+                                <dd className="inline font-semibold">{t.orders.petWeightValue(order.pet.weightKg)}</dd>
+                              </div>
+                            ) : null}
                             {allergyText(order.pet.groomingCautions) && (
                               <div>
-                                <dt className="inline text-muted-foreground">{t.liffBook.cautions}: </dt>
-                                <dd className="inline">{allergyText(order.pet.groomingCautions)}</dd>
+                                <dt className="inline font-light text-foreground/80">{t.liffBook.cautions}</dt>{" "}
+                                <dd className="inline font-semibold">{allergyText(order.pet.groomingCautions)}</dd>
                               </div>
                             )}
                             {order.pet.hasChronicDisease && (
                               <div>
-                                <dt className="inline text-muted-foreground">{t.liffBook.disease}: </dt>
-                                <dd className="inline">{order.pet.chronicDiseaseNote || t.liffBook.diseaseYes}</dd>
+                                <dt className="inline font-light text-foreground/80">{t.liffBook.disease}</dt>{" "}
+                                <dd className="inline font-semibold">{order.pet.chronicDiseaseNote || t.liffBook.diseaseYes}</dd>
                               </div>
                             )}
                           </dl>
@@ -377,7 +382,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                               <h4 className="text-sm font-semibold">{t.fleaTick.title}</h4>
                               {fleaPassed && (
                                 <span className="inline-flex items-center gap-1">
-                                  <VerifySeal passed label={t.liffBook.fleaPassed} />
+                                  <VerifySeal passed label={t.liffBook.fleaPassed} className="h-[18px] w-[18px]" />
                                   <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                                     {t.liffBook.fleaPassed}
                                   </span>

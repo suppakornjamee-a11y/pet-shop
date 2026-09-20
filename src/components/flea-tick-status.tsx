@@ -10,6 +10,15 @@ const TONE = {
   INCOMPLETE: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
 } as const;
 
+/** บรรทัดข้อมูล: ชื่อหัวข้อตัวบาง ตามด้วยข้อมูลตัวหนา */
+function FleaLine({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="font-light text-foreground/80">{label}</span> <span className="font-semibold">{children}</span>
+    </div>
+  );
+}
+
 /**
  * สถานะยาเห็บหมัดของสัตว์เลี้ยงเทียบกับวันบริการ — ใช้ข้อมูลสัตว์เลี้ยงปัจจุบัน (ลูกค้าอัปเดตแล้วเห็นทันที)
  * แสดงแหล่งที่มาของข้อมูลเสมอ ให้พนักงานรู้ว่าเป็นแค่ที่ลูกค้าแจ้ง หรือเห็นหลักฐานแล้ว
@@ -67,13 +76,13 @@ export function FleaTickStatusBlock({
         </div>
       )}
       {hasData && (
-        <div>
-          <div>{t.fleaTick.medicineName(pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-")}</div>
-          {pet.lastFleaTickAt && <div>{t.fleaTick.lastGiven(formatDate(pet.lastFleaTickAt))}</div>}
-        </div>
+        <FleaLine label={t.fleaTick.medicineLabel}>{pet.fleaTickProduct?.name ?? pet.fleaTickMedicine ?? "-"}</FleaLine>
+      )}
+      {hasData && pet.lastFleaTickAt && (
+        <FleaLine label={t.fleaTick.lastGivenLabel}>{formatDate(pet.lastFleaTickAt)}</FleaLine>
       )}
       {status.nextDueDate && (
-        <div>{t.fleaTick.nextDue(formatDate(thaiDayRange(status.nextDueDate).start))}</div>
+        <FleaLine label={t.fleaTick.nextDueLabel}>{formatDate(thaiDayRange(status.nextDueDate).start)}</FleaLine>
       )}
       {pet.fleaTickProduct?.bathNote && (
         <div className="text-amber-800 dark:text-amber-300">{pet.fleaTickProduct.bathNote}</div>
