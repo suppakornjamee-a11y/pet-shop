@@ -6,7 +6,7 @@ import { Loader2, XCircle } from "lucide-react";
 import { liffGetProfile, liffUpdateProfile } from "@/app/actions/liff";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
-import { PageHeader } from "@/components/page-header";
+import { LiffTabs } from "@/components/liff-tabs";
 import { RegisterForm } from "@/components/register-form";
 
 type ProfileResult = Extract<Awaited<ReturnType<typeof liffGetProfile>>, { ok: true }>;
@@ -62,8 +62,11 @@ function ProfileBody() {
   }
 
   return (
-    <div>
-      <PageHeader title={t.liff.profilePageTitle} description={t.liff.profilePageDescription} />
+    <div className="pb-20">
+      <div className="mb-5">
+        <h1 className="text-lg font-semibold">{t.liff.profilePageTitle}</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">{t.liff.profilePageDescription}</p>
+      </div>
       <RegisterForm
         mode="edit"
         customerId={profile.customerId}
@@ -77,6 +80,7 @@ function ProfileBody() {
         }}
         onSuccess={() => router.push("/liff/book")}
       />
+      <LiffTabs />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Bath, Home, Info, Loader2, Pencil, Plus, Scissors, Send, ShoppingBag, Trash2, Wallet } from "lucide-react";
+import { ArrowLeft, Bath, Home, Info, Loader2, Pencil, Plus, Scissors, ShoppingBag, Trash2 } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
 import { RegisterForm } from "@/components/register-form";
+import { LiffTabs } from "@/components/liff-tabs";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,7 @@ import {
   type OwnerDraft,
   type PetDraft,
 } from "./pet-quick-form";
-import { ItemDetail, ReviewDialog, draftReady, whenLabel } from "./item-detail";
+import { ItemDetail, draftReady, whenLabel } from "./item-detail";
 import { validateFleaForDraft } from "./flea-section";
 import { fleaDataOf } from "./flea-validation";
 import {
@@ -160,7 +161,6 @@ function BookingBody() {
   // หน้ารายละเอียดรายการ
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(false);
 
   const loadContext = useCallback(async () => {
     if (!idToken) return;
@@ -319,20 +319,19 @@ function BookingBody() {
       dueNow: est.dueNow,
     };
     updateCart(editingKey ? cart.map((e) => (e.key === editingKey ? entry : e)) : [...cart, entry]);
-    setReviewOpen(false);
     setDraft(null);
     setEditingKey(null);
     setStage("cart");
     window.scrollTo({ top: 0 });
   }
 
-  /** ก่อนเปิดหน้าต่างตรวจสอบรายการ: ตรวจคำตอบเรื่องยาเห็บหมัด ถ้ายังไม่ครบชี้ช่องให้ */
-  function openReview() {
+  /** ก่อนเพิ่มลงรายการจอง: ตรวจคำตอบเรื่องยาเห็บหมัด ถ้ายังไม่ครบชี้ช่องให้ */
+  function addChecked() {
     if (!draft || !draftPet) return;
     const err = validateFleaForDraft(draft, draftPet, catalog, t);
     if (err) return reject(err);
     setInvalidId(null);
-    setReviewOpen(true);
+    addToCart();
   }
 
   function editEntry(e: CartEntry) {
@@ -395,17 +394,6 @@ function BookingBody() {
           t={t}
         />
 
-        <ReviewDialog
-          open={reviewOpen}
-          onOpenChange={setReviewOpen}
-          draft={draft}
-          pet={draftPet}
-          services={draftServices}
-          rooms={rooms}
-          onConfirm={addToCart}
-          t={t}
-        />
-
         <BottomBar
           summary={
             <div className="leading-tight">
@@ -419,9 +407,9 @@ function BookingBody() {
           <Button
             className="h-12 w-full rounded-xl text-base"
             disabled={!draftReady(draft, draftServices, rooms)}
-            onClick={openReview}
+            onClick={addChecked}
           >
-            {t.liffBook.review}
+            {t.liffBook.addToCart}
           </Button>
         </BottomBar>
       </div>
@@ -437,29 +425,7 @@ function BookingBody() {
     return (
       <div className="space-y-4 pb-28">
         <Header onBack={() => setStage("start")} cartCount={0} t={t} />
-        <div
-          className="flex items-center gap-3 rounded-3xl border border-primary/20 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
-          style={{
-            backgroundImage:
-              "linear-gradient(135deg, color-mix(in oklab, var(--accent) 45%, white), color-mix(in oklab, var(--primary) 6%, white))",
-          }}
-        >
-          <span
-            className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm ring-4 ring-white/70"
-            style={{
-              backgroundColor: "var(--primary)",
-              backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
-            }}
-          >
-            <ShoppingBag className="h-6 w-6" />
-            {sorted.length > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-foreground px-1 text-[0.625rem] font-semibold text-background">
-                {sorted.length}
-              </span>
-            )}
-          </span>
-          <h1 className="min-w-0 flex-1 text-xl font-bold leading-tight">{t.liffBook.cartTitle}</h1>
-        </div>
+        <h1 className="text-lg font-semibold">{t.liffBook.cartTitle}</h1>
 
         {sorted.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{t.liffBook.cartEmpty}</p>
@@ -524,73 +490,42 @@ function BookingBody() {
             <Button
               key={b.label}
               variant="outline"
-              className="h-12 min-w-0 gap-1.5 rounded-2xl border-dashed border-primary/40 bg-card px-2 text-[0.8125rem] font-semibold text-primary hover:bg-accent/30 hover:text-primary sm:text-sm"
+              className="h-11 min-w-0 gap-1.5 rounded-xl px-2 text-[0.8125rem] sm:text-sm"
               onClick={() => {
                 setKind(b.kind);
                 setStage("start");
               }}
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Plus className="h-3.5 w-3.5" />
-              </span>
+              <Plus className="h-4 w-4 shrink-0" />
               <span className="truncate">{b.label}</span>
             </Button>
           ))}
         </div>
 
         {cart.length > 0 && (
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-3xl border border-primary/25 bg-card shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-              <div
-                className="space-y-1.5 p-4"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(135deg, color-mix(in oklab, var(--accent) 40%, white), color-mix(in oklab, var(--primary) 6%, white))",
-                }}
-              >
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-sm ring-4 ring-primary/10"
-                    style={{
-                      backgroundColor: "var(--primary)",
-                      backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
-                    }}
-                  >
-                    <Wallet className="h-4 w-4" />
-                  </span>
-                  {t.liffBook.estimate}
-                </div>
-                <div className="text-right text-4xl font-extrabold leading-none tabular-nums text-primary">
-                  {formatBaht(totalEstimate)}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="text-sm font-medium">{t.liffBook.dueAfterApproval}</span>
-                <span className="text-lg font-bold tabular-nums">{formatBaht(totalDue)}</span>
-              </div>
+          <div className="space-y-3 rounded-2xl border bg-card p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm">{t.liffBook.estimate}</span>
+              <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
             </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Info className="h-4 w-4" />
-              </span>
-              <p className="min-w-0 flex-1 pt-1 text-sm leading-relaxed text-foreground/80">{t.liffBook.confirmNotice}</p>
+            <div className="flex items-baseline justify-between gap-3 border-t pt-3">
+              <span className="text-sm text-muted-foreground">{t.liffBook.dueAfterApproval}</span>
+              <span className="font-semibold tabular-nums">{formatBaht(totalDue)}</span>
             </div>
           </div>
         )}
 
         {cart.length > 0 && (
+          <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t.liffBook.confirmNotice}
+          </p>
+        )}
+
+        {cart.length > 0 && (
           <BottomBar>
-            <Button
-              className="h-12 w-full rounded-2xl text-base font-semibold shadow-md transition active:scale-[0.98]"
-              style={{
-                backgroundColor: "var(--primary)",
-                backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 78%, white))",
-              }}
-              disabled={isPending}
-              onClick={submit}
-            >
-              {isPending ? <Loader2 className="animate-spin" /> : <Send />}
+            <Button className="h-12 w-full rounded-xl text-base" disabled={isPending} onClick={submit}>
+              {isPending && <Loader2 className="animate-spin" />}
               {t.liffBook.submit}
             </Button>
           </BottomBar>
@@ -741,6 +676,8 @@ function BookingBody() {
           </Button>
         </BottomBar>
       )}
+
+      {ctx.linked && !kind && <LiffTabs />}
     </div>
   );
 }

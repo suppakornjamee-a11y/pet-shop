@@ -599,13 +599,10 @@ const en: Dictionary = {
     priceNote:
       "Estimate based on the weight given. The shop will weigh and assess on the day. To change services, tell the groomer before they start.",
     depositNote: "The deposit is taken off the total; the final price is settled after the bath.",
-    review: "Review",
-    reviewMessage: "Please check this pet's booking. You can add more pets or services on the next page.",
     addToCart: "Add to booking list",
     edit: "Edit",
     remove: "Remove",
     health: "Health & cautions",
-    when: "Date & time",
     cartTitle: "Booking list",
     cartEmpty: "No bookings yet",
     addAnotherPet: "Add a bath",
@@ -616,7 +613,6 @@ const en: Dictionary = {
     requestTitle: (code: string) => `Booking request ${code}`,
     rescheduleReason: (r: string) => `Reason: ${r}`,
     resubmit: "Send back for review",
-    newBooking: "Book another service",
   },
   bookingRequest: {
     title: "Booking request",

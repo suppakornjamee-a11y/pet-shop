@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -538,109 +537,10 @@ export function draftReady(draft: ItemDraft, services: Service[], rooms: Room[])
   return draft.serviceIds.some((id) => services.some((s) => s.id === id && !s.defaultOn));
 }
 
-/* ---------- หน้าต่างตรวจสอบรายการของสัตว์ตัวนี้ ---------- */
-
-export function healthLines(pet: CtxPet, t: T): string[] {
-  return [
-    pet.allergies ? `${t.liffBook.allergies}: ${pet.allergies}` : null,
-    pet.hasChronicDisease != null
-      ? `${t.liffBook.disease}: ${pet.hasChronicDisease ? pet.chronicDiseaseNote || t.liffBook.diseaseYes : t.liffBook.diseaseNo}`
-      : null,
-    pet.groomingCautions ? `${t.liffBook.cautions}: ${pet.groomingCautions}` : null,
-  ].filter((l): l is string => !!l);
-}
-
 export function whenLabel(draft: ItemDraft, t: T): string[] {
   const day = (d: string) => formatDateLong(thaiDayRange(d).start);
   if (draft.kind === "BOARDING") {
     return [t.liff.confirmCheckInLine(day(draft.date), draft.checkInTime), t.liff.confirmCheckOutLine(day(draft.checkOutDate), draft.checkOutTime)];
   }
   return [`${day(draft.date)} ${draft.time} ${t.liff.timeUnitSuffix}`];
-}
-
-export function ReviewDialog({
-  open,
-  onOpenChange,
-  draft,
-  pet,
-  services,
-  rooms,
-  onConfirm,
-  t,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  draft: ItemDraft;
-  pet: CtxPet;
-  services: Service[];
-  rooms: Room[];
-  onConfirm: () => void;
-  t: T;
-}) {
-  const est = estimateDraft(draft, services, rooms);
-  const names = [...(est.room ? [`${est.room.category.name} · ${est.room.name}`] : []), ...est.serviceNames];
-  const health = healthLines(pet, t);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-3xl sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t.liffBook.review}</DialogTitle>
-        </DialogHeader>
-        <dl className="space-y-3 text-sm">
-          <div>
-            <dt className="text-xs text-muted-foreground">{t.liffBook.petName}</dt>
-            <dd className="font-semibold">
-              {pet.name}
-              {pet.weightKg ? <span className="font-normal text-muted-foreground"> · {pet.weightKg} กก.</span> : null}
-            </dd>
-          </div>
-          {health.length > 0 && (
-            <div>
-              <dt className="text-xs text-muted-foreground">{t.liffBook.health}</dt>
-              {health.map((l) => (
-                <dd key={l}>{l}</dd>
-              ))}
-            </div>
-          )}
-          <div>
-            <dt className="text-xs text-muted-foreground">{t.liffBook.kind[draft.kind]}</dt>
-            {names.map((n) => (
-              <dd key={n}>{n}</dd>
-            ))}
-            {draft.kind === "BATH" && draft.styleNote && (
-              <dd className="text-muted-foreground">
-                {t.liffBook.styleTitle}: {draft.styleNote}
-              </dd>
-            )}
-            {draft.kind === "BATH" && draft.styleImages.length > 0 && (
-              <dd className="mt-1 flex gap-1.5">
-                {draft.styleImages.map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={src} alt="" className="h-12 w-12 rounded-lg object-cover" />
-                ))}
-              </dd>
-            )}
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">{t.liffBook.when}</dt>
-            {whenLabel(draft, t).map((l) => (
-              <dd key={l}>{l}</dd>
-            ))}
-          </div>
-          <div className="space-y-1 rounded-2xl bg-muted/50 p-3">
-            <div className="flex justify-between gap-3">
-              <span>{t.liffBook.estimate}</span>
-              <span className="font-semibold">{formatBaht(est.estimate)}</span>
-            </div>
-            {draft.kind === "BATH" && <p className="font-medium">{t.liffBook.bathDeposit}</p>}
-          </div>
-        </dl>
-        <p className="text-sm text-muted-foreground">{t.liffBook.reviewMessage}</p>
-        <Button className="h-12 w-full rounded-2xl text-base" onClick={onConfirm}>
-          {t.liffBook.addToCart}
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
 }

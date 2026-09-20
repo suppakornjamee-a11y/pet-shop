@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bath, CalendarDays, Check, Clock, Home, Hourglass, Loader2, LogIn, LogOut, Plus, Scissors, X } from "lucide-react";
+import { Check, Hourglass, Loader2, X } from "lucide-react";
 import { liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
 import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { toThaiDateStr } from "@/lib/slots";
@@ -11,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
 import { LiffPaymentBody } from "@/components/liff-payment-view";
+import { LiffTabs } from "@/components/liff-tabs";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ type RequestData = Extract<Awaited<ReturnType<typeof liffGetBookingRequest>>, { 
 type RequestOrder = RequestData["orders"][number];
 
 const POLL_MS = 8000;
-const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Bath, OTHER: Scissors };
 
 /** ขั้นของแถบด้านบน ตามสถานะของรายการที่กำลังดู — แต่ละรายการเดินหน้าแยกกัน (แอดมินอนุมัติทีละรายการ) */
 function stepOf(o: RequestOrder): Step {
@@ -61,39 +60,19 @@ function draftFor(o: RequestOrder): ItemDraft {
   return d;
 }
 
-const gradientFill = (color: "primary" | "destructive") =>
-  ({
-    backgroundColor: `var(--${color})`,
-    backgroundImage: `linear-gradient(135deg, var(--${color}), color-mix(in oklab, var(--${color}) 55%, white))`,
-  }) as const;
-
-const softGradient = (color: "primary" | "destructive") =>
-  ({
-    backgroundImage:
-      color === "primary"
-        ? "linear-gradient(135deg, color-mix(in oklab, var(--accent) 45%, white), color-mix(in oklab, var(--primary) 6%, white))"
-        : "linear-gradient(135deg, color-mix(in oklab, var(--destructive) 12%, white), color-mix(in oklab, var(--destructive) 4%, white))",
-  }) as const;
-
-/** แถวข้อมูลในการ์ดสรุป — ไอคอนในช่องสี่เหลี่ยมมนหน้าชื่อหัวข้อ ค่าชิดขวา */
-function InfoRow({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
+/** แถวข้อมูลในการ์ดสรุป — ชื่อหัวข้อจางๆ ค่าชิดขวา */
+function InfoRow({ label, children, strong = false }: { label: string; children: React.ReactNode; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="flex items-center gap-2.5 text-muted-foreground">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/40 text-primary">
-          <Icon className="h-4 w-4" />
-        </span>
-        {label}
-      </dt>
-      <dd className="text-right font-semibold">{children}</dd>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn("text-right font-medium tabular-nums", strong && "font-semibold text-primary")}>{children}</dd>
     </div>
   );
 }
 
-/** การ์ดสรุปรายการแบบตั๋ว — ส่วนบนบอกบริการ/ราคา ส่วนล่างบอกวันเวลา คั่นด้วยเส้นประและรอยบาก */
+/** การ์ดสรุปรายการ — ส่วนบนบอกบริการ/ราคา ส่วนล่างบอกวันเวลา */
 function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T; showPaid?: boolean }) {
   const kind = orderKind(order);
-  const Icon = KIND_ICONS[kind];
   const names = [
     ...(order.room ? [`${order.room.category.name} · ${order.room.name}`] : []),
     ...order.items
@@ -102,143 +81,88 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
       .map((it) => it.name),
   ];
   return (
-    <div className="overflow-hidden rounded-3xl border bg-card shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-      <div className="flex items-start gap-3 p-4">
-        <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm"
-          style={gradientFill("primary")}
-        >
-          <Icon className="h-6 w-6" />
-        </span>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <div className="font-semibold leading-tight">{t.liffBook.kind[kind]}</div>
-            {order.pet && (
-              <div className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
-                <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
-              </div>
-            )}
-          </div>
-          {names.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {names.map((n) => (
-                <span key={n} className="rounded-full bg-accent/30 px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  {n}
-                </span>
-              ))}
-            </div>
-          )}
-          {order.groomingStyleNote && (
-            <div className="text-xs text-muted-foreground">
-              {t.liffBook.styleTitle}: {order.groomingStyleNote}
+    <div className="rounded-2xl border bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-semibold">{t.liffBook.kind[kind]}</div>
+          {order.pet && (
+            <div className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+              <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
             </div>
           )}
         </div>
-        <div className="text-lg font-bold tabular-nums text-primary">{formatBaht(order.total)}</div>
+        <div className="font-semibold tabular-nums">{formatBaht(order.total)}</div>
       </div>
+      {names.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{names.join(" · ")}</p>}
+      {order.groomingStyleNote && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t.liffBook.styleTitle}: {order.groomingStyleNote}
+        </p>
+      )}
 
-      <div className="relative">
-        <div className="mx-4 border-t border-dashed" />
-        <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
-        <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
-      </div>
-
-      <dl className="space-y-3 p-4 text-sm">
+      <dl className="mt-3 space-y-2 border-t pt-3 text-sm">
         {kind === "BOARDING" && order.checkInAt && order.checkOutAt ? (
           <>
-            <InfoRow icon={LogIn} label={t.orders.form.checkInLabel}>
+            <InfoRow label={t.orders.form.checkInLabel}>
               {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
             </InfoRow>
-            <InfoRow icon={LogOut} label={t.liff.summaryCheckOutLabel}>
+            <InfoRow label={t.liff.summaryCheckOutLabel}>
               {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
             </InfoRow>
           </>
         ) : order.appointmentAt ? (
           <>
-            <InfoRow icon={CalendarDays} label={t.liff.summaryDateLabel}>
-              {formatDateLong(order.appointmentAt)}
-            </InfoRow>
-            <InfoRow icon={Clock} label={t.liff.summaryTimeLabel}>
+            <InfoRow label={t.liff.summaryDateLabel}>{formatDateLong(order.appointmentAt)}</InfoRow>
+            <InfoRow label={t.liff.summaryTimeLabel}>
               {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
             </InfoRow>
           </>
         ) : null}
-        {showPaid && (
-          <div className="space-y-2 rounded-2xl bg-accent/20 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liffBook.estimate}</dt>
-              <dd className="text-right font-semibold tabular-nums">{formatBaht(order.total)}</dd>
-            </div>
-            {order.paid >= order.total ? (
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted-foreground">{t.orders.payment.fullyPaid}</dt>
-                <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">{t.liffBook.depositPaid}</dt>
-                  <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3 border-t border-dashed border-primary/30 pt-2">
-                  <dt className="font-medium">{t.liffBook.remaining}</dt>
-                  <dd className="text-right text-base font-bold tabular-nums text-primary">{formatBaht(order.total - order.paid)}</dd>
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </dl>
+
+      {showPaid && (
+        <dl className="mt-3 space-y-2 border-t border-dashed pt-3 text-sm">
+          <InfoRow label={t.liffBook.estimate}>{formatBaht(order.total)}</InfoRow>
+          {order.paid >= order.total ? (
+            <InfoRow label={t.orders.payment.fullyPaid}>{formatBaht(order.paid)}</InfoRow>
+          ) : (
+            <>
+              <InfoRow label={t.liffBook.depositPaid}>{formatBaht(order.paid)}</InfoRow>
+              <InfoRow label={t.liffBook.remaining} strong>
+                {formatBaht(order.total - order.paid)}
+              </InfoRow>
+            </>
+          )}
+        </dl>
+      )}
     </div>
   );
 }
 
-/** ป้ายสถานะใต้หัวเรื่อง — live = จุดกะพริบเบาๆ บอกว่ายังรออยู่ (ไม่กะพริบถ้าผู้ใช้ตั้งลดการเคลื่อนไหว) */
-function StatusPill({ live = false, children }: { live?: boolean; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-card px-3.5 py-1.5 text-sm font-medium text-primary shadow-sm ring-1 ring-primary/15">
-      {live && (
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-        </span>
-      )}
-      {children}
-    </span>
-  );
-}
-
-/** หัวหน้าสถานะ — wait = รอแอดมินตรวจสอบ (นาฬิกาทราย + วงคลื่นเบาๆ) · ok = สำเร็จ · bad = มีปัญหา */
+/** หัวสถานะ — wait = รอแอดมินตรวจสอบ · ok = สำเร็จ · bad = มีปัญหา (ไอคอนวงกลมเล็ก + ชื่อสถานะ + บรรทัดรอง) */
 function StatusHero({ tone, title, children }: { tone: "ok" | "wait" | "bad"; title: string; children?: React.ReactNode }) {
   const bad = tone === "bad";
   const Icon = bad ? X : tone === "wait" ? Hourglass : Check;
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-3.5 overflow-hidden rounded-3xl border px-4 py-7 text-center",
-        bad ? "border-destructive/20" : "border-primary/20"
-      )}
-      style={softGradient(bad ? "destructive" : "primary")}
-    >
-      <div className="relative flex h-20 w-20 items-center justify-center">
-        <span className={cn("absolute inset-0 rounded-full", bad ? "bg-destructive/10" : "bg-primary/10")} />
-        {tone === "wait" && <span className="absolute h-14 w-14 rounded-full bg-primary/25 motion-safe:animate-ping" />}
-        <span
-          className="relative flex h-14 w-14 items-center justify-center rounded-full text-primary-foreground shadow-md ring-4 ring-white/80"
-          style={gradientFill(bad ? "destructive" : "primary")}
-        >
-          <Icon className="h-7 w-7" strokeWidth={tone === "wait" ? 2.25 : 3} />
-        </span>
+    <div className="flex items-center gap-3">
+      <span
+        className={cn(
+          "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+          bad ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <h1 className="text-lg font-semibold leading-tight">{title}</h1>
+        {children}
       </div>
-      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
-      {children}
     </div>
   );
 }
 
 function RequestBody({ requestId, initialOrderId }: { requestId: string; initialOrderId?: string }) {
   const { t } = useI18n();
-  const router = useRouter();
   const { idToken } = useLiff();
   const [data, setData] = useState<RequestData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -319,7 +243,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
   const canResubmit = !!draft && (draft.kind === "BOARDING" ? !!draft.date && !!draft.checkOutDate : !!draft.time);
 
   return (
-    <div className={cn("space-y-5 py-2", selected.status === "RESCHEDULE_REQUIRED" && "pb-28")}>
+    <div className={cn("space-y-5 py-2", selected.status === "RESCHEDULE_REQUIRED" ? "pb-28" : "pb-20")}>
       <Stepper step={stepOf(selected)} t={t} />
 
       {data.orders.length > 1 && (
@@ -356,9 +280,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         <>
           <StatusHero tone="bad" title={t.liff.queueRejectedTitle}>
             {selected.queueRejectReason && (
-              <p className="rounded-xl bg-card px-3 py-2 text-sm font-medium text-destructive ring-1 ring-destructive/20">
-                {t.liff.slipRejectedReason(selected.queueRejectReason)}
-              </p>
+              <p className="text-sm text-destructive">{t.liff.slipRejectedReason(selected.queueRejectReason)}</p>
             )}
           </StatusHero>
           <SummaryCard order={selected} t={t} />
@@ -399,7 +321,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
       ) : selected.status === "PENDING_APPROVAL" ? (
         <>
           <StatusHero tone="wait" title={t.liff.checkingQueueTitle}>
-            <StatusPill live>{t.labels.bookingRequestStatus.PENDING_APPROVAL}</StatusPill>
+            <p className="text-sm text-muted-foreground">{t.labels.bookingRequestStatus.PENDING_APPROVAL}</p>
           </StatusHero>
           <SummaryCard order={selected} t={t} />
         </>
@@ -411,7 +333,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
       ) : (
         <>
           <StatusHero tone="ok" title={t.liff.inProgressTitle}>
-            <StatusPill>{t.labels.bookingRequestStatus.CONFIRMED}</StatusPill>
+            <p className="text-sm text-muted-foreground">{t.labels.bookingRequestStatus.CONFIRMED}</p>
           </StatusHero>
           <SummaryCard order={selected} t={t} showPaid />
           {isBath && selected.paid < selected.total && (
@@ -420,18 +342,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         </>
       )}
 
-      {selected.status !== "RESCHEDULE_REQUIRED" && (
-        <Button
-          variant="outline"
-          className="h-12 w-full gap-2 rounded-2xl border-dashed border-primary/40 bg-card text-base font-semibold text-primary hover:bg-accent/30 hover:text-primary"
-          onClick={() => router.push("/liff/book")}
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10">
-            <Plus className="h-3.5 w-3.5" />
-          </span>
-          {t.liffBook.newBooking}
-        </Button>
-      )}
+      {selected.status !== "RESCHEDULE_REQUIRED" && <LiffTabs />}
     </div>
   );
 }
