@@ -30,7 +30,7 @@ import { OrderStatusControl } from "@/components/order-status-control";
 import { DetailSection } from "@/components/order-detail-section";
 // import { CustomerPreviewButton } from "@/components/customer-preview-dialog"; // ปิดปุ่ม "ดูข้อมูลลูกค้า" ไว้ก่อน
 import { FleaTickStatusBlock } from "@/components/flea-tick-status";
-import { VerifySeal } from "@/components/verify-seal";
+import { SealLabel } from "@/components/verify-seal";
 import { computeFleaTickStatus } from "@/lib/flea-tick";
 import { BookingRequestPanel, type BookingRequestView } from "@/components/booking-request-panel";
 import { amountDueNow } from "@/lib/booking-request";
@@ -234,7 +234,11 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="whitespace-nowrap text-base">{t.orders.orderDetails}</CardTitle>
-                  <OrderStatusBadges info={badgeInfo} t={t} />
+                  {badgeInfo.kind === "PLAIN" && badgeInfo.status === "PENDING_APPROVAL" ? (
+                    <SealLabel passed={false}>{t.orders.pendingReview}</SealLabel>
+                  ) : (
+                    <OrderStatusBadges info={badgeInfo} t={t} />
+                  )}
                 </div>
                 <OrderStatusControl
                   isShopOrder={isShopOrder}
@@ -380,14 +384,7 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                                 <Bug className="h-3.5 w-3.5" />
                               </span>
                               <h4 className="text-sm font-semibold">{t.fleaTick.title}</h4>
-                              {fleaPassed && (
-                                <span className="inline-flex items-center gap-1">
-                                  <VerifySeal passed label={t.liffBook.fleaPassed} className="h-[18px] w-[18px]" />
-                                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                    {t.liffBook.fleaPassed}
-                                  </span>
-                                </span>
-                              )}
+                              {fleaPassed && <SealLabel passed>{t.liffBook.fleaPassed}</SealLabel>}
                             </div>
                             <FleaTickStatusBlock
                               className="mt-0"

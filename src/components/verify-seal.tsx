@@ -34,3 +34,20 @@ export function VerifySeal({ passed, label, className }: { passed: boolean; labe
     </svg>
   );
 }
+
+/** ตราไอคอน + ข้อความสีเดียวกัน เช่น "ผ่านการให้ยาแล้ว" (เขียว) · "รอตรวจสอบ" (เหลืองอำพัน + นาฬิกา) */
+export function SealLabel({ passed, children }: { passed: boolean; children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <VerifySeal passed={passed} label={children} className="h-[18px] w-[18px]" />
+      <span
+        className={cn(
+          "text-xs font-medium",
+          passed ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
+        )}
+      >
+        {children}
+      </span>
+    </span>
+  );
+}

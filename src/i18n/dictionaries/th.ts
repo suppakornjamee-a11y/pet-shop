@@ -349,6 +349,7 @@ const th = {
     depositBadge: (amount: string) => `มัดจำ ${amount}`,
     owner: "เจ้าของ",
     ownerName: "ชื่อ",
+    pendingReview: "รอตรวจสอบ",
     ownerPhone: "เบอร์ติดต่อ",
     petWeightLabel: "น้ำหนัก",
     petWeightValue: (kg: number) => `${kg} กิโลกรัม`,
@@ -649,7 +650,7 @@ const th = {
     noMatchHint: "ไม่พบในฐานข้อมูลยา แอดมินจะตรวจสอบให้",
     evidenceLabel: "รูปกล่องยา / หลักฐานจากคลินิก",
     check: {
-      level: { GREEN: "ผ่านอัตโนมัติ", YELLOW: "ลูกค้าแจ้งข้อมูลใหม่ (มีหลักฐาน)", RED: "ต้องตรวจสอบ" },
+      level: { GREEN: "ผ่านอัตโนมัติ", YELLOW: "รอตรวจสอบข้อมูลยาเห็บหมัด", RED: "ต้องตรวจสอบ" },
       confirm: "ยืนยันข้อมูลยาเห็บหมัดแล้ว",
       request: "ขอข้อมูลเพิ่ม",
       requestTitle: "ขอข้อมูลยาเห็บหมัดเพิ่มเติม",

@@ -336,6 +336,7 @@ const en: Dictionary = {
     depositBadge: (amount: string) => `Deposit ${amount}`,
     owner: "Owner",
     ownerName: "Name",
+    pendingReview: "Pending review",
     ownerPhone: "Contact number",
     petWeightLabel: "Weight",
     petWeightValue: (kg: number) => `${kg} kg`,
@@ -634,7 +635,7 @@ const en: Dictionary = {
     noMatchHint: "Not in the medicine list. An admin will check it.",
     evidenceLabel: "Photo of the box / clinic record",
     check: {
-      level: { GREEN: "Passed automatically", YELLOW: "Customer updated (with evidence)", RED: "Needs review" },
+      level: { GREEN: "Passed automatically", YELLOW: "Flea & tick info pending review", RED: "Needs review" },
       confirm: "Mark flea & tick info as checked",
       request: "Ask for more info",
       requestTitle: "Ask for more flea & tick information",

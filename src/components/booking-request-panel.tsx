@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { notifyStaffAlertsChanged } from "@/lib/staff-alerts-signal";
 import { useI18n } from "@/components/i18n-provider";
 import { SpeciesIcon } from "@/components/species-icon";
+import { SealLabel } from "@/components/verify-seal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -99,9 +100,13 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
         <div className="space-y-1">
           <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             {t.bookingRequest.title} {request.code}
-            <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", TONE[request.status])}>
-              {t.labels.bookingRequestStatus[request.status]}
-            </span>
+            {request.status === "PENDING_APPROVAL" ? (
+              <SealLabel passed={false}>{t.orders.pendingReview}</SealLabel>
+            ) : (
+              <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", TONE[request.status])}>
+                {t.labels.bookingRequestStatus[request.status]}
+              </span>
+            )}
           </CardTitle>
           {request.status === "NEEDS_RESCHEDULE" && request.rescheduleReason && (
             <p className="text-sm text-fuchsia-700 dark:text-fuchsia-300">
@@ -155,13 +160,15 @@ export function BookingRequestPanel({ request, canManage }: { request: BookingRe
             </Link>
           ))}
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{t.bookingRequest.dueNowTotal}</span>
-          <span className="font-bold">{formatBaht(request.dueNow)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{t.bookingRequest.totalEstimate}</span>
-          <span className="font-bold text-red-600 dark:text-red-400">{formatBaht(request.totalEstimate)}</span>
+        <div className="space-y-0.5">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="text-muted-foreground">{t.bookingRequest.dueNowTotal}</span>
+            <span className="font-bold">{formatBaht(request.dueNow)}</span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-muted-foreground">{t.bookingRequest.totalEstimate}</span>
+            <span className="text-xl font-bold text-red-600 dark:text-red-400">{formatBaht(request.totalEstimate)}</span>
+          </div>
         </div>
       </CardContent>
 
