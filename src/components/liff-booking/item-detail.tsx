@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import { Clock, ImagePlus, Loader2, Video, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Clock, Loader2, Video } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
-import { compressImageToDataUrl } from "@/lib/file";
+import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
@@ -24,38 +23,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { bathGroups, estimateDraft, type ItemDraft } from "./cart";
+import { FleaTickSection } from "./flea-section";
+import { ImagePicker } from "./image-picker";
 import {
   CCTV_ROOM_RATE,
   MonthCalendar,
   NANNY_REGULAR_RATE,
   NANNY_VIP_RATE,
+  Section,
   TimeSlotGroups,
   todayStr,
+  type CtxPet,
   type Room,
   type Service,
   type SlotOption,
-  type Species,
   type T,
 } from "./shared";
-
-/** ข้อมูลสัตว์เลี้ยงจาก liffGetBookingContext */
-export type CtxPet = {
-  id: string;
-  name: string;
-  species: Species;
-  breed: string | null;
-  birthDate: string;
-  weightKg: number | null;
-  allergies: string | null;
-  groomingCautions: string | null;
-  hasChronicDisease: boolean | null;
-  chronicDiseaseNote: string | null;
-  fleaTickMedicine: string | null;
-  fleaTickProductId: string | null;
-  lastFleaTickAt: string;
-};
-
-const STYLE_IMAGE_LIMIT = 3;
 
 function OptionRow({
   active,
@@ -80,80 +63,6 @@ function OptionRow({
       <span className={cn(active && "font-medium")}>{label}</span>
       {price !== undefined && <span className="shrink-0 text-muted-foreground">{formatBaht(price)}</span>}
     </button>
-  );
-}
-
-function Section({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4">
-      {title && <p className="text-sm font-semibold">{title}</p>}
-      {children}
-    </div>
-  );
-}
-
-/* ---------- ภาพตัวอย่างทรงขน ---------- */
-
-function StyleImages({ images, onChange, t }: { images: string[]; onChange: (v: string[]) => void; t: T }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function add(files: FileList | null) {
-    if (!files) return;
-    setBusy(true);
-    try {
-      const next = [...images];
-      for (const f of Array.from(files).slice(0, STYLE_IMAGE_LIMIT - images.length)) {
-        // ย่อให้เล็กกว่าสลิป — ใช้ดูทรงเท่านั้น และส่งไปพร้อมคำขอจองหลายรายการในครั้งเดียว
-        next.push(await compressImageToDataUrl(f, { maxSide: 1000, quality: 0.72 }));
-      }
-      onChange(next);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t.liff.errorTitle);
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <Label>{t.liffBook.styleImages}</Label>
-      <div className="flex flex-wrap gap-2">
-        {images.map((src, i) => (
-          <div key={i} className="relative h-20 w-20 overflow-hidden rounded-xl border">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="h-full w-full object-cover" />
-            <button
-              type="button"
-              aria-label={t.liffBook.remove}
-              onClick={() => onChange(images.filter((_, j) => j !== i))}
-              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-        {images.length < STYLE_IMAGE_LIMIT && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => inputRef.current?.click()}
-            className="flex h-20 w-20 items-center justify-center rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-muted"
-          >
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-          </button>
-        )}
-      </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => add(e.target.files)}
-      />
-    </div>
   );
 }
 
@@ -403,12 +312,19 @@ function RoomPicker({
 export function ItemDetail({
   draft,
   onChange,
+  pet,
+  catalog,
+  invalidId,
   services,
   rooms,
   t,
 }: {
   draft: ItemDraft;
   onChange: (d: ItemDraft) => void;
+  pet: CtxPet;
+  catalog: FleaTickProductInfo[];
+  /** ช่องแรกที่ยังกรอกไม่ครบตอนกดตรวจสอบรายการ — ขึ้นขอบแดง */
+  invalidId?: string | null;
   /** บริการของประเภทนี้ที่กรองชนิดสัตว์แล้ว */
   services: Service[];
   rooms: Room[];
@@ -452,6 +368,8 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <>
+          <FleaTickSection draft={draft} set={set} pet={pet} catalog={catalog} invalidId={invalidId} t={t} />
+
           <Section title={t.liffBook.bathType}>
             <div className="grid gap-2">
               {groups.main.map((s) => (
@@ -481,7 +399,13 @@ export function ItemDetail({
                       onChange={(e) => set({ styleNote: e.target.value })}
                     />
                   </div>
-                  <StyleImages images={draft.styleImages} onChange={(styleImages) => set({ styleImages })} t={t} />
+                  <ImagePicker
+                    label={t.liffBook.styleImages}
+                    images={draft.styleImages}
+                    onChange={(styleImages) => set({ styleImages })}
+                    max={3}
+                    t={t}
+                  />
                 </div>
               )}
             </Section>

@@ -11,6 +11,16 @@ import {
   type Species,
 } from "./shared";
 
+/** คำตอบเรื่องยาเห็บหมัดของงานอาบน้ำ — declare = แจ้งข้อมูลใหม่/แก้ไขพร้อมหลักฐาน, none = ยังไม่ได้ให้ยาใหม่/ไม่แน่ใจ */
+export type FleaDraft = {
+  choice: "" | "declare" | "none";
+  medicine: string;
+  productId: string | null;
+  date: string;
+  evidence: string[];
+};
+export const EMPTY_FLEA: FleaDraft = { choice: "", medicine: "", productId: null, date: "", evidence: [] };
+
 /** ข้อมูลที่ลูกค้ากำลังกรอกของรายการหนึ่ง (สัตว์ 1 ตัว × บริการ 1 ประเภท) */
 export type ItemDraft = {
   kind: Kind;
@@ -31,6 +41,7 @@ export type ItemDraft = {
   styleImages: string[];
   /** ที่มาของข้อมูลสัตว์เลี้ยงในรายการนี้ (ยืนยันข้อมูลเดิม / อัปเดต / กรอกใหม่) — ส่งไปจดลงประวัติออเดอร์ */
   petInfo: "" | "NEW" | "SAME" | "UPDATED";
+  flea: FleaDraft;
 };
 
 export function newItemDraft(kind: Kind, petId: string): ItemDraft {
@@ -52,6 +63,7 @@ export function newItemDraft(kind: Kind, petId: string): ItemDraft {
     styleNote: "",
     styleImages: [],
     petInfo: "",
+    flea: { ...EMPTY_FLEA, evidence: [] },
   };
 }
 
@@ -119,6 +131,8 @@ export function estimateDraft(draft: ItemDraft, services: Service[], rooms: Room
 export function entryToPayload(e: CartEntry) {
   const d = e.draft;
   const boarding = d.kind === "BOARDING";
+  // ตะกร้าที่เก็บไว้ในเครื่องจากเวอร์ชันเก่าไม่มี flea — ถือว่ายังไม่ได้ตอบ
+  const fleaAnswer = d.flea?.choice === "declare" || d.flea?.choice === "none" ? d.flea.choice : null;
   return {
     petId: d.petId,
     kind: d.kind,
@@ -136,6 +150,16 @@ export function entryToPayload(e: CartEntry) {
     groomingStyleNote: d.kind === "BATH" ? d.styleNote || undefined : undefined,
     groomingStyleImages: d.kind === "BATH" ? d.styleImages : [],
     petInfo: d.kind === "BATH" && d.petInfo ? d.petInfo : undefined,
+    flea:
+      d.kind === "BATH" && fleaAnswer
+        ? {
+            answer: fleaAnswer,
+            medicine: d.flea.medicine,
+            productId: d.flea.productId,
+            date: d.flea.date || undefined,
+            evidence: d.flea.evidence,
+          }
+        : undefined,
   };
 }
 

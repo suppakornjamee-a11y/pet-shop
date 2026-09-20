@@ -4,6 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireStaffUser } from "@/lib/auth-helpers";
+import { sendLinePush } from "@/lib/line";
+import { FLEA_INFO_REQUEST_LOG_PREFIX, FLEA_STAFF_CHECKED_LOG } from "@/lib/order-log";
 import type { ActionResult } from "./customers";
 
 const unit = z.enum(["DAY", "WEEK", "MONTH"]);
@@ -99,4 +101,64 @@ export async function confirmPetFleaTick(petId: string, productId: string): Prom
   });
   revalidatePath("/settings/flea-tick");
   return { ok: true, message: "บันทึกผลตรวจหลักฐานแล้ว" };
+}
+
+/**
+ * พนักงานตรวจข้อมูล/หลักฐานยาเห็บหมัดของออเดอร์นี้แล้ว (ตอนเช็คคิว) — บันทึกว่าใครตรวจเมื่อไหร่ที่สัตว์เลี้ยงและประวัติออเดอร์
+ * เป็นการยืนยันข้อมูลที่บันทึกไว้ ไม่ใช่การรับรองว่าปลอดเห็บหมัด
+ */
+export async function confirmOrderFleaTick(orderId: string): Promise<ActionResult> {
+  const user = await requireStaffUser();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      pet: { select: { id: true, fleaTickMedicine: true, lastFleaTickAt: true, fleaTickProductId: true } },
+    },
+  });
+  if (!order?.pet) return { ok: false, error: "ไม่พบสัตว์เลี้ยงของออเดอร์นี้" };
+  const pet = order.pet;
+  if (!pet.fleaTickMedicine && !pet.lastFleaTickAt && !pet.fleaTickProductId) {
+    return { ok: false, error: "สัตว์เลี้ยงยังไม่มีข้อมูลยาเห็บหมัดให้ตรวจ" };
+  }
+  await prisma.$transaction([
+    prisma.pet.update({
+      where: { id: pet.id },
+      data: { fleaTickSource: "STAFF_CHECKED", fleaTickCheckedById: user.id, fleaTickCheckedAt: new Date() },
+    }),
+    prisma.orderActivityLog.create({
+      data: { orderId, action: FLEA_STAFF_CHECKED_LOG, createdById: user.id },
+    }),
+  ]);
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/settings/flea-tick");
+  return { ok: true, message: "บันทึกผลตรวจยาเห็บหมัดแล้ว" };
+}
+
+/** พนักงานขอข้อมูลยาเห็บหมัดเพิ่มจากลูกค้าทาง LINE (เช่น ขอวันที่ให้ยาล่าสุดหรือรูปกล่องยา) — ลูกค้าตอบกลับในแชทร้านตามปกติ */
+export async function requestOrderFleaTickInfo(orderId: string, message: string): Promise<ActionResult> {
+  const user = await requireStaffUser();
+  const note = message.trim();
+  if (!note) return { ok: false, error: "กรุณาพิมพ์ข้อความถึงลูกค้า" };
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, pet: { select: { name: true } }, customer: { select: { lineUserId: true } } },
+  });
+  if (!order) return { ok: false, error: "ไม่พบออเดอร์" };
+  const lineUserId = order.customer?.lineUserId;
+  if (!lineUserId) return { ok: false, error: "ลูกค้ายังไม่ได้ผูก LINE จึงส่งข้อความไม่ได้" };
+  try {
+    await sendLinePush(
+      lineUserId,
+      `ร้านขอข้อมูลยาเห็บหมัดเพิ่มเติม${order.pet ? `ของน้อง${order.pet.name}` : ""}ค่ะ\n${note}`
+    );
+  } catch (e) {
+    console.error("[LINE] flea info request push failed:", e);
+    return { ok: false, error: "ส่งข้อความ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+  }
+  await prisma.orderActivityLog.create({
+    data: { orderId, action: `${FLEA_INFO_REQUEST_LOG_PREFIX}${note}`, createdById: user.id },
+  });
+  revalidatePath(`/orders/${orderId}`);
+  return { ok: true, message: "ส่งข้อความถึงลูกค้าแล้ว" };
 }

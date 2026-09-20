@@ -35,6 +35,33 @@ export type Room = {
 
 export type SlotOption = { time: string; available: boolean };
 
+/** ข้อมูลสัตว์เลี้ยงจาก liffGetBookingContext */
+export type CtxPet = {
+  id: string;
+  name: string;
+  species: Species;
+  breed: string | null;
+  birthDate: string;
+  weightKg: number | null;
+  allergies: string | null;
+  groomingCautions: string | null;
+  hasChronicDisease: boolean | null;
+  chronicDiseaseNote: string | null;
+  fleaTickMedicine: string | null;
+  fleaTickProductId: string | null;
+  lastFleaTickAt: string;
+};
+
+/** กล่องหัวข้อของหน้ารายละเอียดรายการ */
+export function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-2xl border bg-card p-4">
+      {title && <p className="text-sm font-semibold">{title}</p>}
+      {children}
+    </div>
+  );
+}
+
 export const todayStr = () => toThaiDateStr(new Date());
 export const NANNY_REGULAR_RATE = 300;
 export const NANNY_VIP_RATE = 400;

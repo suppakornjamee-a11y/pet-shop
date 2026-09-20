@@ -596,6 +596,17 @@ const th = {
     infoSame: "ข้อมูลเดิมยังถูกต้อง",
     infoUpdate: "มีข้อมูลอัปเดต",
     infoRequired: "กรุณาเลือกว่าข้อมูลเดิมยังถูกต้องหรือมีข้อมูลอัปเดต",
+    fleaAnswerLabel: "สถานะการให้ยาเห็บหมัด",
+    fleaRenewed: "ให้ยาครั้งใหม่แล้ว",
+    fleaNotRenewed: "ยังไม่ได้ให้ยาครั้งใหม่",
+    fleaFix: "แก้ไขข้อมูลยา",
+    fleaUnsure: "ไม่แน่ใจ ให้ร้านตรวจสอบ",
+    fleaSpeciesMismatch: "ยานี้ไม่ตรงกับชนิดสัตว์เลี้ยง",
+    fleaChoiceRequired: "กรุณาเลือกสถานะการให้ยาเห็บหมัด",
+    fleaDateFuture: "วันที่ให้ยาต้องไม่เป็นวันในอนาคต",
+    fleaDateBeforeBirth: "วันที่ให้ยาต้องไม่ก่อนวันเกิดของสัตว์เลี้ยง",
+    fleaDateNotNewer: (date: string) => `วันที่ให้ยาครั้งใหม่ต้องหลังวันที่เดิม (${date})`,
+    fleaEvidenceRequired: "กรุณาแนบรูปกล่องยาหรือหลักฐานจากคลินิก",
     age: (years: number, months: number) => {
       const parts = [years > 0 ? `${years} ปี` : null, months > 0 ? `${months} เดือน` : null].filter(Boolean);
       return `อายุ ${parts.length > 0 ? parts.join(" ") : "ไม่ถึง 1 เดือน"}`;
@@ -644,6 +655,15 @@ const th = {
     pickFormulaHint: "พบหลายสูตร กรุณาเลือกสูตรที่ใช้ หรือแนบรูปกล่องยา",
     noMatchHint: "ไม่พบในฐานข้อมูลยา แอดมินจะตรวจสอบให้",
     evidenceLabel: "รูปกล่องยา / หลักฐานจากคลินิก",
+    check: {
+      level: { GREEN: "ผ่านอัตโนมัติ", YELLOW: "ลูกค้าแจ้งข้อมูลใหม่ (มีหลักฐาน)", RED: "ต้องตรวจสอบ" },
+      confirm: "ยืนยันข้อมูลยาเห็บหมัดแล้ว",
+      request: "ขอข้อมูลเพิ่ม",
+      requestTitle: "ขอข้อมูลยาเห็บหมัดเพิ่มเติม",
+      requestLabel: "ข้อความถึงลูกค้า",
+      requestSend: "ส่งทาง LINE",
+      checked: "พนักงานตรวจสอบแล้ว",
+    },
     status: {
       COVERED: "อยู่ในช่วงตามข้อมูลที่แจ้ง",
       DUE_BEFORE_SERVICE: "ถึงกำหนดก่อนวันบริการ",

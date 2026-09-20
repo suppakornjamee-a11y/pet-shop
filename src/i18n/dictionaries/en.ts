@@ -581,6 +581,17 @@ const en: Dictionary = {
     infoSame: "Existing information is still correct",
     infoUpdate: "I have updates",
     infoRequired: "Please choose whether the existing information is still correct or has updates",
+    fleaAnswerLabel: "Flea & tick treatment status",
+    fleaRenewed: "I gave a new dose",
+    fleaNotRenewed: "Not given a new dose yet",
+    fleaFix: "Edit medicine information",
+    fleaUnsure: "Not sure, please have the shop check",
+    fleaSpeciesMismatch: "This medicine does not match the pet's species",
+    fleaChoiceRequired: "Please choose the flea & tick treatment status",
+    fleaDateFuture: "The dose date cannot be in the future",
+    fleaDateBeforeBirth: "The dose date cannot be before the pet's birth date",
+    fleaDateNotNewer: (date: string) => `The new dose date must be after the previous one (${date})`,
+    fleaEvidenceRequired: "Please attach a photo of the medicine box or a clinic record",
     age: (years: number, months: number) => {
       const parts = [years > 0 ? `${years} yr` : null, months > 0 ? `${months} mo` : null].filter(Boolean);
       return `Age ${parts.length > 0 ? parts.join(" ") : "under 1 month"}`;
@@ -629,6 +640,15 @@ const en: Dictionary = {
     pickFormulaHint: "Several formulas match. Pick the one used, or attach a photo of the box.",
     noMatchHint: "Not in the medicine list. An admin will check it.",
     evidenceLabel: "Photo of the box / clinic record",
+    check: {
+      level: { GREEN: "Passed automatically", YELLOW: "Customer updated (with evidence)", RED: "Needs review" },
+      confirm: "Mark flea & tick info as checked",
+      request: "Ask for more info",
+      requestTitle: "Ask for more flea & tick information",
+      requestLabel: "Message to customer",
+      requestSend: "Send via LINE",
+      checked: "Checked by staff",
+    },
     status: {
       COVERED: "Within the period, per the information given",
       DUE_BEFORE_SERVICE: "Due before the service date",

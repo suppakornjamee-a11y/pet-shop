@@ -24,6 +24,8 @@ import { OrderExtraCharges } from "@/components/order-extra-charges";
 import { AddOrderItemForm } from "@/components/add-order-item-form";
 import { OrderItemsRows } from "@/components/order-items-rows";
 import { StyleImagesViewer } from "@/components/style-images-viewer";
+import { FleaCheckPanel } from "@/components/flea-check-panel";
+import { FLEA_STAFF_CHECKED_LOG, parseFleaCheckLog } from "@/lib/order-log";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { getLocale } from "@/i18n/get-locale";
 
@@ -149,6 +151,9 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
         };
       })()
     : null;
+  // ผลตรวจยาเห็บหมัดที่ระบบสรุปไว้ตอนลูกค้าจอง (ประวัติเรียงใหม่สุดก่อน จึงเจอรายการล่าสุดก่อน)
+  const fleaCheck = order.activityLogs.map((l) => parseFleaCheckLog(l.action)).find((c) => c !== null) ?? null;
+  const fleaStaffChecked = order.activityLogs.some((l) => l.action === FLEA_STAFF_CHECKED_LOG);
   const backHref = order.roomId
     ? "/boarding"
     : order.queueType === "OTHER"
@@ -323,6 +328,16 @@ export default async function OrderDetailPage(props: PageProps<"/orders/[id]">) 
                       pet={order.pet}
                       serviceDate={toThaiDateStr(order.appointmentAt ?? order.checkInAt ?? new Date())}
                       alwaysShow={order.status === "PENDING_APPROVAL" && !order.roomId}
+                    />
+                  )}
+                  {fleaCheck && (
+                    <FleaCheckPanel
+                      orderId={order.id}
+                      level={fleaCheck.level}
+                      text={fleaCheck.text}
+                      evidence={fleaCheck.level === "GREEN" ? [] : (order.pet?.fleaTickEvidenceUrls ?? [])}
+                      checked={fleaStaffChecked}
+                      canAct={!isGroomer && order.status !== "CANCELLED" && fleaCheck.level !== "GREEN"}
                     />
                   )}
                   {/* ข้อมูลที่ลูกค้ากรอกจากหน้าจอง LINE — น้ำหนัก / ข้อควรระวังระหว่างกรูมมิ่ง / โรคประจำตัว */}

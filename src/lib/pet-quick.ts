@@ -91,6 +91,7 @@ export async function quickPetWriteData(db: Db, p: QuickPetInput) {
     groomingCautions: p.groomingCautions,
     hasChronicDisease: p.hasChronicDisease,
     chronicDiseaseNote: p.hasChronicDisease ? p.chronicDiseaseNote || null : null,
-    ...(await fleaTickWriteData(db, p.id ?? null, p)),
+    // สัตว์เดิมไม่แตะข้อมูลยาเห็บหมัดที่ฟอร์มนี้ — แก้ได้ผ่านขั้นตรวจยาตอนจอง (ต้องมีหลักฐาน) เท่านั้น
+    ...(p.id ? {} : await fleaTickWriteData(db, null, p)),
   };
 }

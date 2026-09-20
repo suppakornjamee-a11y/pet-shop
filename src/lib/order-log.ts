@@ -27,3 +27,26 @@ export const CUSTOMER_CONFIRMED_LOG_SUFFIX = " — ลูกค้ายืน�
 
 /** บันทึกกิจกรรมตอนระบบลบรูปตัวอย่างทรงขนที่ครบกำหนดเก็บ */
 export const STYLE_IMAGES_PURGED_LOG = "ลบรูปตัวอย่างทรงขนอัตโนมัติ (ครบ 30 วันนับจากวันที่ลูกค้าอัปโหลด)";
+
+/**
+ * ผลตรวจข้อมูลยาเห็บหมัดตอนลูกค้าจอง — ระดับ (เขียว/เหลือง/แดง) อยู่ในวงเล็บเหลี่ยมให้หน้าออเดอร์อ่านกลับได้
+ * เขียนที่ createBookingRequest อ่านที่หน้าออเดอร์ฝั่งพนักงาน (ไม่มีคอลัมน์แยก จึงใช้รูปแบบข้อความนี้ร่วมกัน)
+ */
+export const FLEA_CHECK_LOG_PREFIX = "ตรวจยาเห็บหมัดตอนจอง";
+export type FleaCheckLogLevel = "GREEN" | "YELLOW" | "RED";
+/** ชื่อระดับที่พนักงานเห็นในประวัติออเดอร์ (ใช้คำไทยให้อ่านเข้าใจได้ทันที) */
+const FLEA_LEVEL_WORD: Record<FleaCheckLogLevel, string> = { GREEN: "เขียว", YELLOW: "เหลือง", RED: "แดง" };
+export const fleaCheckLog = (level: FleaCheckLogLevel, text: string) =>
+  `${FLEA_CHECK_LOG_PREFIX} [${FLEA_LEVEL_WORD[level]}]: ${text}`;
+export function parseFleaCheckLog(action: string): { level: FleaCheckLogLevel; text: string } | null {
+  for (const level of Object.keys(FLEA_LEVEL_WORD) as FleaCheckLogLevel[]) {
+    const head = `${FLEA_CHECK_LOG_PREFIX} [${FLEA_LEVEL_WORD[level]}]: `;
+    if (action.startsWith(head)) return { level, text: action.slice(head.length) };
+  }
+  return null;
+}
+
+/** พนักงานตรวจข้อมูล/หลักฐานยาเห็บหมัดของออเดอร์นี้แล้ว (ตอนเช็คคิว) */
+export const FLEA_STAFF_CHECKED_LOG = "พนักงานตรวจสอบข้อมูลยาเห็บหมัดแล้ว";
+/** พนักงานขอข้อมูลยาเห็บหมัดเพิ่มจากลูกค้าทาง LINE — ข้อความที่ส่งต่อท้ายคำนี้ */
+export const FLEA_INFO_REQUEST_LOG_PREFIX = "ขอข้อมูลยาเห็บหมัดเพิ่มเติมจากลูกค้า: ";

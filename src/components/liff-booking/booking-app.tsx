@@ -37,7 +37,8 @@ import {
   type OwnerDraft,
   type PetDraft,
 } from "./pet-quick-form";
-import { ItemDetail, ReviewDialog, draftReady, whenLabel, type CtxPet } from "./item-detail";
+import { ItemDetail, ReviewDialog, draftReady, whenLabel } from "./item-detail";
+import { validateFleaForDraft } from "./flea-section";
 import {
   entryToPayload,
   estimateDraft,
@@ -48,7 +49,7 @@ import {
   type CartEntry,
   type ItemDraft,
 } from "./cart";
-import { Stepper, type Kind, type Room, type Service, type T } from "./shared";
+import { Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
 const KIND_ORDER: Kind[] = ["BOARDING", "BATH", "OTHER"];
 const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Bath, OTHER: Scissors };
@@ -202,6 +203,7 @@ function BookingBody() {
   );
 
   function openDetail(k: Kind, petId: string, petInfo: ItemDraft["petInfo"] = "") {
+    setInvalidId(null);
     setDraft({ ...newItemDraft(k, petId), petInfo });
     setEditingKey(null);
     setStage("detail");
@@ -305,7 +307,17 @@ function BookingBody() {
     window.scrollTo({ top: 0 });
   }
 
+  /** ก่อนเปิดหน้าต่างตรวจสอบรายการ: ตรวจคำตอบเรื่องยาเห็บหมัด ถ้ายังไม่ครบชี้ช่องให้ */
+  function openReview() {
+    if (!draft || !draftPet) return;
+    const err = validateFleaForDraft(draft, draftPet, catalog, t);
+    if (err) return reject(err);
+    setInvalidId(null);
+    setReviewOpen(true);
+  }
+
   function editEntry(e: CartEntry) {
+    setInvalidId(null);
     setDraft(e.draft);
     setEditingKey(e.key);
     setStage("detail");
@@ -353,7 +365,16 @@ function BookingBody() {
           </div>
         </div>
 
-        <ItemDetail draft={draft} onChange={setDraft} services={draftServices} rooms={rooms} t={t} />
+        <ItemDetail
+          draft={draft}
+          onChange={setDraft}
+          pet={draftPet}
+          catalog={catalog}
+          invalidId={invalidId}
+          services={draftServices}
+          rooms={rooms}
+          t={t}
+        />
 
         <ReviewDialog
           open={reviewOpen}
@@ -370,7 +391,7 @@ function BookingBody() {
           <Button
             className="h-14 w-full rounded-2xl text-base"
             disabled={!draftReady(draft, draftServices, rooms)}
-            onClick={() => setReviewOpen(true)}
+            onClick={openReview}
           >
             {t.liffBook.review}
           </Button>
