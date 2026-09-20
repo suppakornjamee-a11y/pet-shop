@@ -117,8 +117,8 @@ export function PaymentPanel({
         <div className="flex flex-wrap items-center gap-2">
           {paymentsWithSlip.length > 0 && <SlipViewerDialog payments={paymentsWithSlip} />}
           {activePayment && (
-            <Badge variant="outline" className={cn("gap-1 text-xs", paymentStatusColor[activePayment.status])}>
-              {activePayment.status === "SUBMITTED" && <PendingReviewIcon className="h-3.5 w-3.5" />}
+            <Badge variant="outline" className={cn("gap-[7px] text-xs", paymentStatusColor[activePayment.status])}>
+              {activePayment.status === "SUBMITTED" && <PendingReviewIcon className="h-3 w-3" />}
               {showPurposeLabel && `${t.labels.paymentPurpose[activePayment.purpose]} · `}
               {t.labels.paymentStatus[activePayment.status]}
             </Badge>
@@ -133,8 +133,8 @@ export function PaymentPanel({
                 <span className="text-muted-foreground">{t.labels.paymentPurpose[p.purpose]}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="font-medium">{formatBaht(p.amount)}</span>
-                  <Badge variant="outline" className={cn("gap-1 text-[10px]", paymentStatusColor[p.status])}>
-                    {p.status === "SUBMITTED" && <PendingReviewIcon className="h-3 w-3" />}
+                  <Badge variant="outline" className={cn("gap-1.5 text-[10px]", paymentStatusColor[p.status])}>
+                    {p.status === "SUBMITTED" && <PendingReviewIcon className="h-[11px] w-[11px]" />}
                     {t.labels.paymentStatus[p.status]}
                   </Badge>
                 </div>

@@ -27,8 +27,8 @@ export function OrderStatusBadges({
 
   if (info.kind === "SLIP_SUBMITTED") {
     return (
-      <Badge variant="outline" className={cn(textSize, "gap-1", paymentStatusColor.SUBMITTED)}>
-        <PendingReviewIcon className="h-3.5 w-3.5" />
+      <Badge variant="outline" className={cn(textSize, "gap-[7px]", paymentStatusColor.SUBMITTED)}>
+        <PendingReviewIcon className="h-3 w-3" />
         {t.orders.slipPendingReviewBadge}
       </Badge>
     );
