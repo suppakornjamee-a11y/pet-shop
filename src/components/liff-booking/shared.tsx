@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronLeft, ChevronRight, Sunrise, Sun, Sunset } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sunrise, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { toThaiDateStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
@@ -52,11 +52,35 @@ export type CtxPet = {
   lastFleaTickAt: string;
 };
 
-/** กล่องหัวข้อของหน้ารายละเอียดรายการ */
-export function Section({ title, children }: { title?: string; children: React.ReactNode }) {
+/** กล่องหัวข้อของหน้ารายละเอียดรายการ — icon = ไอคอนหน้าหัวข้อ, tone accent = กล่องสีเน้น (สรุปราคา) */
+export function Section({
+  title,
+  icon: Icon,
+  tone = "default",
+  children,
+}: {
+  title?: string;
+  icon?: LucideIcon;
+  tone?: "default" | "accent";
+  children: React.ReactNode;
+}) {
   return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4">
-      {title && <p className="text-sm font-semibold">{title}</p>}
+    <div
+      className={cn(
+        "space-y-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
+        tone === "accent" ? "border-primary/25 bg-accent/30" : "bg-card"
+      )}
+    >
+      {title && (
+        <div className="flex items-center gap-2">
+          {Icon && (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/60 text-primary">
+              <Icon className="h-4 w-4" />
+            </span>
+          )}
+          <p className="text-sm font-semibold">{title}</p>
+        </div>
+      )}
       {children}
     </div>
   );

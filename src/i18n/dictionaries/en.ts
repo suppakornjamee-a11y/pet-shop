@@ -678,7 +678,6 @@ const en: Dictionary = {
     testHit: (via: string) => `Found — customers will be offered this medicine (matches “${via}”)`,
     testMiss: "Not found — customers will not see this medicine in the list",
     learnAlias: (typed: string) => `Remember “${typed}” as a similar name for this medicine`,
-    didYouMean: "Is this the medicine?",
     speciesLabel: "Species",
     speciesAny: "Not specified / per formula",
     formLabel: "Form",

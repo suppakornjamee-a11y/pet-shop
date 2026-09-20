@@ -8,7 +8,7 @@ import { createCustomerWithPets, updateCustomerWithPets, type ActionResult } fro
 import { getFleaTickCatalog } from "@/app/actions/liff";
 import { compressImageToDataUrl } from "@/lib/file";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
-import { MedicineNameField } from "@/components/medicine-name-field";
+import { MedicineNameField, fitsSpecies } from "@/components/medicine-name-field";
 import { toThaiDateStr } from "@/lib/slots";
 import { ageFromBirthDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -484,7 +484,19 @@ export function RegisterForm({
               <Label>{t.register.speciesLabel}</Label>
               <Select
                 value={pet.species}
-                onValueChange={(v) => updatePet(i, { species: v as "DOG" | "CAT" })}
+                onValueChange={(v) => {
+                  const species = v as "DOG" | "CAT";
+                  const chosen = fleaCatalog.find((p) => p.id === pet.fleaTickProductId);
+                  if (!chosen || fitsSpecies(chosen, species)) {
+                    updatePet(i, { species });
+                  } else {
+                    updatePet(i, {
+                      species,
+                      fleaTickProductId: null,
+                      fleaTickMedicine: pet.fleaTickMedicine === chosen.name ? "" : pet.fleaTickMedicine,
+                    });
+                  }
+                }}
                 items={{
                   DOG: (
                     <span className="flex items-center gap-2">

@@ -10,13 +10,21 @@ import { Input } from "@/components/ui/input";
 const LIFF_FIELD = "h-11 rounded-xl bg-card";
 const INVALID = "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40";
 
+/** ยานี้ใช้กับสัตว์ชนิดนี้ได้ไหม (ยาที่ไม่ระบุชนิดใช้ได้ทั้งหมาและแมว) */
+export function fitsSpecies(product: Pick<FleaTickProductInfo, "species">, species: Species): boolean {
+  return !product.species || product.species === species;
+}
+
 /**
  * ช่องกรอกชื่อยาเห็บหมัดแบบ autocomplete — พิมพ์แล้วรายการแสดงตามที่พิมพ์ (ช่องว่างไม่แสดงอะไร)
  * พิมพ์แค่ส่วนแรกของชื่อ ชื่อไทย หรือสะกดผิดเล็กน้อยก็เจอ เลือกด้วยการกดหรือใช้ลูกศร + Enter ก็ได้
+ * รายการแสดงเฉพาะชื่อยา (บรรทัดเดียว) และกรองตามชนิดสัตว์ "ตอนนี้" ของฟอร์มเสมอ (เปลี่ยนชนิดสัตว์รายการเปลี่ยนตาม)
  *
  * รายการลอยทับเนื้อหาใต้ช่อง (ไม่ดันหน้า) และเลื่อนหน้าให้เห็นเองเมื่อเปิด — บนมือถือรายการที่แสดงต่อท้ายช่องในหน้า
  * มักไปซ่อนอยู่หลังคีย์บอร์ดหรือปุ่มที่แปะด้านล่างจอ
- * เลือกแล้วเติมชื่อเต็มของยาลงช่องให้ และไม่เลือกให้เองเด็ดขาด (ต้องกดเลือกเอง)
+ *
+ * เลือกแล้ว: ข้อความที่พิมพ์ไว้หายไป ช่องกลายเป็นชื่อยาที่เลือก (กด "เปลี่ยน" เพื่อเลือกใหม่) — ไม่เลือกให้เองเด็ดขาด
+ * ชื่อเต็มของยาที่เลือกยังถูกเก็บไว้ในข้อมูลด้วย (fleaTickMedicine) เพื่อให้หน้าอื่นที่โชว์แค่ข้อความยังอ่านได้
  */
 export function MedicineNameField({
   value,
@@ -50,7 +58,9 @@ export function MedicineNameField({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
-  const selected = catalog.find((p) => p.id === productId) ?? null;
+  // ยาที่เลือกไว้ต้องใช้กับสัตว์ชนิดปัจจุบันได้ — ถ้าเปลี่ยนชนิดสัตว์แล้วไม่ตรงกัน ถือว่ายังไม่ได้เลือก
+  const found = catalog.find((p) => p.id === productId) ?? null;
+  const selected = found && fitsSpecies(found, species) ? found : null;
   const typed = value.trim().length >= 1;
 
   // รายการกรองตามที่พิมพ์เท่านั้น — ยังไม่ได้พิมพ์อะไรก็ไม่แสดงรายการ
@@ -66,14 +76,35 @@ export function MedicineNameField({
     if (show) listRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [show, options.length]);
 
-  const describe = (p: FleaTickProductInfo) =>
-    [p.formula, p.species ? t.labels.species[p.species] : null, t.fleaTick.form[p.form]].filter(Boolean).join(" · ");
-
   function pick(p: FleaTickProductInfo) {
     onChange({ fleaTickMedicine: p.name, fleaTickProductId: p.id });
     setOpen(false);
     setActive(-1);
     inputRef.current?.blur(); // ปิดคีย์บอร์ดบนมือถือ
+  }
+
+  function clear() {
+    onChange({ fleaTickMedicine: "", fleaTickProductId: null });
+    // ช่องพิมพ์เพิ่งกลับมาแสดง — รอให้ mount แล้วโฟกัสให้พิมพ์ต่อได้เลย
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  if (selected) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-11 items-center justify-between gap-2 rounded-xl border border-primary/40 bg-primary/5 py-1.5 pl-3 pr-1.5 text-sm",
+          inputClassName === "" && "min-h-8 rounded-lg"
+        )}
+      >
+        <span className="min-w-0 truncate font-medium">{selected.name}</span>
+        {!readOnly && (
+          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 px-2.5 text-xs" onClick={clear}>
+            {t.fleaTick.change}
+          </Button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -113,29 +144,8 @@ export function MedicineNameField({
         }}
       />
 
-      {selected ? (
-        <div className="flex items-start justify-between gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <div className="min-w-0">
-            <div className="font-medium">{selected.name}</div>
-            <div className="text-xs text-muted-foreground">{describe(selected)}</div>
-          </div>
-          {!readOnly && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 px-2 text-xs"
-              onClick={() => onChange({ fleaTickProductId: null })}
-            >
-              {t.fleaTick.change}
-            </Button>
-          )}
-        </div>
-      ) : (
-        showNoMatchHint &&
-        !readOnly &&
-        typed &&
-        options.length === 0 && <p className="text-xs text-muted-foreground">{t.fleaTick.noMatchHint}</p>
+      {showNoMatchHint && !readOnly && typed && options.length === 0 && (
+        <p className="text-xs text-muted-foreground">{t.fleaTick.noMatchHint}</p>
       )}
 
       {show && (
@@ -145,7 +155,6 @@ export function MedicineNameField({
           role="listbox"
           className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 scroll-mb-28 overflow-y-auto rounded-xl border bg-popover p-1 shadow-lg"
         >
-          <p className="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>
           {options.map((p, i) => (
             <button
               key={p.id}
@@ -156,12 +165,11 @@ export function MedicineNameField({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(p)}
               className={cn(
-                "flex w-full flex-col items-start rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent/50",
+                "w-full rounded-lg px-2.5 py-2.5 text-left text-sm font-medium transition-colors hover:bg-accent/50",
                 i === active && "bg-accent/60"
               )}
             >
-              <span className="font-medium">{p.name}</span>
-              <span className="text-xs text-muted-foreground">{describe(p)}</span>
+              {p.name}
             </button>
           ))}
         </div>

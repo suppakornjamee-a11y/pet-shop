@@ -693,7 +693,6 @@ const th = {
     testHit: (via: string) => `พบ — จะขึ้นให้ลูกค้าเลือก (ตรงกับ “${via}”)`,
     testMiss: "ไม่พบ — ลูกค้าจะไม่เห็นยานี้ในรายการ",
     learnAlias: (typed: string) => `จำ “${typed}” เป็นชื่อใกล้เคียงของยาตัวนี้`,
-    didYouMean: "ใช่ยาตัวนี้ไหม",
     speciesLabel: "ชนิดสัตว์",
     speciesAny: "ไม่ระบุ / แยกตามสูตร",
     formLabel: "รูปแบบยา",

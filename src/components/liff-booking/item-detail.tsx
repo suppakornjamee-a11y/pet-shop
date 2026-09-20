@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Loader2, Video } from "lucide-react";
+import { Bath, Check, Clock, Loader2, Receipt, Scissors, Sparkles, Video } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { formatBaht, formatDateLong } from "@/lib/format";
@@ -40,28 +40,52 @@ import {
   type T,
 } from "./shared";
 
+/** แถวตัวเลือกบริการ — radio = เลือกได้อย่างเดียวในกลุ่ม, check = ติ๊กได้หลายรายการ (วงกลม/ช่องติ๊กบอกสถานะที่เลือกชัดเจน) */
 function OptionRow({
   active,
   label,
   price,
+  mode,
   onClick,
 }: {
   active: boolean;
   label: string;
   price?: number;
+  mode: "radio" | "check";
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      role={mode === "radio" ? "radio" : "checkbox"}
+      aria-checked={active}
       onClick={onClick}
       className={cn(
-        "flex items-center justify-between gap-3 rounded-xl border p-3 text-left text-sm transition-colors",
-        active ? "border-primary bg-accent/40" : "bg-card hover:bg-muted"
+        "flex items-center gap-3 rounded-xl border p-3 text-left text-sm transition-colors",
+        active ? "border-primary bg-accent/30" : "bg-card hover:bg-muted/60"
       )}
     >
-      <span className={cn(active && "font-medium")}>{label}</span>
-      {price !== undefined && <span className="shrink-0 text-muted-foreground">{formatBaht(price)}</span>}
+      <span
+        aria-hidden
+        className={cn(
+          "flex h-5 w-5 shrink-0 items-center justify-center border-2 transition-colors",
+          mode === "radio" ? "rounded-full" : "rounded-md",
+          active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
+        )}
+      >
+        {active &&
+          (mode === "radio" ? (
+            <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+          ) : (
+            <Check className="h-3.5 w-3.5" strokeWidth={3} />
+          ))}
+      </span>
+      <span className={cn("min-w-0 flex-1", active && "font-medium")}>{label}</span>
+      {price !== undefined && (
+        <span className={cn("shrink-0 tabular-nums", active ? "font-semibold text-primary" : "text-muted-foreground")}>
+          {formatBaht(price)}
+        </span>
+      )}
     </button>
   );
 }
@@ -370,20 +394,34 @@ export function ItemDetail({
         <>
           <FleaTickSection draft={draft} set={set} pet={pet} catalog={catalog} invalidId={invalidId} t={t} />
 
-          <Section title={t.liffBook.bathType}>
+          <Section title={t.liffBook.bathType} icon={Bath}>
             <div className="grid gap-2">
               {groups.main.map((s) => (
-                <OptionRow key={s.id} active={has(s.id)} label={s.name} price={s.price} onClick={() => pickOne(groups.main, s.id)} />
+                <OptionRow
+                  key={s.id}
+                  mode="radio"
+                  active={has(s.id)}
+                  label={s.name}
+                  price={s.price}
+                  onClick={() => pickOne(groups.main, s.id)}
+                />
               ))}
             </div>
           </Section>
 
           {groups.groom.length > 0 && (
-            <Section title={t.liffBook.groomType}>
+            <Section title={t.liffBook.groomType} icon={Scissors}>
               <div className="grid gap-2">
-                <OptionRow active={!groomChosen} label={t.liffBook.noGroom} onClick={() => pickOne(groups.groom, null)} />
+                <OptionRow mode="radio" active={!groomChosen} label={t.liffBook.noGroom} onClick={() => pickOne(groups.groom, null)} />
                 {groups.groom.map((s) => (
-                  <OptionRow key={s.id} active={has(s.id)} label={s.name} price={s.price} onClick={() => pickOne(groups.groom, s.id)} />
+                  <OptionRow
+                    key={s.id}
+                    mode="radio"
+                    active={has(s.id)}
+                    label={s.name}
+                    price={s.price}
+                    onClick={() => pickOne(groups.groom, s.id)}
+                  />
                 ))}
               </div>
               {groomChosen && (
@@ -420,7 +458,14 @@ export function ItemDetail({
                 <Section>
                   <div className="grid gap-2">
                     {groups.addons.map((s) => (
-                      <OptionRow key={s.id} active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
+                      <OptionRow
+                        key={s.id}
+                        mode="check"
+                        active={has(s.id)}
+                        label={s.name}
+                        price={s.price}
+                        onClick={() => toggle(s.id)}
+                      />
                     ))}
                   </div>
                 </Section>
@@ -431,20 +476,20 @@ export function ItemDetail({
       )}
 
       {draft.kind !== "BATH" && pickable.length > 0 && (
-        <Section title={draft.kind === "OTHER" ? t.liffBook.services : t.liff.servicesSectionTitle}>
+        <Section title={draft.kind === "OTHER" ? t.liffBook.services : t.liff.servicesSectionTitle} icon={Sparkles}>
           <div className="grid gap-2">
             {pickable.map((s) => (
-              <OptionRow key={s.id} active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
+              <OptionRow key={s.id} mode="check" active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
             ))}
           </div>
         </Section>
       )}
 
       {groups.free.length > 0 && (
-        <Section title={t.liff.defaultServicesTitle}>
+        <Section title={t.liff.defaultServicesTitle} icon={Sparkles}>
           <div className="grid gap-2">
             {groups.free.map((s) => (
-              <OptionRow key={s.id} active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
+              <OptionRow key={s.id} mode="check" active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
             ))}
           </div>
         </Section>
@@ -458,14 +503,21 @@ export function ItemDetail({
       )}
 
       {draft.kind === "BATH" && (
-        <Section>
+        <Section tone="accent">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
-            <span className="text-lg font-bold text-primary">{formatBaht(estimate)}</span>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/60 text-primary">
+                <Receipt className="h-4 w-4" />
+              </span>
+              <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
+            </div>
+            <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
           </div>
-          <p className="text-sm font-medium">{t.liffBook.bathDeposit}</p>
-          <p className="text-xs text-muted-foreground">{t.liffBook.priceNote}</p>
-          <p className="text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
+          <p className="rounded-xl bg-card px-3 py-2 text-sm font-medium">{t.liffBook.bathDeposit}</p>
+          <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+            <p>{t.liffBook.priceNote}</p>
+            <p>{t.liffBook.depositNote}</p>
+          </div>
         </Section>
       )}
     </div>

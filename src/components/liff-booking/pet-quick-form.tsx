@@ -7,7 +7,8 @@ import { petAge } from "@/lib/pet-age";
 import { formatDateLong } from "@/lib/format";
 import { thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
-import { MedicineNameField } from "@/components/medicine-name-field";
+import { MedicineNameField, fitsSpecies } from "@/components/medicine-name-field";
+import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -338,7 +339,19 @@ export function PetFields({
             id={id("species")}
             className={SELECT}
             value={pet.species}
-            onChange={(e) => set({ species: e.target.value as Species, fleaTickProductId: null })}
+            onChange={(e) => {
+              const next = e.target.value as Species;
+              const chosen = catalog.find((p) => p.id === pet.fleaTickProductId);
+              if (!chosen || fitsSpecies(chosen, next)) {
+                set({ species: next });
+              } else {
+                set({
+                  species: next,
+                  fleaTickProductId: null,
+                  fleaTickMedicine: pet.fleaTickMedicine === chosen.name ? "" : pet.fleaTickMedicine,
+                });
+              }
+            }}
           >
             {(["DOG", "CAT"] as const).map((s) => (
               <option key={s} value={s}>
@@ -501,25 +514,32 @@ export function ExistingPetFields({
   ];
 
   return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4">
-      <div>
-        <p className="text-sm font-semibold">{pet.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {[t.labels.species[pet.species], pet.breed, age ? t.liffBook.age(age.years, age.months) : null]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+    <div className="space-y-4 rounded-2xl border bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/50 text-primary">
+          <SpeciesIcon species={pet.species} className="h-7 w-7" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-base font-semibold leading-tight">{pet.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {[t.labels.species[pet.species], pet.breed, age ? t.liffBook.age(age.years, age.months) : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
       </div>
 
       {pet.infoStatus !== "update" && (
-        <div className="space-y-1 rounded-xl bg-muted/50 p-3 text-sm">
+        <div className="space-y-2">
           <p className="text-sm font-semibold">{t.liffBook.health}</p>
-          {rows.map(([label, value]) => (
-            <p key={label}>
-              <span className="text-muted-foreground">{label}: </span>
-              {value}
-            </p>
-          ))}
+          <dl className="divide-y rounded-xl border bg-muted/30 text-sm">
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{label}</dt>
+                <dd className="font-medium sm:text-right">{value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       )}
 

@@ -88,9 +88,15 @@ function petToDraft(p: CtxPet): PetDraft {
   };
 }
 
-function BottomBar({ children }: { children: React.ReactNode }) {
+/** แถบปุ่มที่แปะขอบล่างจอ — summary = ข้อความสรุปด้านซ้าย (เช่น ยอดโดยประมาณ) */
+function BottomBar({ summary, children }: { summary?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">{children}</div>
+    <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+      <div className="flex items-center gap-3 rounded-2xl border bg-card/95 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur">
+        {summary && <div className="min-w-0 shrink-0 pl-2">{summary}</div>}
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -400,9 +406,18 @@ function BookingBody() {
           t={t}
         />
 
-        <BottomBar>
+        <BottomBar
+          summary={
+            <div className="leading-tight">
+              <div className="text-[0.6875rem] text-muted-foreground">{t.liffBook.estimate}</div>
+              <div className="text-lg font-bold tabular-nums text-primary">
+                {formatBaht(estimateDraft(draft, draftServices, rooms).estimate)}
+              </div>
+            </div>
+          }
+        >
           <Button
-            className="h-14 w-full rounded-2xl text-base"
+            className="h-12 w-full rounded-xl text-base"
             disabled={!draftReady(draft, draftServices, rooms)}
             onClick={openReview}
           >
@@ -518,7 +533,7 @@ function BookingBody() {
 
         {cart.length > 0 && (
           <BottomBar>
-            <Button className="h-14 w-full rounded-2xl text-base" disabled={isPending} onClick={submit}>
+            <Button className="h-12 w-full rounded-xl text-base" disabled={isPending} onClick={submit}>
               {isPending && <Loader2 className="animate-spin" />}
               {t.liffBook.submit}
             </Button>
@@ -664,7 +679,7 @@ function BookingBody() {
 
       {kind && !showRegister && (
         <BottomBar>
-          <Button className="h-14 w-full rounded-2xl text-base" disabled={!canNext || isPending} onClick={nextFromStart}>
+          <Button className="h-12 w-full rounded-xl text-base" disabled={!canNext || isPending} onClick={nextFromStart}>
             {isPending && <Loader2 className="animate-spin" />}
             {kind === "BATH" ? t.liffBook.saveAndNext : t.liff.nextStepButton}
           </Button>

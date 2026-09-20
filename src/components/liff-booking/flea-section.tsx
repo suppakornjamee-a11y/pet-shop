@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { AlertTriangle, Bug, CheckCircle2, Info, type LucideIcon } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, validateFleaDeclaration, type FleaAssessment } from "@/lib/flea-tick-check";
 import { cn } from "@/lib/utils";
@@ -45,17 +46,21 @@ export function validateFleaForDraft(
   return declarationError(error, stored, t);
 }
 
-function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string } {
+function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string; icon: LucideIcon } {
   const due = pre.status.nextDueDate ? ` · ${t.fleaTick.nextDue(dayLabel(pre.status.nextDueDate))}` : "";
-  if (pre.level === "GREEN") return { text: `${t.fleaTick.status.COVERED}${due}`, tone: "text-emerald-700" };
+  if (pre.level === "GREEN") {
+    return { text: `${t.fleaTick.status.COVERED}${due}`, tone: "bg-emerald-50 text-emerald-700", icon: CheckCircle2 };
+  }
   if (pre.level === "ASK" && pre.ask === "EXPIRED") {
-    return { text: `${t.fleaTick.status.DUE_BEFORE_SERVICE}${due}`, tone: "font-medium text-destructive" };
+    return { text: `${t.fleaTick.status.DUE_BEFORE_SERVICE}${due}`, tone: "bg-rose-50 font-medium text-rose-700", icon: AlertTriangle };
   }
   if (pre.level === "ASK" && pre.ask === "SPECIES_MISMATCH") {
-    return { text: t.liffBook.fleaSpeciesMismatch, tone: "font-medium text-amber-700" };
+    return { text: t.liffBook.fleaSpeciesMismatch, tone: "bg-amber-50 font-medium text-amber-800", icon: AlertTriangle };
   }
-  if (pre.level === "ASK") return { text: t.fleaTick.status.INCOMPLETE, tone: "font-medium text-amber-700" };
-  return { text: t.fleaTick.status.INCOMPLETE, tone: "text-muted-foreground" };
+  if (pre.level === "ASK") {
+    return { text: t.fleaTick.status.INCOMPLETE, tone: "bg-amber-50 font-medium text-amber-800", icon: AlertTriangle };
+  }
+  return { text: t.fleaTick.status.INCOMPLETE, tone: "bg-muted text-muted-foreground", icon: Info };
 }
 
 /**
@@ -108,18 +113,21 @@ export function FleaTickSection({
   }
 
   return (
-    <Section title={t.fleaTick.title}>
-      <dl className="space-y-1 text-sm">
-        <div>
-          <dt className="inline text-muted-foreground">{t.liffBook.fleaMedicine}: </dt>
-          <dd className="inline">{productName || stored.medicine.trim() || "-"}</dd>
+    <Section title={t.fleaTick.title} icon={Bug}>
+      <dl className="divide-y rounded-xl border text-sm">
+        <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaMedicine}</dt>
+          <dd className="font-medium sm:text-right">{productName || stored.medicine.trim() || "-"}</dd>
         </div>
-        <div>
-          <dt className="inline text-muted-foreground">{t.liffBook.fleaDate}: </dt>
-          <dd className="inline">{stored.givenAt ? dayLabel(stored.givenAt) : "-"}</dd>
+        <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaDate}</dt>
+          <dd className="font-medium sm:text-right">{stored.givenAt ? dayLabel(stored.givenAt) : "-"}</dd>
         </div>
       </dl>
-      <p className={cn("text-sm", line.tone)}>{line.text}</p>
+      <p className={cn("flex items-start gap-2 rounded-xl px-3 py-2 text-sm", line.tone)}>
+        <line.icon className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{line.text}</span>
+      </p>
 
       {asking && (
         <div className="space-y-1.5">
