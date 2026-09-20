@@ -7,8 +7,9 @@
  *  เหลือง ลูกค้าถูกถามเพิ่มแล้วแจ้งข้อมูลใหม่พร้อมหลักฐาน — พนักงานดูหลักฐานได้ ไม่ต้องตัดสินใจ
  *  แดง    พนักงานต้องตัดสินใจตอนเช็คคิว — ไม่มีข้อมูล/ไม่ครบ วันที่ผิดปกติ ลูกค้าตอบว่ายังไม่ได้ให้ยา ฯลฯ
  *
- * "ต้องถามลูกค้า" (ASK) เป็นสถานะก่อนตอบเท่านั้น: ครบกำหนดก่อนวันบริการ / ยาไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว /
- * ยาไม่ตรงชนิดสัตว์ — ตอบแล้วจะกลายเป็นเหลืองหรือแดง
+ * "ต้องถามลูกค้า" (ASK) เป็นสถานะก่อนตอบเท่านั้น: ครบกำหนดก่อนวันบริการ / ยาไม่ตรงชนิดสัตว์ —
+ * ตอบแล้วจะกลายเป็นเหลืองหรือแดง
+ * ยาที่ยังไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว (หรือข้อมูลไม่ครบ) ไม่ถามลูกค้า: แสดงป้าย "รอตรวจสอบ" แล้วให้พนักงานตรวจตอนเช็คคิว
  *
  * ระบบพิสูจน์ไม่ได้ว่าให้ยาจริง — ตรวจได้แค่ความขัดกันของข้อมูลและเก็บหลักฐาน การตรวจเห็บหมัดจริงยังเป็นหน้าที่พนักงาน
  */
@@ -22,7 +23,7 @@ import {
 } from "@/lib/flea-tick";
 
 export type FleaLevel = "GREEN" | "YELLOW" | "RED";
-export type FleaAsk = "EXPIRED" | "NOT_IN_DB" | "SPECIES_MISMATCH";
+export type FleaAsk = "EXPIRED" | "SPECIES_MISMATCH";
 export type FleaRed =
   | "NO_DATA"
   | "INCOMPLETE"
@@ -78,7 +79,7 @@ export function assessFleaTick(
   const unusable = status.reasons.some(
     (r) => r === "PRODUCT_NOT_VERIFIED" || r === "NO_TICK_PERIOD" || r === "NO_FLEA_PERIOD" || r === "NO_PRODUCT"
   );
-  if (!product || unusable) return { level: "ASK", ask: "NOT_IN_DB", status };
+  if (!product || unusable) return { level: "RED", reasons: ["NOT_IN_DB"], status };
   if (status.kind === "DUE_BEFORE_SERVICE") return { level: "ASK", ask: "EXPIRED", status };
   return { level: "GREEN", status };
 }
@@ -199,7 +200,7 @@ export const FLEA_RED_TEXT: Record<FleaRed, string> = {
   NOT_RENEWED: "ลูกค้าแจ้งว่ายังไม่ได้ให้ยาครั้งใหม่ ยาที่แจ้งไว้ครบกำหนดก่อนวันบริการ",
   UNSURE: "ลูกค้าไม่แน่ใจข้อมูลยา ขอให้ร้านตรวจสอบ",
   NOT_COVERED: "ยาที่ลูกค้าแจ้งใหม่ยังครบกำหนดก่อนวันบริการ",
-  NOT_IN_DB: "ชื่อยาที่ลูกค้าแจ้งไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว (มีหลักฐานแนบ)",
+  NOT_IN_DB: "ชื่อยาไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว รอพนักงานตรวจสอบ",
   SPECIES_MISMATCH: "ยาที่แจ้งไม่ตรงกับชนิดสัตว์เลี้ยง",
 };
 

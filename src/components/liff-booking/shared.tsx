@@ -56,13 +56,16 @@ export type CtxPet = {
 export function Section({
   title,
   icon: Icon,
+  titleExtra,
   tone = "default",
   children,
 }: {
   title?: string;
   icon?: LucideIcon;
+  /** ต่อท้ายชื่อหัวข้อ เช่น ป้ายสถานะ */
+  titleExtra?: React.ReactNode;
   tone?: "default" | "accent";
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
     <div
@@ -79,6 +82,7 @@ export function Section({
             </span>
           )}
           <p className="text-sm font-semibold">{title}</p>
+          {titleExtra}
         </div>
       )}
       {children}

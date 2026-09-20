@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Bug, CheckCircle2, Info, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Bug, CheckCircle2, type LucideIcon } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, validateFleaDeclaration, type FleaAssessment } from "@/lib/flea-tick-check";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,33 @@ export function validateFleaForDraft(
   return declarationError(error, stored, t);
 }
 
-function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string; icon: LucideIcon } {
+/** เส้นขอบของตรา: วงกลมที่ขอบเป็นคลื่น 8 กลีบ (แบบตราไอคอนยืนยันของ IG/Facebook) คำนวณครั้งเดียวตอนโหลดโมดูล */
+const SEAL_PATH = (() => {
+  const points: string[] = [];
+  const steps = 160;
+  for (let i = 0; i <= steps; i++) {
+    const theta = (i / steps) * Math.PI * 2;
+    const r = 9.7 + 1.1 * Math.cos(8 * theta);
+    points.push(`${(12 + r * Math.cos(theta)).toFixed(2)} ${(12 + r * Math.sin(theta)).toFixed(2)}`);
+  }
+  return `M${points.join("L")}Z`;
+})();
+
+/** ตราแบบไอคอนยืนยันของ IG/Facebook — สีเหลืองอำพัน + นาฬิกา = รอตรวจสอบ */
+function PendingSeal({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1" role="status" aria-label={label}>
+      <svg viewBox="0 0 24 24" className="h-6 w-6 shrink-0 text-amber-500 drop-shadow-sm" aria-hidden>
+        <path d={SEAL_PATH} fill="currentColor" />
+        <circle cx="12" cy="12" r="4.3" fill="none" stroke="white" strokeWidth="1.8" />
+        <path d="M12 9.9V12l1.5 1" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="text-xs font-medium text-amber-700">{label}</span>
+    </span>
+  );
+}
+
+function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string; icon: LucideIcon } | null {
   const due = pre.status.nextDueDate ? ` · ${t.fleaTick.nextDue(dayLabel(pre.status.nextDueDate))}` : "";
   if (pre.level === "GREEN") {
     return { text: `${t.fleaTick.status.COVERED}${due}`, tone: "bg-emerald-50 text-emerald-700", icon: CheckCircle2 };
@@ -57,16 +83,15 @@ function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string; ic
   if (pre.level === "ASK" && pre.ask === "SPECIES_MISMATCH") {
     return { text: t.liffBook.fleaSpeciesMismatch, tone: "bg-amber-50 font-medium text-amber-800", icon: AlertTriangle };
   }
-  if (pre.level === "ASK") {
-    return { text: t.fleaTick.status.INCOMPLETE, tone: "bg-amber-50 font-medium text-amber-800", icon: AlertTriangle };
-  }
-  return { text: t.fleaTick.status.INCOMPLETE, tone: "bg-muted text-muted-foreground", icon: Info };
+  // ข้อมูลไม่ครบ / ยายังไม่ยืนยันในฐานข้อมูล: ไม่แสดงแถบ — ใช้ป้ายรอตรวจสอบที่หัวข้อแทน
+  return null;
 }
 
 /**
  * ตรวจยาเห็บหมัดตอนเลือกวันเวลา (งานอาบน้ำ) — เทียบข้อมูลที่บันทึกไว้กับวันบริการที่เลือก
- * เขียว: ผ่านเอง แสดงสรุปสั้นๆ · เหลือง/ต้องถาม: ครบกำหนดก่อนวันบริการ / ยาไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว / ยาไม่ตรงชนิดสัตว์
- * ต้องเลือกคำตอบก่อนไปต่อ · แดง (ไม่มีข้อมูล ฯลฯ): ไม่ถามอะไร ปล่อยให้พนักงานตรวจตอนเช็คคิว แต่เพิ่ม/แก้ข้อมูลเองได้
+ * เขียว: ผ่านเอง แสดงสรุปสั้นๆ (แก้ข้อมูลเองได้) · ต้องถาม: ครบกำหนดก่อนวันบริการ / ยาไม่ตรงชนิดสัตว์ — ต้องเลือกคำตอบก่อนไปต่อ
+ * รอตรวจสอบ (ไม่มีข้อมูล ข้อมูลไม่ครบ ยายังไม่อยู่ในฐานข้อมูลที่ยืนยันแล้ว): เหลือแค่หัวข้อกับตราสถานะ ไม่ถามอะไรลูกค้า
+ * พนักงานตรวจตอนเช็คคิว (ลูกค้าแก้ข้อมูลยาได้ที่ฟอร์ม "มีข้อมูลอัปเดต" ของหน้าแรก)
  */
 export function FleaTickSection({
   draft,
@@ -92,6 +117,8 @@ export function FleaTickSection({
 
   const asking = pre.level === "ASK";
   const expired = pre.level === "ASK" && pre.ask === "EXPIRED";
+  // รอตรวจสอบ = ไม่มีข้อมูล/ข้อมูลไม่ครบ/ยายังไม่ยืนยัน → ส่วนนี้เหลือแค่หัวข้อกับป้าย ไม่ถามอะไรลูกค้า พนักงานตรวจตอนเช็คคิว
+  const pending = pre.level === "RED";
   const productName = catalog.find((p) => p.id === stored.productId)?.name;
   const line = statusLine(pre, t);
 
@@ -113,21 +140,25 @@ export function FleaTickSection({
   }
 
   return (
-    <Section title={t.fleaTick.title} icon={Bug}>
-      <dl className="divide-y rounded-xl border text-sm">
-        <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaMedicine}</dt>
-          <dd className="font-medium sm:text-right">{productName || stored.medicine.trim() || "-"}</dd>
-        </div>
-        <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaDate}</dt>
-          <dd className="font-medium sm:text-right">{stored.givenAt ? dayLabel(stored.givenAt) : "-"}</dd>
-        </div>
-      </dl>
-      <p className={cn("flex items-start gap-2 rounded-xl px-3 py-2 text-sm", line.tone)}>
-        <line.icon className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>{line.text}</span>
-      </p>
+    <Section title={t.fleaTick.title} icon={Bug} titleExtra={pending ? <PendingSeal label={t.fleaTick.pending} /> : undefined}>
+      {!pending && (
+        <dl className="divide-y rounded-xl border text-sm">
+          <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaMedicine}</dt>
+            <dd className="font-medium sm:text-right">{productName || stored.medicine.trim() || "-"}</dd>
+          </div>
+          <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{t.liffBook.fleaDate}</dt>
+            <dd className="font-medium sm:text-right">{stored.givenAt ? dayLabel(stored.givenAt) : "-"}</dd>
+          </div>
+        </dl>
+      )}
+      {line && (
+        <p className={cn("flex items-start gap-2 rounded-xl px-3 py-2 text-sm", line.tone)}>
+          <line.icon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{line.text}</span>
+        </p>
+      )}
 
       {asking && (
         <div className="space-y-1.5">
@@ -145,7 +176,7 @@ export function FleaTickSection({
         </div>
       )}
 
-      {!asking && flea.choice !== "declare" && (
+      {!asking && !pending && flea.choice !== "declare" && (
         <Button type="button" variant="outline" className="w-full rounded-xl" onClick={startDeclare}>
           {t.liffBook.fleaFix}
         </Button>

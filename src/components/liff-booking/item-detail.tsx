@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bath, Check, Clock, Loader2, Receipt, Scissors, Sparkles, Video } from "lucide-react";
+import { Bath, Check, Clock, Loader2, Scissors, Sparkles, Video, Wallet } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { formatBaht, formatDateLong } from "@/lib/format";
@@ -506,8 +506,14 @@ export function ItemDetail({
         <Section tone="accent">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/60 text-primary">
-                <Receipt className="h-4 w-4" />
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-sm ring-4 ring-primary/10"
+                style={{
+                  backgroundColor: "var(--primary)",
+                  backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
+                }}
+              >
+                <Wallet className="h-5 w-5" />
               </span>
               <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
             </div>
