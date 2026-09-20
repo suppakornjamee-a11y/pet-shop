@@ -26,7 +26,12 @@ import {
   OwnerFields,
   PetFields,
   emptyPetDraft,
+  focusField,
   petDraftToInput,
+  splitDetail,
+  validateOwner,
+  validatePet,
+  type FieldError,
   type OwnerDraft,
   type PetDraft,
 } from "./pet-quick-form";
@@ -53,6 +58,8 @@ type Ctx =
 type Stage = "start" | "detail" | "cart";
 
 function petToDraft(p: CtxPet): PetDraft {
+  const allergy = splitDetail(p.allergies);
+  const caution = splitDetail(p.groomingCautions);
   return {
     id: p.id,
     name: p.name,
@@ -60,8 +67,10 @@ function petToDraft(p: CtxPet): PetDraft {
     breed: p.breed ?? "",
     birthDate: p.birthDate,
     weightKg: p.weightKg ? String(p.weightKg) : "",
-    allergies: p.allergies ?? "",
-    groomingCautions: p.groomingCautions ?? "",
+    hasAllergies: allergy.has,
+    allergies: allergy.note,
+    hasCautions: caution.has,
+    groomingCautions: caution.note,
     hasChronicDisease: p.hasChronicDisease == null ? "" : p.hasChronicDisease ? "yes" : "no",
     chronicDiseaseNote: p.chronicDiseaseNote ?? "",
     fleaTickMedicine: p.fleaTickMedicine ?? "",
@@ -129,6 +138,9 @@ function BookingBody() {
   const [newPets, setNewPets] = useState<PetDraft[]>([emptyPetDraft()]);
   const [selectedPetId, setSelectedPetId] = useState<string>("");
   const [petEdits, setPetEdits] = useState<Record<string, PetDraft>>({});
+
+  // ช่องแรกที่ยังกรอกไม่ครบตอนกดถัดไป — ขึ้นขอบแดงและโฟกัสให้
+  const [invalidId, setInvalidId] = useState<string | null>(null);
 
   // หน้ารายละเอียดรายการ
   const [draft, setDraft] = useState<ItemDraft | null>(null);
@@ -200,12 +212,29 @@ function BookingBody() {
 
   /* ---------- ปุ่มถัดไปของหน้าแรก ---------- */
 
+  /** ชี้ช่องที่ยังไม่ครบให้ลูกค้าเห็น แล้วบอกว่ายังส่งไม่ได้ */
+  function reject(err: FieldError) {
+    setInvalidId(err.id);
+    focusField(err.id);
+    toast.error(err.message);
+  }
+
   function nextFromStart() {
     if (!kind || !idToken || !ctx) return;
+    setInvalidId(null);
     if (!ctx.linked) {
       // ลูกค้าใหม่ + อาบน้ำ: บันทึกฟอร์มสั้น (ผูก LINE นี้ให้) แล้วไปหน้ารายการของตัวแรก
+      const ownerError = validateOwner(owner, t);
+      if (ownerError) return reject(ownerError);
+      for (const [i, pet] of newPets.entries()) {
+        const petError = validatePet(pet, i, t);
+        if (petError) return reject(petError);
+      }
       startTransition(async () => {
-        const res = await liffSaveQuickProfile(idToken, { customer: owner, pets: newPets.map(petDraftToInput) });
+        const res = await liffSaveQuickProfile(idToken, {
+          customer: owner,
+          pets: newPets.map((pet) => petDraftToInput(pet, t.liffBook.diseaseNo)),
+        });
         if (!res.ok) {
           handleLiffAuthExpiry(res);
           toast.error(res.error);
@@ -222,8 +251,10 @@ function BookingBody() {
     }
     const petDraft = selectedPetId === "new" ? newPets[0] : petEdits[selectedPetId];
     if (!petDraft) return;
+    const petError = validatePet(petDraft, 0, t);
+    if (petError) return reject(petError);
     startTransition(async () => {
-      const res = await liffSaveQuickProfile(idToken, { pets: [petDraftToInput(petDraft)] });
+      const res = await liffSaveQuickProfile(idToken, { pets: [petDraftToInput(petDraft, t.liffBook.diseaseNo)] });
       if (!res.ok) {
         handleLiffAuthExpiry(res);
         toast.error(res.error);
@@ -508,7 +539,7 @@ function BookingBody() {
 
       {kind && !ctx.linked && kind === "BATH" && (
         <div className="space-y-4">
-          <OwnerFields owner={owner} onChange={setOwner} t={t} />
+          <OwnerFields owner={owner} onChange={setOwner} invalidId={invalidId} t={t} />
           {newPets.map((p, i) => (
             <PetFields
               key={i}
@@ -517,6 +548,7 @@ function BookingBody() {
               catalog={catalog}
               onChange={(v) => setNewPets(newPets.map((x, j) => (j === i ? v : x)))}
               onRemove={newPets.length > 1 ? () => setNewPets(newPets.filter((_, j) => j !== i)) : undefined}
+              invalidId={invalidId}
               t={t}
             />
           ))}
@@ -568,6 +600,7 @@ function BookingBody() {
                 catalog={catalog}
                 onChange={(v) => setNewPets([v])}
                 onRemove={pets.length > 0 ? () => setSelectedPetId(pets[0].id) : undefined}
+                invalidId={invalidId}
                 t={t}
               />
             ) : (
@@ -578,6 +611,7 @@ function BookingBody() {
                   index={0}
                   catalog={catalog}
                   onChange={(v) => setPetEdits({ ...petEdits, [selectedPetId]: v })}
+                  invalidId={invalidId}
                   t={t}
                 />
               )

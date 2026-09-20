@@ -12,6 +12,9 @@ import { todayStr, type Species, type T } from "./shared";
 
 export type OwnerDraft = { name: string; phone: string; petInstagram: string };
 
+/** ช่องแบบ "ไม่มี / มี แล้วระบุรายละเอียด" — ใช้กับอาการแพ้ ข้อควรระวัง และโรคประจำตัว */
+export type HasDetail = "" | "no" | "yes";
+
 export type PetDraft = {
   id?: string;
   name: string;
@@ -19,9 +22,11 @@ export type PetDraft = {
   breed: string;
   birthDate: string;
   weightKg: string;
+  hasAllergies: HasDetail;
   allergies: string;
+  hasCautions: HasDetail;
   groomingCautions: string;
-  hasChronicDisease: "" | "no" | "yes";
+  hasChronicDisease: HasDetail;
   chronicDiseaseNote: string;
   fleaTickMedicine: string;
   fleaTickProductId: string | null;
@@ -34,7 +39,9 @@ export const emptyPetDraft = (): PetDraft => ({
   breed: "",
   birthDate: "",
   weightKg: "",
+  hasAllergies: "",
   allergies: "",
+  hasCautions: "",
   groomingCautions: "",
   hasChronicDisease: "",
   chronicDiseaseNote: "",
@@ -43,8 +50,18 @@ export const emptyPetDraft = (): PetDraft => ({
   lastFleaTickDate: "",
 });
 
+/** ค่าที่เก็บในฐานข้อมูลเป็นข้อความเดียว — "ไม่มี" หรือรายละเอียดที่ลูกค้าระบุ */
+const detailValue = (has: HasDetail, note: string, noneLabel: string) => (has === "yes" ? note : noneLabel);
+
+/** แปลงข้อความที่เก็บไว้กลับเป็นตัวเลือก + รายละเอียด (ข้อมูลเดิมที่พิมพ์ว่าไม่มี ถือเป็น "ไม่มี") */
+export function splitDetail(value: string | null): { has: HasDetail; note: string } {
+  const text = (value ?? "").trim();
+  if (!text) return { has: "", note: "" };
+  return /^(ไม่มี|-|none|no)$/i.test(text) ? { has: "no", note: "" } : { has: "yes", note: text };
+}
+
 /** แปลงฟอร์มเป็นข้อมูลที่ส่งให้ liffSaveQuickProfile (ตรวจความครบที่ฝั่ง server อีกชั้น) */
-export function petDraftToInput(p: PetDraft) {
+export function petDraftToInput(p: PetDraft, noneLabel: string) {
   return {
     id: p.id,
     name: p.name,
@@ -52,8 +69,8 @@ export function petDraftToInput(p: PetDraft) {
     breed: p.breed,
     birthDate: p.birthDate,
     weightKg: p.weightKg,
-    allergies: p.allergies,
-    groomingCautions: p.groomingCautions,
+    allergies: detailValue(p.hasAllergies, p.allergies, noneLabel),
+    groomingCautions: detailValue(p.hasCautions, p.groomingCautions, noneLabel),
     hasChronicDisease: p.hasChronicDisease === "yes" ? true : p.hasChronicDisease === "no" ? false : undefined,
     chronicDiseaseNote: p.chronicDiseaseNote,
     fleaTickMedicine: p.fleaTickMedicine,
@@ -62,7 +79,50 @@ export function petDraftToInput(p: PetDraft) {
   };
 }
 
+/* ---------- ตรวจความครบก่อนส่ง (ชี้ช่องแรกที่ยังไม่ครบให้ลูกค้าเห็น) ---------- */
+
+export type FieldError = { id: string; message: string };
+
+export function petFieldId(index: number, field: string) {
+  return `pet-${index}-${field}`;
+}
+
+export function validateOwner(owner: OwnerDraft, t: T): FieldError | null {
+  if (!owner.name.trim()) return { id: "ow-name", message: t.liffBook.requiredField(t.liffBook.ownerName) };
+  if (owner.phone.trim().length < 6) return { id: "ow-phone", message: t.liffBook.requiredField(t.liffBook.phone) };
+  return null;
+}
+
+export function validatePet(pet: PetDraft, index: number, t: T): FieldError | null {
+  const id = (f: string) => petFieldId(index, f);
+  const need = (label: string) => t.liffBook.requiredField(label);
+  if (!pet.name.trim()) return { id: id("name"), message: need(t.liffBook.petName) };
+  if (!pet.breed.trim()) return { id: id("breed"), message: need(t.liffBook.breed) };
+  if (!pet.birthDate) return { id: id("birth"), message: need(t.liffBook.birthDate) };
+  if (!(Number(pet.weightKg) > 0)) return { id: id("weight"), message: need(t.liffBook.weight) };
+  if (!pet.hasAllergies) return { id: id("allergy"), message: need(t.liffBook.allergies) };
+  if (pet.hasAllergies === "yes" && !pet.allergies.trim()) return { id: id("allergy-note"), message: t.liffBook.detailPlaceholder };
+  if (!pet.hasCautions) return { id: id("caution"), message: need(t.liffBook.cautions) };
+  if (pet.hasCautions === "yes" && !pet.groomingCautions.trim())
+    return { id: id("caution-note"), message: t.liffBook.detailPlaceholder };
+  if (!pet.hasChronicDisease) return { id: id("disease"), message: need(t.liffBook.disease) };
+  if (pet.hasChronicDisease === "yes" && !pet.chronicDiseaseNote.trim())
+    return { id: id("disease-note"), message: t.liffBook.detailPlaceholder };
+  return null;
+}
+
+/** โฟกัสช่องที่ยังไม่ครบและเลื่อนจอไปหา */
+export function focusField(id: string) {
+  const el = document.getElementById(id);
+  if (!(el instanceof HTMLElement)) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.focus({ preventScroll: true });
+}
+
 const FIELD = "h-11 rounded-xl bg-card";
+const SELECT = "h-11 w-full rounded-xl border bg-card px-3 text-sm";
+/** ช่องที่ยังไม่ครบ — ขอบและวงโฟกัสเป็นสีแดงจนกว่าจะกรอก */
+const INVALID = "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40";
 
 /** ชื่อยาเห็บหมัด — พิมพ์เอง แล้วระบบแสดงชื่อยาในฐานข้อมูลที่ใกล้เคียงให้กดเลือก (ไม่เลือกให้อัตโนมัติ) */
 export function MedicineNameField({
@@ -71,6 +131,7 @@ export function MedicineNameField({
   species,
   catalog,
   onChange,
+  inputId,
   t,
 }: {
   value: string;
@@ -78,6 +139,7 @@ export function MedicineNameField({
   species: Species;
   catalog: FleaTickProductInfo[];
   onChange: (patch: { fleaTickMedicine?: string; fleaTickProductId?: string | null }) => void;
+  inputId?: string;
   t: T;
 }) {
   const selected = catalog.find((p) => p.id === productId) ?? null;
@@ -91,6 +153,7 @@ export function MedicineNameField({
   return (
     <div className="space-y-1.5">
       <Input
+        id={inputId}
         className={FIELD}
         value={value}
         onChange={(e) => onChange({ fleaTickMedicine: e.target.value, fleaTickProductId: null })}
@@ -134,19 +197,35 @@ export function MedicineNameField({
   );
 }
 
-export function OwnerFields({ owner, onChange, t }: { owner: OwnerDraft; onChange: (o: OwnerDraft) => void; t: T }) {
+export function OwnerFields({
+  owner,
+  onChange,
+  invalidId,
+  t,
+}: {
+  owner: OwnerDraft;
+  onChange: (o: OwnerDraft) => void;
+  invalidId?: string | null;
+  t: T;
+}) {
+  const bad = (id: string) => invalidId === id;
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4">
       <p className="text-sm font-semibold">{t.liffBook.ownerTitle}</p>
       <div className="space-y-1.5">
         <Label htmlFor="ow-name">{t.liffBook.ownerName}</Label>
-        <Input id="ow-name" className={FIELD} value={owner.name} onChange={(e) => onChange({ ...owner, name: e.target.value })} />
+        <Input
+          id="ow-name"
+          className={cn(FIELD, bad("ow-name") && INVALID)}
+          value={owner.name}
+          onChange={(e) => onChange({ ...owner, name: e.target.value })}
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="ow-phone">{t.liffBook.phone}</Label>
         <Input
           id="ow-phone"
-          className={FIELD}
+          className={cn(FIELD, bad("ow-phone") && INVALID)}
           inputMode="tel"
           value={owner.phone}
           onChange={(e) => onChange({ ...owner, phone: e.target.value })}
@@ -165,6 +244,54 @@ export function OwnerFields({ owner, onChange, t }: { owner: OwnerDraft; onChang
   );
 }
 
+/** ช่อง "ไม่มี / มี" + ช่องรายละเอียดที่ต้องกรอกเมื่อเลือกมี (อาการแพ้ / ข้อควรระวัง / โรคประจำตัว) */
+function DetailField({
+  fieldId,
+  label,
+  has,
+  note,
+  onHas,
+  onNote,
+  invalidId,
+  t,
+}: {
+  fieldId: string;
+  label: string;
+  has: HasDetail;
+  note: string;
+  onHas: (v: HasDetail) => void;
+  onNote: (v: string) => void;
+  invalidId?: string | null;
+  t: T;
+}) {
+  const noteId = `${fieldId}-note`;
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={fieldId}>{label}</Label>
+      <select
+        id={fieldId}
+        className={cn(SELECT, invalidId === fieldId && INVALID)}
+        value={has}
+        onChange={(e) => onHas(e.target.value as HasDetail)}
+      >
+        <option value="" disabled />
+        <option value="no">{t.liffBook.diseaseNo}</option>
+        <option value="yes">{t.liffBook.diseaseYes}</option>
+      </select>
+      {has === "yes" && (
+        <Textarea
+          id={noteId}
+          rows={2}
+          className={cn("rounded-xl bg-card", invalidId === noteId && INVALID)}
+          placeholder={t.liffBook.detailPlaceholder}
+          value={note}
+          onChange={(e) => onNote(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
+
 /** ข้อมูลสัตว์เลี้ยงหนึ่งตัว — ชุดช่องตามที่ร้านกำหนดสำหรับงานอาบน้ำ/กรูมมิ่ง */
 export function PetFields({
   pet,
@@ -172,6 +299,7 @@ export function PetFields({
   catalog,
   onChange,
   onRemove,
+  invalidId,
   t,
 }: {
   pet: PetDraft;
@@ -179,10 +307,12 @@ export function PetFields({
   catalog: FleaTickProductInfo[];
   onChange: (p: PetDraft) => void;
   onRemove?: () => void;
+  invalidId?: string | null;
   t: T;
 }) {
   const set = (patch: Partial<PetDraft>) => onChange({ ...pet, ...patch });
-  const id = (f: string) => `pet-${index}-${f}`;
+  const id = (f: string) => petFieldId(index, f);
+  const bad = (f: string) => invalidId === id(f);
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4">
@@ -197,29 +327,36 @@ export function PetFields({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor={id("name")}>{t.liffBook.petName}</Label>
-          <Input id={id("name")} className={FIELD} value={pet.name} onChange={(e) => set({ name: e.target.value })} />
+          <Input
+            id={id("name")}
+            className={cn(FIELD, bad("name") && INVALID)}
+            value={pet.name}
+            onChange={(e) => set({ name: e.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
-          <Label>{t.liffBook.species}</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <Label htmlFor={id("species")}>{t.liffBook.species}</Label>
+          <select
+            id={id("species")}
+            className={SELECT}
+            value={pet.species}
+            onChange={(e) => set({ species: e.target.value as Species, fleaTickProductId: null })}
+          >
             {(["DOG", "CAT"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => set({ species: s, fleaTickProductId: null })}
-                className={cn(
-                  "h-11 rounded-xl border text-sm transition-colors",
-                  pet.species === s ? "border-primary bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted"
-                )}
-              >
+              <option key={s} value={s}>
                 {t.labels.species[s]}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={id("breed")}>{t.liffBook.breed}</Label>
-          <Input id={id("breed")} className={FIELD} value={pet.breed} onChange={(e) => set({ breed: e.target.value })} />
+          <Input
+            id={id("breed")}
+            className={cn(FIELD, bad("breed") && INVALID)}
+            value={pet.breed}
+            onChange={(e) => set({ breed: e.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={id("birth")}>{t.liffBook.birthDate}</Label>
@@ -228,7 +365,7 @@ export function PetFields({
             type="date"
             lang="en-GB"
             max={todayStr()}
-            className={FIELD}
+            className={cn(FIELD, bad("birth") && INVALID)}
             value={pet.birthDate}
             onChange={(e) => set({ birthDate: e.target.value })}
           />
@@ -241,65 +378,54 @@ export function PetFields({
             inputMode="decimal"
             min={0}
             step="0.1"
-            className={FIELD}
+            className={cn(FIELD, bad("weight") && INVALID)}
             value={pet.weightKg}
             onChange={(e) => set({ weightKg: e.target.value })}
           />
         </div>
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={id("allergy")}>{t.liffBook.allergies}</Label>
-        <Textarea
-          id={id("allergy")}
-          rows={2}
-          className="rounded-xl bg-card"
-          placeholder={t.liffBook.allergiesPlaceholder}
-          value={pet.allergies}
-          onChange={(e) => set({ allergies: e.target.value })}
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={id("caution")}>{t.liffBook.cautions}</Label>
-        <Textarea
-          id={id("caution")}
-          rows={2}
-          className="rounded-xl bg-card"
-          placeholder={t.liffBook.cautionsPlaceholder}
-          value={pet.groomingCautions}
-          onChange={(e) => set({ groomingCautions: e.target.value })}
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={id("disease")}>{t.liffBook.disease}</Label>
-        <select
-          id={id("disease")}
-          className="h-11 w-full rounded-xl border bg-card px-3 text-sm"
-          value={pet.hasChronicDisease}
-          onChange={(e) => set({ hasChronicDisease: e.target.value as PetDraft["hasChronicDisease"] })}
-        >
-          <option value="" disabled />
-          <option value="no">{t.liffBook.diseaseNo}</option>
-          <option value="yes">{t.liffBook.diseaseYes}</option>
-        </select>
-        {pet.hasChronicDisease === "yes" && (
-          <Textarea
-            rows={2}
-            className="rounded-xl bg-card"
-            placeholder={t.liffBook.diseasePlaceholder}
-            value={pet.chronicDiseaseNote}
-            onChange={(e) => set({ chronicDiseaseNote: e.target.value })}
-          />
-        )}
-      </div>
+
+      <DetailField
+        fieldId={id("allergy")}
+        label={t.liffBook.allergies}
+        has={pet.hasAllergies}
+        note={pet.allergies}
+        onHas={(v) => set({ hasAllergies: v })}
+        onNote={(v) => set({ allergies: v })}
+        invalidId={invalidId}
+        t={t}
+      />
+      <DetailField
+        fieldId={id("caution")}
+        label={t.liffBook.cautions}
+        has={pet.hasCautions}
+        note={pet.groomingCautions}
+        onHas={(v) => set({ hasCautions: v })}
+        onNote={(v) => set({ groomingCautions: v })}
+        invalidId={invalidId}
+        t={t}
+      />
+      <DetailField
+        fieldId={id("disease")}
+        label={t.liffBook.disease}
+        has={pet.hasChronicDisease}
+        note={pet.chronicDiseaseNote}
+        onHas={(v) => set({ hasChronicDisease: v })}
+        onNote={(v) => set({ chronicDiseaseNote: v })}
+        invalidId={invalidId}
+        t={t}
+      />
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>{t.liffBook.fleaMedicine}</Label>
+          <Label htmlFor={id("flea-medicine")}>{t.liffBook.fleaMedicine}</Label>
           <MedicineNameField
             value={pet.fleaTickMedicine}
             productId={pet.fleaTickProductId}
             species={pet.species}
             catalog={catalog}
             onChange={(patch) => set(patch)}
+            inputId={id("flea-medicine")}
             t={t}
           />
         </div>
