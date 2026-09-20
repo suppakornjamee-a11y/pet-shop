@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Bath, Home, Loader2, Pencil, Plus, Scissors, ShoppingBag, Trash2 } from "lucide-react";
+import { ArrowLeft, Bath, Home, Info, Loader2, Pencil, Plus, Scissors, Send, ShoppingBag, Trash2, Wallet } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -437,7 +437,29 @@ function BookingBody() {
     return (
       <div className="space-y-4 pb-28">
         <Header onBack={() => setStage("start")} cartCount={0} t={t} />
-        <h1 className="text-lg font-bold">{t.liffBook.cartTitle}</h1>
+        <div
+          className="flex items-center gap-3 rounded-3xl border border-primary/20 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, color-mix(in oklab, var(--accent) 45%, white), color-mix(in oklab, var(--primary) 6%, white))",
+          }}
+        >
+          <span
+            className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm ring-4 ring-white/70"
+            style={{
+              backgroundColor: "var(--primary)",
+              backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
+            }}
+          >
+            <ShoppingBag className="h-6 w-6" />
+            {sorted.length > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-foreground px-1 text-[0.625rem] font-semibold text-background">
+                {sorted.length}
+              </span>
+            )}
+          </span>
+          <h1 className="min-w-0 flex-1 text-xl font-bold leading-tight">{t.liffBook.cartTitle}</h1>
+        </div>
 
         {sorted.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{t.liffBook.cartEmpty}</p>
@@ -494,47 +516,81 @@ function BookingBody() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Button
-            variant="outline"
-            className="h-12 rounded-2xl"
-            onClick={() => {
-              setKind("BATH");
-              setStage("start");
-            }}
-          >
-            <Plus className="h-4 w-4" /> {t.liffBook.addAnotherPet}
-          </Button>
-          <Button
-            variant="outline"
-            className="h-12 rounded-2xl"
-            onClick={() => {
-              setKind(null);
-              setStage("start");
-            }}
-          >
-            <Plus className="h-4 w-4" /> {t.liffBook.addOtherService}
-          </Button>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: t.liffBook.addAnotherPet, kind: "BATH" as const },
+            { label: t.liffBook.addOtherService, kind: null },
+          ].map((b) => (
+            <Button
+              key={b.label}
+              variant="outline"
+              className="h-12 min-w-0 gap-1.5 rounded-2xl border-dashed border-primary/40 bg-card px-2 text-[0.8125rem] font-semibold text-primary hover:bg-accent/30 hover:text-primary sm:text-sm"
+              onClick={() => {
+                setKind(b.kind);
+                setStage("start");
+              }}
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Plus className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">{b.label}</span>
+            </Button>
+          ))}
         </div>
 
         {cart.length > 0 && (
-          <div className="space-y-2 rounded-2xl border bg-card p-4 text-sm">
-            <div className="flex justify-between gap-3">
-              <span>{t.liffBook.estimate}</span>
-              <span className="font-semibold">{formatBaht(totalEstimate)}</span>
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-3xl border border-primary/25 bg-card shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+              <div
+                className="space-y-1.5 p-4"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(135deg, color-mix(in oklab, var(--accent) 40%, white), color-mix(in oklab, var(--primary) 6%, white))",
+                }}
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-sm ring-4 ring-primary/10"
+                    style={{
+                      backgroundColor: "var(--primary)",
+                      backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
+                    }}
+                  >
+                    <Wallet className="h-4 w-4" />
+                  </span>
+                  {t.liffBook.estimate}
+                </div>
+                <div className="text-right text-4xl font-extrabold leading-none tabular-nums text-primary">
+                  {formatBaht(totalEstimate)}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <span className="text-sm font-medium">{t.liffBook.dueAfterApproval}</span>
+                <span className="text-lg font-bold tabular-nums">{formatBaht(totalDue)}</span>
+              </div>
             </div>
-            <div className="flex justify-between gap-3">
-              <span>{t.liffBook.dueAfterApproval}</span>
-              <span className="text-lg font-bold text-primary">{formatBaht(totalDue)}</span>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Info className="h-4 w-4" />
+              </span>
+              <p className="min-w-0 flex-1 pt-1 text-sm leading-relaxed text-foreground/80">{t.liffBook.confirmNotice}</p>
             </div>
-            <p className="text-xs text-muted-foreground">{t.liffBook.confirmNotice}</p>
           </div>
         )}
 
         {cart.length > 0 && (
           <BottomBar>
-            <Button className="h-12 w-full rounded-xl text-base" disabled={isPending} onClick={submit}>
-              {isPending && <Loader2 className="animate-spin" />}
+            <Button
+              className="h-12 w-full rounded-2xl text-base font-semibold shadow-md transition active:scale-[0.98]"
+              style={{
+                backgroundColor: "var(--primary)",
+                backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 78%, white))",
+              }}
+              disabled={isPending}
+              onClick={submit}
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <Send />}
               {t.liffBook.submit}
             </Button>
           </BottomBar>

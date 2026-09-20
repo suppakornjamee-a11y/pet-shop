@@ -131,7 +131,10 @@ export function FleaTickSection({
             <span className="text-xs font-medium text-emerald-700">{t.liffBook.fleaPassed}</span>
           </span>
         ) : (
-          <Seal passed={false} label={t.fleaTick.pending} />
+          <span className="inline-flex items-center gap-1">
+            <Seal passed={false} label={t.fleaTick.pending} />
+            <span className="text-xs font-medium text-amber-700">{t.fleaTick.pending}</span>
+          </span>
         )
       }
     >
