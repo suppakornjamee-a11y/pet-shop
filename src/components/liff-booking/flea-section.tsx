@@ -1,40 +1,20 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatDateLong } from "@/lib/format";
-import { thaiDayRange } from "@/lib/slots";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
-import {
-  assessFleaTick,
-  validateFleaDeclaration,
-  type FleaAssessment,
-  type FleaDeclarationError,
-  type FleaPetData,
-} from "@/lib/flea-tick-check";
+import { assessFleaTick, validateFleaDeclaration, type FleaAssessment } from "@/lib/flea-tick-check";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EMPTY_FLEA, type FleaDraft, type ItemDraft } from "./cart";
+import { dayLabel, declarationError, fleaDataOf } from "./flea-validation";
 import { ImagePicker } from "./image-picker";
 import { MedicineNameField, type FieldError } from "./pet-quick-form";
 import { Section, todayStr, type CtxPet, type T } from "./shared";
 
 const FIELD = "h-11 rounded-xl bg-card";
 const INVALID = "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40";
-
-/** ข้อมูลยาเห็บหมัดที่บันทึกไว้กับสัตว์เลี้ยง ในรูปที่ตัวตรวจใช้ */
-export function fleaDataOf(pet: CtxPet): FleaPetData {
-  return {
-    species: pet.species,
-    birthDate: pet.birthDate || null,
-    medicine: pet.fleaTickMedicine ?? "",
-    productId: pet.fleaTickProductId,
-    givenAt: pet.lastFleaTickAt || null,
-  };
-}
-
-const dayLabel = (d: string) => formatDateLong(thaiDayRange(d).start);
 
 /**
  * ตรวจคำตอบเรื่องยาเห็บหมัดของรายการอาบน้ำก่อนไปหน้าตรวจสอบรายการ — คืนช่องแรกที่ยังไม่ครบ (เซิร์ฟเวอร์ตรวจซ้ำอีกชั้น)
@@ -62,23 +42,6 @@ export function validateFleaForDraft(
   });
   if (!error) return null;
   return declarationError(error, stored, t);
-}
-
-function declarationError(error: FleaDeclarationError, stored: FleaPetData, t: T): FieldError {
-  switch (error) {
-    case "MEDICINE":
-      return { id: "flea-medicine", message: t.liffBook.requiredField(t.liffBook.fleaMedicine) };
-    case "DATE":
-      return { id: "flea-date", message: t.liffBook.requiredField(t.liffBook.fleaDate) };
-    case "DATE_FUTURE":
-      return { id: "flea-date", message: t.liffBook.fleaDateFuture };
-    case "DATE_BEFORE_BIRTH":
-      return { id: "flea-date", message: t.liffBook.fleaDateBeforeBirth };
-    case "DATE_NOT_NEWER":
-      return { id: "flea-date", message: t.liffBook.fleaDateNotNewer(stored.givenAt ? dayLabel(stored.givenAt) : "-") };
-    case "EVIDENCE":
-      return { id: "flea-evidence", message: t.liffBook.fleaEvidenceRequired };
-  }
 }
 
 function statusLine(pre: FleaAssessment, t: T): { text: string; tone: string } {

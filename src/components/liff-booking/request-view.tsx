@@ -298,7 +298,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
           <SummaryCard order={selected} t={t} />
           {draft &&
             (draft.kind === "BOARDING" ? (
-              <div className="grid gap-3 rounded-2xl border bg-card p-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 rounded-2xl border bg-card p-4 lg:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">{t.orders.form.checkInLabel}</Label>
                   <div className="grid grid-cols-[1fr_auto] gap-2">

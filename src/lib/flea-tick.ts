@@ -131,19 +131,64 @@ function editDistance(a: string, b: string): number {
   return row[b.length];
 }
 
-/** ความใกล้เคียง 0–1 ระหว่างคำที่พิมพ์กับชื่อหนึ่งชื่อ */
-function similarity(query: string, name: string): number {
-  if (!query || !name) return 0;
-  if (query === name) return 1;
-  if (name.includes(query) && query.length >= 3) return 0.9;
-  if (query.includes(name) && name.length >= 3) return 0.85;
-  return 1 - editDistance(query, name) / Math.max(query.length, name.length);
+const WORD_SEPARATORS = /[\s\-_.,/()+]+/;
+
+/**
+ * ความใกล้เคียง 0–1 ระหว่างคำที่พิมพ์ (q ผ่าน normalizeMedicineName แล้ว) กับชื่อหนึ่งชื่อ (ชื่อหลัก / สูตร / ชื่อใกล้เคียง)
+ * เรียงความสำคัญ: ตรงทั้งคำ 1 > พิมพ์ขึ้นต้นชื่อ 0.95 > ขึ้นต้นคำใดคำหนึ่งในชื่อ 0.92 > อยู่กลางชื่อ 0.85 >
+ * พิมพ์ผิดเล็กน้อย (เทียบทั้งชื่อ หรือเทียบเฉพาะส่วนหน้าเท่าที่พิมพ์ไว้แล้ว)
+ * คำที่พิมพ์สั้นมาก (1-3 ตัว) ไม่ใช้การเดาแบบพิมพ์ผิด กันได้ยาที่ไม่เกี่ยวข้องขึ้นมา
+ */
+function scoreName(q: string, rawName: string): number {
+  const n = normalizeMedicineName(rawName);
+  if (!q || !n) return 0;
+  if (q === n) return 1;
+  let best = 0;
+  if (n.startsWith(q)) best = 0.95;
+  else if (
+    q.length >= 2 &&
+    rawName
+      .split(WORD_SEPARATORS)
+      .map(normalizeMedicineName)
+      .some((w) => w.startsWith(q))
+  ) {
+    best = 0.92;
+  }
+  if (q.length >= 3 && n.includes(q)) best = Math.max(best, 0.85);
+  // พิมพ์ยาวกว่าชื่อ (เช่น ใส่ขนาดน้ำหนักต่อท้าย) — ชื่อที่ครอบคลุมคำที่พิมพ์มากกว่าได้คะแนนสูงกว่า
+  if (n.length >= 3 && q.includes(n)) best = Math.max(best, 0.8 + 0.1 * (n.length / q.length));
+  if (q.length >= 4) {
+    best = Math.max(best, 0.9 * (1 - editDistance(q, n.slice(0, q.length)) / q.length));
+    best = Math.max(best, 1 - editDistance(q, n) / Math.max(q.length, n.length));
+  }
+  return best;
 }
 
-export type MedicineMatch = { product: FleaTickProductInfo; score: number; exact: boolean };
+const MATCH_THRESHOLD = 0.6;
+
+type NameSet = { name: string; formula: string | null; aliases: string[] };
+
+/** ความใกล้เคียงสูงสุดของคำที่พิมพ์กับทุกชื่อของยาตัวหนึ่ง + ชื่อที่ตรงที่สุด */
+function bestNameMatch(q: string, p: NameSet): { score: number; via: string; exact: boolean } {
+  let score = 0;
+  let via = "";
+  let exact = false;
+  for (const raw of [p.name, p.formula ?? "", ...p.aliases]) {
+    const s = scoreName(q, raw);
+    if (s > score) {
+      score = s;
+      via = raw;
+    }
+    if (s === 1) exact = true;
+  }
+  return { score, via, exact };
+}
+
+export type MedicineMatch = { product: FleaTickProductInfo; score: number; exact: boolean; via: string };
 
 /**
  * หายาที่ชื่อใกล้เคียงกับที่พิมพ์ เรียงจากใกล้ที่สุด — กรองตามชนิดสัตว์ (ยาที่ไม่ระบุชนิดแสดงเสมอ)
+ * พิมพ์แค่ส่วนแรกของชื่อ (เช่น "Sim" → Simparica) หรือชื่อไทย/ชื่อใกล้เคียงที่ร้านตั้งไว้ก็เจอ
  * คืนหลายรายการได้ เช่นพิมพ์ "NexGard" จะได้ทั้ง NexGard / Spectra / Combo ให้ลูกค้าเลือกสูตรเอง
  */
 export function matchMedicine(
@@ -156,15 +201,22 @@ export function matchMedicine(
   const out: MedicineMatch[] = [];
   for (const p of products) {
     if (petSpecies && p.species && p.species !== petSpecies) continue;
-    const names = [p.name, p.formula ?? "", ...p.aliases].map(normalizeMedicineName).filter(Boolean);
-    let best = 0;
-    let exact = false;
-    for (const n of names) {
-      const s = similarity(q, n);
-      if (s > best) best = s;
-      if (q === n) exact = true;
-    }
-    if (best >= 0.6) out.push({ product: p, score: best, exact });
+    const { score, via, exact } = bestNameMatch(q, p);
+    if (score >= MATCH_THRESHOLD) out.push({ product: p, score, exact, via });
   }
   return out.sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name, "th"));
+}
+
+/** ใช้ทดสอบหลังบ้านว่าคำที่ลูกค้าอาจพิมพ์จะทำให้ยานี้ขึ้นให้เลือกไหม (ตามชื่อหลัก/สูตร/ชื่อใกล้เคียงที่กำลังกรอก) */
+export function testMedicineMatch(query: string, names: NameSet): { score: number; via: string } | null {
+  const q = normalizeMedicineName(query);
+  if (q.length < 2) return null;
+  const { score, via } = bestNameMatch(q, names);
+  return score >= MATCH_THRESHOLD ? { score, via } : null;
+}
+
+/** ชื่อนี้ (ผ่าน normalizeMedicineName แล้วเท่ากัน) ซ้ำกับชื่อหลัก/สูตร/ชื่อใกล้เคียงที่มีอยู่แล้วหรือยัง */
+export function medicineNameKnown(name: string, names: NameSet): boolean {
+  const n = normalizeMedicineName(name);
+  return !!n && [names.name, names.formula ?? "", ...names.aliases].some((x) => normalizeMedicineName(x) === n);
 }

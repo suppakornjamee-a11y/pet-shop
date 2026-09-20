@@ -592,6 +592,7 @@ const en: Dictionary = {
     fleaDateBeforeBirth: "The dose date cannot be before the pet's birth date",
     fleaDateNotNewer: (date: string) => `The new dose date must be after the previous one (${date})`,
     fleaEvidenceRequired: "Please attach a photo of the medicine box or a clinic record",
+    fleaDateUnchanged: "The medicine changed, please enter the latest dose date of the new medicine",
     age: (years: number, months: number) => {
       const parts = [years > 0 ? `${years} yr` : null, months > 0 ? `${months} mo` : null].filter(Boolean);
       return `Age ${parts.length > 0 ? parts.join(" ") : "under 1 month"}`;
@@ -665,9 +666,18 @@ const en: Dictionary = {
     verified: "Verified",
     pending: "Awaiting check",
     inactive: "Inactive",
-    nameLabel: "Full name",
+    nameLabel: "Main name (full name)",
     formulaLabel: "Formula",
-    aliasesLabel: "Other names (comma separated)",
+    aliasesLabel: "Similar names — words customers may type, e.g. Thai names or other spellings",
+    aliasesPlaceholder: "Type and press Enter to add",
+    aliasesShort: "Similar names",
+    removeAlias: "Remove this name",
+    testLabel: "Test the search",
+    testPlaceholder: "Type a word a customer might type",
+    testHit: (via: string) => `Found — customers will be offered this medicine (matches “${via}”)`,
+    testMiss: "Not found — customers will not see this medicine in the list",
+    learnAlias: (typed: string) => `Remember “${typed}” as a similar name for this medicine`,
+    didYouMean: "Is this the medicine?",
     speciesLabel: "Species",
     speciesAny: "Not specified / per formula",
     formLabel: "Form",

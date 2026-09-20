@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { BadgeCheck, Loader2, Pencil, Plus, Save, ShieldCheck } from "lucide-react";
 import { confirmPetFleaTick, upsertFleaTickProduct, verifyFleaTickProduct } from "@/app/actions/flea-tick";
 import { formatDate } from "@/lib/format";
+import { medicineNameKnown, testMedicineMatch } from "@/lib/flea-tick";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { SpeciesIcon } from "@/components/species-icon";
@@ -16,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AliasInput } from "./alias-input";
 
 type Unit = "DAY" | "WEEK" | "MONTH";
 type Form = "CHEWABLE" | "SPOT_ON" | "COLLAR" | "OTHER";
@@ -55,7 +57,7 @@ export type ReviewPet = {
 type FormState = {
   name: string;
   formula: string;
-  aliases: string;
+  aliases: string[];
   species: "" | Species;
   form: Form;
   tickValue: string;
@@ -71,7 +73,7 @@ type FormState = {
 const emptyForm: FormState = {
   name: "",
   formula: "",
-  aliases: "",
+  aliases: [],
   species: "",
   form: "OTHER",
   tickValue: "",
@@ -106,6 +108,10 @@ export function FleaTickManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [picked, setPicked] = useState<Record<string, string>>({});
+  // ติ๊ก "จำชื่อที่ลูกค้าพิมพ์เป็นชื่อใกล้เคียง" ของแต่ละรายการรอตรวจ (ค่าเริ่มต้น = ติ๊ก)
+  const [learn, setLearn] = useState<Record<string, boolean>>({});
+  // ช่องทดสอบการค้นหาในหน้าต่างแก้ไขยา
+  const [testQuery, setTestQuery] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
 
   const period = (v: number | null, u: Unit | null) => (v && u ? `${v} ${t.fleaTick.unit[u]}` : t.fleaTick.notSpecified);
@@ -113,6 +119,7 @@ export function FleaTickManager({
   function openNew() {
     setEditingId(null);
     setForm(emptyForm);
+    setTestQuery("");
     setOpen(true);
   }
   function openEdit(p: ManagedProduct) {
@@ -120,7 +127,7 @@ export function FleaTickManager({
     setForm({
       name: p.name,
       formula: p.formula ?? "",
-      aliases: p.aliases.join(", "),
+      aliases: p.aliases,
       species: p.species ?? "",
       form: p.form,
       tickValue: p.tickValue ? String(p.tickValue) : "",
@@ -132,6 +139,7 @@ export function FleaTickManager({
       note: p.note ?? "",
       active: p.active,
     });
+    setTestQuery("");
     setOpen(true);
   }
 
@@ -155,10 +163,7 @@ export function FleaTickManager({
           id: editingId ?? undefined,
           name: form.name,
           formula: form.formula,
-          aliases: form.aliases
-            .split(",")
-            .map((a) => a.trim())
-            .filter(Boolean),
+          aliases: form.aliases,
           species: form.species || null,
           form: form.form,
           tickValue: form.tickValue ? Number(form.tickValue) : null,
@@ -190,6 +195,10 @@ export function FleaTickManager({
             review.map((r) => {
               const options = products.filter((p) => p.active && (!p.species || p.species === r.species));
               const value = picked[r.id] ?? r.productId ?? "";
+              const chosen = products.find((p) => p.id === value);
+              // เสนอให้จำชื่อที่ลูกค้าพิมพ์ก็ต่อเมื่อชื่อนั้นยังไม่ตรงกับชื่อหลัก/สูตร/ชื่อใกล้เคียงของยาที่เลือก
+              const canLearn = !!chosen && !!r.typed?.trim() && !medicineNameKnown(r.typed, chosen);
+              const willLearn = canLearn && (learn[r.id] ?? true);
               return (
                 <div key={r.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_auto]">
                   <div className="min-w-0 space-y-1.5">
@@ -236,10 +245,21 @@ export function FleaTickManager({
                         </option>
                       ))}
                     </select>
+                    {canLearn && (
+                      <label className="flex items-start gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                          checked={willLearn}
+                          onChange={(e) => setLearn((prev) => ({ ...prev, [r.id]: e.target.checked }))}
+                        />
+                        {t.fleaTick.learnAlias(r.typed!.trim())}
+                      </label>
+                    )}
                     <Button
                       size="sm"
                       disabled={isPending || !value}
-                      onClick={() => run(() => confirmPetFleaTick(r.id, value))}
+                      onClick={() => run(() => confirmPetFleaTick(r.id, value, willLearn))}
                     >
                       <ShieldCheck /> {t.fleaTick.confirmCheck}
                     </Button>
@@ -295,6 +315,11 @@ export function FleaTickManager({
                   {t.fleaTick.tickLabel}: {period(p.tickValue, p.tickUnit)} · {t.fleaTick.fleaLabel}:{" "}
                   {period(p.fleaValue, p.fleaUnit)}
                 </div>
+                {p.aliases.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {t.fleaTick.aliasesShort}: {p.aliases.join(" · ")}
+                  </div>
+                )}
                 {p.note && <div className="text-xs text-muted-foreground">{p.note}</div>}
                 {p.status === "VERIFIED" && p.verifiedByName && p.verifiedAt && (
                   <div className="text-xs text-muted-foreground">
@@ -352,11 +377,38 @@ export function FleaTickManager({
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="ft-aliases">{t.fleaTick.aliasesLabel}</Label>
-              <Input
+              <AliasInput
                 id="ft-aliases"
-                value={form.aliases}
-                onChange={(e) => setForm({ ...form, aliases: e.target.value })}
+                values={form.aliases}
+                onChange={(aliases) => setForm({ ...form, aliases })}
+                placeholder={t.fleaTick.aliasesPlaceholder}
+                removeLabel={t.fleaTick.removeAlias}
               />
+              {/* ลองพิมพ์คำที่ลูกค้าอาจพิมพ์ ดูว่ายาตัวนี้จะขึ้นให้เลือกไหม (ใช้ชื่อหลัก/สูตร/ชื่อใกล้เคียงที่กำลังกรอกอยู่) */}
+              <div className="space-y-1 pt-1">
+                <Label htmlFor="ft-test" className="text-xs text-muted-foreground">
+                  {t.fleaTick.testLabel}
+                </Label>
+                <Input
+                  id="ft-test"
+                  value={testQuery}
+                  placeholder={t.fleaTick.testPlaceholder}
+                  onChange={(e) => setTestQuery(e.target.value)}
+                />
+                {testQuery.trim().length >= 2 &&
+                  (() => {
+                    const hit = testMedicineMatch(testQuery, {
+                      name: form.name,
+                      formula: form.formula || null,
+                      aliases: form.aliases,
+                    });
+                    return hit ? (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">{t.fleaTick.testHit(hit.via)}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{t.fleaTick.testMiss}</p>
+                    );
+                  })()}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ft-form">{t.fleaTick.formLabel}</Label>

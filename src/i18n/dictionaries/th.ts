@@ -607,6 +607,7 @@ const th = {
     fleaDateBeforeBirth: "วันที่ให้ยาต้องไม่ก่อนวันเกิดของสัตว์เลี้ยง",
     fleaDateNotNewer: (date: string) => `วันที่ให้ยาครั้งใหม่ต้องหลังวันที่เดิม (${date})`,
     fleaEvidenceRequired: "กรุณาแนบรูปกล่องยาหรือหลักฐานจากคลินิก",
+    fleaDateUnchanged: "เปลี่ยนยาแล้ว กรุณากรอกวันที่ให้ยาครั้งล่าสุดของยาตัวใหม่",
     age: (years: number, months: number) => {
       const parts = [years > 0 ? `${years} ปี` : null, months > 0 ? `${months} เดือน` : null].filter(Boolean);
       return `อายุ ${parts.length > 0 ? parts.join(" ") : "ไม่ถึง 1 เดือน"}`;
@@ -680,9 +681,18 @@ const th = {
     verified: "ยืนยันแล้ว",
     pending: "รอตรวจสอบ",
     inactive: "ปิดใช้งาน",
-    nameLabel: "ชื่อเต็ม",
+    nameLabel: "ชื่อหลัก (ชื่อเต็ม)",
     formulaLabel: "สูตร",
-    aliasesLabel: "ชื่อเรียกอื่น (คั่นด้วยจุลภาค)",
+    aliasesLabel: "ชื่อใกล้เคียง — คำที่ลูกค้าอาจพิมพ์ เช่น ชื่อภาษาไทย หรือสะกดต่างกัน",
+    aliasesPlaceholder: "พิมพ์แล้วกด Enter เพื่อเพิ่ม",
+    aliasesShort: "ชื่อใกล้เคียง",
+    removeAlias: "ลบชื่อนี้",
+    testLabel: "ทดสอบการค้นหา",
+    testPlaceholder: "ลองพิมพ์คำที่ลูกค้าอาจพิมพ์",
+    testHit: (via: string) => `พบ — จะขึ้นให้ลูกค้าเลือก (ตรงกับ “${via}”)`,
+    testMiss: "ไม่พบ — ลูกค้าจะไม่เห็นยานี้ในรายการ",
+    learnAlias: (typed: string) => `จำ “${typed}” เป็นชื่อใกล้เคียงของยาตัวนี้`,
+    didYouMean: "ใช่ยาตัวนี้ไหม",
     speciesLabel: "ชนิดสัตว์",
     speciesAny: "ไม่ระบุ / แยกตามสูตร",
     formLabel: "รูปแบบยา",

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { matchMedicine, type FleaTickProductInfo } from "@/lib/flea-tick";
+import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
 import { petAge } from "@/lib/pet-age";
 import { formatDateLong } from "@/lib/format";
 import { thaiDayRange } from "@/lib/slots";
@@ -11,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { todayStr, type Species, type T } from "./shared";
+import { declarationError, fleaDataOf, type FleaFieldIds } from "./flea-validation";
+import { ImagePicker } from "./image-picker";
+import { todayStr, type CtxPet, type Species, type T } from "./shared";
 
 export type OwnerDraft = { name: string; phone: string; petInstagram: string };
 
@@ -34,6 +37,8 @@ export type PetDraft = {
   fleaTickMedicine: string;
   fleaTickProductId: string | null;
   lastFleaTickDate: string;
+  /** รูปหลักฐานยาเห็บหมัด — ใช้เฉพาะตอนสัตว์เดิมเลือก "มีข้อมูลอัปเดต" แล้วแก้ข้อมูลยา */
+  fleaEvidence: string[];
   /** เฉพาะสัตว์ที่มีข้อมูลอยู่แล้ว: ลูกค้ายืนยันว่าข้อมูลเดิมยังถูกต้อง หรือมีข้อมูลอัปเดต */
   infoStatus: "" | "same" | "update";
 };
@@ -53,8 +58,19 @@ export const emptyPetDraft = (): PetDraft => ({
   fleaTickMedicine: "",
   fleaTickProductId: null,
   lastFleaTickDate: "",
+  fleaEvidence: [],
   infoStatus: "",
 });
+
+/** ข้อมูลยาเห็บหมัดในฟอร์มตอนนี้ ในรูปที่ตัวตรวจใช้ */
+export function fleaDeclarationOf(p: PetDraft): FleaDeclaration {
+  return {
+    medicine: p.fleaTickMedicine,
+    productId: p.fleaTickProductId,
+    date: p.lastFleaTickDate,
+    evidence: p.fleaEvidence,
+  };
+}
 
 /** ค่าที่เก็บในฐานข้อมูลเป็นข้อความเดียว — "ไม่มี" หรือรายละเอียดที่ลูกค้าระบุ */
 const detailValue = (has: HasDetail, note: string, noneLabel: string) => (has === "yes" ? note : noneLabel);
@@ -122,11 +138,36 @@ export function validatePet(pet: PetDraft, index: number, t: T): FieldError | nu
   return null;
 }
 
-/** สัตว์เลี้ยงที่มีข้อมูลอยู่แล้ว — ต้องมีน้ำหนักล่าสุด และเลือกว่าข้อมูลเดิมถูกต้องหรือมีอัปเดต (ถ้าอัปเดตต้องกรอกครบเหมือนสัตว์ใหม่) */
-export function validateExistingPet(pet: PetDraft, t: T): FieldError | null {
+const INFO_FLEA_IDS: FleaFieldIds = {
+  medicine: petFieldId(0, "flea-medicine"),
+  date: petFieldId(0, "flea-date"),
+  evidence: petFieldId(0, "flea-evidence"),
+};
+
+/**
+ * สัตว์เลี้ยงที่มีข้อมูลอยู่แล้ว — ต้องมีน้ำหนักล่าสุด และเลือกว่าข้อมูลเดิมถูกต้องหรือมีอัปเดต
+ * ถ้าอัปเดตต้องกรอกครบเหมือนสัตว์ใหม่ และถ้าแก้ข้อมูลยาเห็บหมัดต้องผ่านกติกาเดียวกับส่วนตรวจยาตอนเลือกวันเวลา
+ * (เปลี่ยนยาต้องกรอกวันที่ใหม่ + แนบหลักฐาน ฯลฯ) — ยังไม่รู้วันบริการตอนนี้ จึงเทียบกับวันนี้ไปก่อน แล้วตรวจซ้ำอีกรอบเมื่อเลือกวันแล้ว
+ */
+export function validateExistingPet(
+  pet: PetDraft,
+  original: CtxPet | undefined,
+  catalog: FleaTickProductInfo[],
+  t: T
+): FieldError | null {
   if (!(Number(pet.weightKg) > 0)) return { id: petFieldId(0, "weight"), message: t.liffBook.requiredField(t.liffBook.weight) };
   if (!pet.infoStatus) return { id: petFieldId(0, "info"), message: t.liffBook.infoRequired };
-  return pet.infoStatus === "update" ? validatePet(pet, 0, t) : null;
+  if (pet.infoStatus !== "update") return null;
+  const health = validatePet(pet, 0, t);
+  if (health || !original) return health;
+
+  const stored = fleaDataOf(original);
+  const declaration = fleaDeclarationOf(pet);
+  if (!fleaInfoChanged(stored, declaration)) return null;
+  const today = todayStr();
+  const pre = assessFleaTick(stored, catalog, today, today);
+  const error = validateFleaDeclaration({ declaration, pre, stored, catalog, today });
+  return error ? declarationError(error, stored, t, INFO_FLEA_IDS) : null;
 }
 
 /** โฟกัสช่องที่ยังไม่ครบและเลื่อนจอไปหา */
@@ -198,12 +239,13 @@ export function MedicineNameField({
         value.trim().length >= 2 &&
         matches.length > 0 && (
           <div className="space-y-1.5">
-            {matches.length > 1 && <p className="text-xs text-amber-700">{t.fleaTick.pickFormulaHint}</p>}
+            <p className="text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>
             {matches.map(({ product }) => (
               <button
                 key={product.id}
                 type="button"
-                onClick={() => onChange({ fleaTickProductId: product.id })}
+                // เลือกแล้วเติมชื่อเต็มของยาลงช่องให้เลย (ลูกค้าไม่ต้องเห็นคำที่พิมพ์ค้างไว้แค่บางส่วน)
+                onClick={() => onChange({ fleaTickMedicine: product.name, fleaTickProductId: product.id })}
                 className="flex w-full flex-col items-start rounded-xl border bg-card px-3 py-2 text-left text-sm transition-colors hover:bg-accent/40"
               >
                 <span className="font-medium">{product.name}</span>
@@ -314,7 +356,7 @@ function DetailField({
 
 /** ข้อมูลสัตว์เลี้ยงหนึ่งตัว — ชุดช่องตามที่ร้านกำหนดสำหรับงานอาบน้ำ/กรูมมิ่ง
  * bare = ฝังอยู่ในการ์ดอื่น (ไม่มีกรอบและหัวข้อของตัวเอง), hideWeight = น้ำหนักแสดงที่อื่นในการ์ดแม่แล้ว,
- * hideFlea = ไม่แสดงช่องยาเห็บหมัด (สัตว์เดิมแก้ผ่านขั้นตรวจยาตอนเลือกวันเวลา) */
+ * hideFlea = ไม่แสดงช่องยาเห็บหมัด, showFleaEvidence = แสดงช่องแนบรูปหลักฐานยา (สัตว์เดิมที่แก้ข้อมูลยา) */
 export function PetFields({
   pet,
   index,
@@ -324,6 +366,7 @@ export function PetFields({
   invalidId,
   hideWeight = false,
   hideFlea = false,
+  showFleaEvidence = false,
   bare = false,
   t,
 }: {
@@ -335,6 +378,7 @@ export function PetFields({
   invalidId?: string | null;
   hideWeight?: boolean;
   hideFlea?: boolean;
+  showFleaEvidence?: boolean;
   bare?: boolean;
   t: T;
 }) {
@@ -355,7 +399,7 @@ export function PetFields({
           )}
         </div>
       )}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor={id("name")}>{t.liffBook.petName}</Label>
           <Input
@@ -451,7 +495,7 @@ export function PetFields({
       />
 
       {!hideFlea && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor={id("flea-medicine")}>{t.liffBook.fleaMedicine}</Label>
             <MedicineNameField
@@ -461,6 +505,7 @@ export function PetFields({
               catalog={catalog}
               onChange={(patch) => set(patch)}
               inputId={id("flea-medicine")}
+              invalid={bad("flea-medicine")}
               t={t}
             />
           </div>
@@ -471,12 +516,24 @@ export function PetFields({
               type="date"
               lang="en-GB"
               max={todayStr()}
-              className={FIELD}
+              className={cn(FIELD, bad("flea-date") && INVALID)}
               value={pet.lastFleaTickDate}
               onChange={(e) => set({ lastFleaTickDate: e.target.value })}
             />
           </div>
         </div>
+      )}
+      {!hideFlea && showFleaEvidence && (
+        <ImagePicker
+          id={id("flea-evidence")}
+          label={t.fleaTick.evidenceLabel}
+          images={pet.fleaEvidence}
+          onChange={(fleaEvidence) => set({ fleaEvidence })}
+          max={3}
+          maxSide={1100}
+          invalid={bad("flea-evidence")}
+          t={t}
+        />
       )}
     </div>
   );
@@ -581,7 +638,7 @@ export function ExistingPetFields({
           onChange={onChange}
           invalidId={invalidId}
           hideWeight
-          hideFlea
+          showFleaEvidence
           bare
           t={t}
         />

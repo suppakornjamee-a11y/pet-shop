@@ -14,6 +14,7 @@ import {
   liffSubmitBookingRequest,
 } from "@/app/actions/liff";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
+import { fleaInfoChanged } from "@/lib/flea-tick-check";
 import { formatBaht } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
@@ -27,6 +28,7 @@ import {
   OwnerFields,
   PetFields,
   emptyPetDraft,
+  fleaDeclarationOf,
   focusField,
   petDraftToInput,
   splitDetail,
@@ -39,6 +41,7 @@ import {
 } from "./pet-quick-form";
 import { ItemDetail, ReviewDialog, draftReady, whenLabel } from "./item-detail";
 import { validateFleaForDraft } from "./flea-section";
+import { fleaDataOf } from "./flea-validation";
 import {
   entryToPayload,
   estimateDraft,
@@ -47,6 +50,7 @@ import {
   newItemDraft,
   saveCart,
   type CartEntry,
+  type FleaDraft,
   type ItemDraft,
 } from "./cart";
 import { Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
@@ -79,6 +83,7 @@ function petToDraft(p: CtxPet): PetDraft {
     fleaTickMedicine: p.fleaTickMedicine ?? "",
     fleaTickProductId: p.fleaTickProductId,
     lastFleaTickDate: p.lastFleaTickAt,
+    fleaEvidence: [],
     infoStatus: "",
   };
 }
@@ -202,9 +207,9 @@ function BookingBody() {
     [draft, servicesByKind, draftPet]
   );
 
-  function openDetail(k: Kind, petId: string, petInfo: ItemDraft["petInfo"] = "") {
+  function openDetail(k: Kind, petId: string, petInfo: ItemDraft["petInfo"] = "", flea: FleaDraft | null = null) {
     setInvalidId(null);
-    setDraft({ ...newItemDraft(k, petId), petInfo });
+    setDraft({ ...newItemDraft(k, petId), petInfo, ...(flea ? { flea } : {}) });
     setEditingKey(null);
     setStage("detail");
     window.scrollTo({ top: 0 });
@@ -257,8 +262,16 @@ function BookingBody() {
     const isNewPet = selectedPetId === "new";
     const petDraft = isNewPet ? newPets[0] : petEdits[selectedPetId];
     if (!petDraft) return;
-    const petError = isNewPet ? validatePet(petDraft, 0, t) : validateExistingPet(petDraft, t);
+    const original = isNewPet ? undefined : pets.find((p) => p.id === petDraft.id);
+    const petError = isNewPet ? validatePet(petDraft, 0, t) : validateExistingPet(petDraft, original, catalog, t);
     if (petError) return reject(petError);
+    // สัตว์เดิมที่แก้ข้อมูลยาเห็บหมัด: ยังไม่บันทึกลงสัตว์เลี้ยงที่ขั้นนี้ — ส่งต่อเป็นคำตอบ "แจ้งข้อมูลยาใหม่" ของรายการ
+    // เพื่อให้เซิร์ฟเวอร์ตรวจ + เก็บหลักฐาน + จดผลลงประวัติออเดอร์ตอนส่งคำขอ (ทางเดียวกับส่วนตรวจยาตอนเลือกวันเวลา)
+    let fleaInit: FleaDraft | null = null;
+    if (original && petDraft.infoStatus === "update") {
+      const declaration = fleaDeclarationOf(petDraft);
+      if (fleaInfoChanged(fleaDataOf(original), declaration)) fleaInit = { choice: "declare", ...declaration };
+    }
     // สัตว์เดิมที่ลูกค้ายืนยันว่าข้อมูลถูกต้อง: บันทึกแค่น้ำหนักล่าสุด — นอกนั้นบันทึกเต็มชุดเหมือนเดิม
     const confirmSame = !isNewPet && petDraft.infoStatus === "same";
     startTransition(async () => {
@@ -278,7 +291,7 @@ function BookingBody() {
         setNewPets([emptyPetDraft()]);
         setSelectedPetId(res.petIds[0]);
       }
-      openDetail("BATH", res.petIds[0], isNewPet ? "NEW" : confirmSame ? "SAME" : "UPDATED");
+      openDetail("BATH", res.petIds[0], isNewPet ? "NEW" : confirmSame ? "SAME" : "UPDATED", fleaInit);
     });
   }
 
@@ -466,7 +479,7 @@ function BookingBody() {
           </div>
         )}
 
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="outline"
             className="h-12 rounded-2xl"

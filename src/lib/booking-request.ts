@@ -185,6 +185,7 @@ async function loadFleaCatalog(): Promise<FleaTickProductInfo[]> {
 }
 
 const FLEA_DECLARATION_ERROR: Record<Exclude<FleaDeclarationError, "DATE_NOT_NEWER">, string> = {
+  DATE_UNCHANGED: "เปลี่ยนยาแล้ว กรุณากรอกวันที่ให้ยาครั้งล่าสุดของยาตัวใหม่",
   MEDICINE: "กรุณากรอกชื่อยาเห็บหมัด",
   DATE: "กรุณากรอกวันที่ให้ยาเห็บหมัดครั้งล่าสุด",
   DATE_FUTURE: "วันที่ให้ยาเห็บหมัดต้องไม่เป็นวันในอนาคต",

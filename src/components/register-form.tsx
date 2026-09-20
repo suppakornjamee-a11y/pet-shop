@@ -299,15 +299,15 @@ function FleaTickFields({
           !readOnly &&
           typed && (
             <div className="space-y-1.5">
-              {matches.length > 1 && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">{t.fleaTick.pickFormulaHint}</p>
+              {matches.length > 0 && (
+                <p className="text-xs font-medium text-muted-foreground">{t.fleaTick.didYouMean}</p>
               )}
               {matches.length === 0 && <p className="text-xs text-muted-foreground">{t.fleaTick.noMatchHint}</p>}
               {matches.map(({ product }) => (
                 <button
                   key={product.id}
                   type="button"
-                  onClick={() => onChange({ fleaTickProductId: product.id })}
+                  onClick={() => onChange({ fleaTickMedicine: product.name, fleaTickProductId: product.id })}
                   className="flex w-full flex-col items-start rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-accent/50"
                 >
                   <span className="font-medium">{product.name}</span>

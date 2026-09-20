@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireStaffUser } from "@/lib/auth-helpers";
+import { medicineNameKnown, normalizeMedicineName } from "@/lib/flea-tick";
 import { sendLinePush } from "@/lib/line";
 import { FLEA_INFO_REQUEST_LOG_PREFIX, FLEA_STAFF_CHECKED_LOG } from "@/lib/order-log";
 import type { ActionResult } from "./customers";
@@ -43,8 +44,19 @@ export async function upsertFleaTickProduct(input: unknown): Promise<ActionResul
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const { id, ...d } = parsed.data;
+  // ชื่อใกล้เคียง: ตัดชื่อซ้ำ (ไม่นับตัวพิมพ์/ช่องว่าง) และชื่อที่ซ้ำกับชื่อหลัก/สูตรทิ้ง — ค้นหาได้ผลเท่าเดิม แต่รายการไม่รก
+  const aliases: string[] = [];
+  for (const raw of d.aliases) {
+    const alias = raw.trim();
+    const key = normalizeMedicineName(alias);
+    if (!key || key === normalizeMedicineName(d.name) || key === normalizeMedicineName(d.formula ?? "")) continue;
+    if (aliases.some((a) => normalizeMedicineName(a) === key)) continue;
+    aliases.push(alias);
+    if (aliases.length >= 40) break;
+  }
   const data = {
     ...d,
+    aliases,
     formula: d.formula || null,
     bathNote: d.bathNote || null,
     labelSource: d.labelSource || null,
@@ -86,21 +98,41 @@ export async function verifyFleaTickProduct(id: string): Promise<ActionResult> {
  * พนักงานตรวจหลักฐาน (กล่องยา / ใบเสร็จ / สมุดสัตวแพทย์) แล้วเลือกยาที่ตรงกับหลักฐาน
  * บันทึกว่าใครตรวจ เมื่อไหร่ — เป็นการยืนยันข้อมูลที่บันทึก ไม่ใช่การรับรองว่าปลอดเห็บหมัด
  */
-export async function confirmPetFleaTick(petId: string, productId: string): Promise<ActionResult> {
+export async function confirmPetFleaTick(petId: string, productId: string, learnAlias = false): Promise<ActionResult> {
   const user = await requireStaffUser();
   const product = await prisma.fleaTickProduct.findFirst({ where: { id: productId, active: true } });
   if (!product) return { ok: false, error: "กรุณาเลือกยาจากฐานข้อมูล" };
-  await prisma.pet.update({
-    where: { id: petId },
-    data: {
-      fleaTickProductId: productId,
-      fleaTickSource: "STAFF_CHECKED",
-      fleaTickCheckedById: user.id,
-      fleaTickCheckedAt: new Date(),
-    },
-  });
+  const pet = await prisma.pet.findUnique({ where: { id: petId }, select: { fleaTickMedicine: true } });
+  if (!pet) return { ok: false, error: "ไม่พบสัตว์เลี้ยง" };
+
+  // จำชื่อที่ลูกค้าพิมพ์ไว้เป็น "ชื่อใกล้เคียง" ของยาตัวนี้ — ครั้งหน้าใครพิมพ์คำนี้จะขึ้นให้เลือกยาตัวนี้เลย
+  const typed = pet.fleaTickMedicine?.trim() ?? "";
+  const learned =
+    learnAlias && typed.length >= 2 && typed.length <= 60 && product.aliases.length < 40 && !medicineNameKnown(typed, product)
+      ? typed
+      : null;
+
+  await prisma.$transaction([
+    prisma.pet.update({
+      where: { id: petId },
+      data: {
+        fleaTickProductId: productId,
+        fleaTickSource: "STAFF_CHECKED",
+        fleaTickCheckedById: user.id,
+        fleaTickCheckedAt: new Date(),
+      },
+    }),
+    ...(learned
+      ? [prisma.fleaTickProduct.update({ where: { id: productId }, data: { aliases: { push: learned } } })]
+      : []),
+  ]);
   revalidatePath("/settings/flea-tick");
-  return { ok: true, message: "บันทึกผลตรวจหลักฐานแล้ว" };
+  return {
+    ok: true,
+    message: learned
+      ? `บันทึกผลตรวจหลักฐานแล้ว และเพิ่ม “${learned}” เป็นชื่อใกล้เคียงของ ${product.name}`
+      : "บันทึกผลตรวจหลักฐานแล้ว",
+  };
 }
 
 /**

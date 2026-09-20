@@ -101,6 +101,7 @@ export type FleaDeclarationError =
   | "DATE"
   | "DATE_FUTURE"
   | "DATE_BEFORE_BIRTH"
+  | "DATE_UNCHANGED"
   | "DATE_NOT_NEWER"
   | "EVIDENCE";
 
@@ -113,6 +114,15 @@ export function medicineChanged(
   if (!hadAny) return false;
   if (stored.productId && next.productId) return stored.productId !== next.productId;
   return normalizeMedicineName(stored.medicine) !== normalizeMedicineName(next.medicine);
+}
+
+/** ข้อมูลยาที่กรอกมาต่างจากที่บันทึกไว้ไหม (ชื่อยา / รหัสยา / วันที่ / มีรูปแนบ) — ไม่ต่าง = ลูกค้าไม่ได้แก้อะไร ไม่ต้องตรวจซ้ำ */
+export function fleaInfoChanged(stored: FleaPetData, next: FleaDeclaration): boolean {
+  const hadAny = !!stored.medicine.trim() || !!stored.productId;
+  const medicineDiffers = hadAny
+    ? medicineChanged(stored, next) || (next.productId ?? null) !== (stored.productId ?? null)
+    : !!next.medicine.trim() || !!next.productId;
+  return medicineDiffers || (next.date || "") !== (stored.givenAt ?? "") || next.evidence.length > 0;
 }
 
 /**
@@ -144,6 +154,8 @@ export function validateFleaDeclaration(input: {
   if (!isValidDateStr(d.date)) return "DATE";
   if (d.date > today) return "DATE_FUTURE";
   if (stored.birthDate && d.date < stored.birthDate) return "DATE_BEFORE_BIRTH";
+  // เปลี่ยนยาแล้วแต่ยังเป็นวันที่เดิม = วันที่ของยาตัวเก่า ถ้าปล่อยผ่านจะเอาไปนับระยะคุ้มครองของยาตัวใหม่ผิด
+  if (medicineChanged(stored, d) && stored.givenAt && d.date === stored.givenAt) return "DATE_UNCHANGED";
   // ครบกำหนดแล้วบอกว่าให้ยาครั้งใหม่ วันที่ต้องใหม่กว่าที่บันทึกไว้เดิม ไม่งั้นก็คือข้อมูลเก่าชุดเดิม
   if (pre.level === "ASK" && pre.ask === "EXPIRED" && stored.givenAt && d.date <= stored.givenAt) return "DATE_NOT_NEWER";
   if (evidenceRequired(pre, stored, d, catalog) && d.evidence.length === 0) return "EVIDENCE";
