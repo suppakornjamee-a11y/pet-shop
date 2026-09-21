@@ -610,18 +610,15 @@ function BookingBody() {
 
   return (
     <div className="space-y-5 pb-44">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="h-14 w-auto" />
-          <div className="mt-1 text-xs text-muted-foreground">{t.liff.bookTagline}</div>
-        </div>
+      <div className="relative flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="h-14 w-auto" />
         {cart.length > 0 && (
           <button
             type="button"
             onClick={() => setStage("cart")}
             aria-label={t.liffBook.viewCart(cart.length)}
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm transition-colors hover:bg-muted"
+            className="absolute right-0 flex h-11 w-11 items-center justify-center rounded-2xl border bg-card shadow-sm transition-colors hover:bg-muted"
           >
             <ShoppingBag className="h-5 w-5" />
             <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] font-semibold text-primary-foreground">

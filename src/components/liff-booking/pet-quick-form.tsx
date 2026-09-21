@@ -8,7 +8,6 @@ import { formatDateLong } from "@/lib/format";
 import { thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { MedicineNameField, fitsSpecies } from "@/components/medicine-name-field";
-import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -516,9 +515,6 @@ export function ExistingPetFields({
   return (
     <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
       <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-card text-primary ring-2 ring-primary/15">
-          <SpeciesIcon species={pet.species} className="h-7 w-7" />
-        </span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold leading-tight">{pet.name}</p>
           {summary && <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>}

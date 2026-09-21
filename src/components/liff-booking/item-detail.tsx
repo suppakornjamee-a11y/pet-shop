@@ -432,7 +432,6 @@ export function ItemDetail({
                       id="style-note"
                       rows={2}
                       className="rounded-2xl border-primary/15 bg-primary/5"
-                      placeholder={t.liffBook.styleNotePlaceholder}
                       value={draft.styleNote}
                       onChange={(e) => set({ styleNote: e.target.value })}
                     />
