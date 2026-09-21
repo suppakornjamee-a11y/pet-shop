@@ -52,6 +52,9 @@ export type CtxPet = {
   lastFleaTickAt: string;
 };
 
+/** พื้นการ์ดของหน้าจอง — ขอบมนมาก เงาอ่อนสีชมพู */
+export const CARD = "rounded-3xl border bg-card shadow-[0_2px_12px_rgba(190,60,110,0.06)]";
+
 /** กล่องหัวข้อของหน้ารายละเอียดรายการ — icon = ไอคอนหน้าหัวข้อ, tone accent = กล่องสีเน้น (สรุปราคา) */
 export function Section({
   title,
@@ -68,12 +71,7 @@ export function Section({
   children?: React.ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "space-y-3 rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
-        tone === "accent" ? "border-primary/25 bg-accent/30" : "bg-card"
-      )}
-    >
+    <div className={cn("space-y-3 p-4", CARD, tone === "accent" && "border-primary/25 bg-accent/30")}>
       {title && (
         <div className="flex items-center gap-2">
           {Icon && (
@@ -81,7 +79,7 @@ export function Section({
               <Icon className="h-4 w-4" />
             </span>
           )}
-          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-base font-bold">{title}</p>
           {titleExtra}
         </div>
       )}
@@ -118,10 +116,13 @@ function leadingBlanks(year: number, month: number): number {
 }
 
 export function MonthCalendar({
+  title,
   value,
   min,
   onChange,
 }: {
+  /** หัวข้อของกล่องปฏิทิน (ชิดซ้าย) — เดือนและปุ่มเลื่อนเดือนอยู่ชิดขวาในแถวเดียวกัน */
+  title?: string;
   value: string;
   min: string;
   onChange: (v: string) => void;
@@ -146,24 +147,25 @@ export function MonthCalendar({
   }
 
   return (
-    <div className="rounded-2xl border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-semibold">{monthLabel}</span>
-        <div className="flex gap-1">
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        {title ? <h2 className="text-base font-bold">{title}</h2> : <span />}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
             disabled={!canGoBack}
             aria-label="เดือนก่อนหน้า"
-            className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
+          <span className="min-w-[6.5rem] text-center text-sm text-muted-foreground">{monthLabel}</span>
           <button
             type="button"
             onClick={() => shiftMonth(1)}
             aria-label="เดือนถัดไป"
-            className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -197,7 +199,7 @@ export function MonthCalendar({
                 "relative flex h-10 items-center justify-center rounded-xl text-sm transition-colors sm:h-12",
                 isPast && "text-muted-foreground/35",
                 !isPast && !isSelected && "hover:bg-muted",
-                isSelected && "bg-primary font-semibold text-primary-foreground"
+                isSelected && "bg-primary font-semibold text-primary-foreground shadow-sm"
               )}
             >
               {day}
@@ -267,14 +269,18 @@ export function TimeSlotGroups({
                     disabled={!s.available}
                     onClick={() => onChange(s.time)}
                     className={cn(
-                      "flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-sm transition-colors",
-                      !s.available && "border-transparent bg-muted text-muted-foreground/50 line-through",
+                      "relative flex items-center justify-center rounded-xl border py-2.5 text-sm transition-colors",
+                      !s.available && "border-transparent bg-muted/70 text-muted-foreground/60 line-through",
                       s.available && !isSelected && "bg-card hover:border-primary/50",
-                      isSelected && "border-primary bg-primary font-semibold text-primary-foreground"
+                      isSelected && "border-primary bg-primary/10 font-semibold text-primary"
                     )}
                   >
-                    {s.available && !isSelected && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
                     {s.time}
+                    {!s.available && (
+                      <span className="absolute -top-1.5 right-1 rounded-full bg-destructive/10 px-1.5 text-[0.5625rem] font-medium leading-4 text-destructive no-underline">
+                        {t.liffBook.slotFull}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -20,10 +20,15 @@ export function ImagePicker({
   max = 3,
   maxSide = 1000,
   invalid = false,
+  variant = "tile",
+  buttonLabel,
   t,
 }: {
   id?: string;
   label: string;
+  /** tile = ช่องสี่เหลี่ยมเล็กต่อท้ายรูป (ค่าเริ่มต้น) · button = ปุ่มเส้นประเต็มความกว้างพร้อมข้อความ (ใช้กับภาพตัวอย่างทรงขน) */
+  variant?: "tile" | "button";
+  buttonLabel?: string;
   images: string[];
   onChange: (v: string[]) => void;
   max?: number;
@@ -54,7 +59,7 @@ export function ImagePicker({
 
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      {variant === "tile" && <Label>{label}</Label>}
       <div className="flex flex-wrap gap-2">
         {images.map((src, i) => (
           <div key={i} className="relative h-20 w-20 overflow-hidden rounded-xl border">
@@ -70,7 +75,22 @@ export function ImagePicker({
             </button>
           </div>
         ))}
-        {images.length < max && (
+        {images.length < max && variant === "button" && (
+          <button
+            id={id}
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              "flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed text-sm text-muted-foreground transition-colors hover:bg-muted",
+              invalid && "border-destructive border-solid"
+            )}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+            {buttonLabel ?? label}
+          </button>
+        )}
+        {images.length < max && variant === "tile" && (
           <button
             id={id}
             type="button"

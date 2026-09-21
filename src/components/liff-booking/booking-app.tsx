@@ -1,9 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Bath, Home, Info, Loader2, Pencil, Plus, Scissors, ShoppingBag, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  FileText,
+  Home,
+  Info,
+  Loader2,
+  PawPrint,
+  Plus,
+  QrCode,
+  Scissors,
+  Send,
+  ShoppingBag,
+  Sparkles,
+} from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -54,10 +70,10 @@ import {
   type FleaDraft,
   type ItemDraft,
 } from "./cart";
-import { Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
+import { CARD, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
-const KIND_ORDER: Kind[] = ["BOARDING", "BATH", "OTHER"];
-const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Bath, OTHER: Scissors };
+const KIND_ORDER: Kind[] = ["BATH", "BOARDING", "OTHER"];
+const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Scissors, OTHER: Sparkles };
 
 type Ctx =
   | { linked: false }
@@ -89,11 +105,24 @@ function petToDraft(p: CtxPet): PetDraft {
   };
 }
 
-/** แถบปุ่มที่แปะขอบล่างจอ — summary = ข้อความสรุปด้านซ้าย (เช่น ยอดโดยประมาณ) */
-function BottomBar({ summary, children }: { summary?: React.ReactNode; children: React.ReactNode }) {
+/** แถบปุ่มที่แปะขอบล่างจอ — summary = ข้อความสรุปด้านซ้าย (เช่น ยอดโดยประมาณ) · aboveTabs = ยกขึ้นเหนือแถบเมนูล่าง */
+function BottomBar({
+  summary,
+  aboveTabs = false,
+  children,
+}: {
+  summary?: React.ReactNode;
+  aboveTabs?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-      <div className="flex items-center gap-3 rounded-2xl border bg-card/95 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur">
+    <div
+      className={cn(
+        "fixed inset-x-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
+        aboveTabs ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-3"
+      )}
+    >
+      <div className="flex items-center gap-3 rounded-3xl border bg-card/95 p-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
         {summary && <div className="min-w-0 shrink-0 pl-2">{summary}</div>}
         <div className="min-w-0 flex-1">{children}</div>
       </div>
@@ -101,35 +130,59 @@ function BottomBar({ summary, children }: { summary?: React.ReactNode; children:
   );
 }
 
-function Header({ onBack, cartCount, onCart, t }: { onBack?: () => void; cartCount: number; onCart?: () => void; t: T }) {
+/** แถบหัวของหน้าย่อย — ปุ่มย้อนกลับกลมทางซ้าย ชื่อหน้ากึ่งกลาง */
+function AppBar({ title, onBack, t }: { title: string; onBack: () => void; t: T }) {
   return (
-    <div className="flex items-start gap-3">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label={t.liff.backButton}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-      )}
-      <div className="min-w-0 flex-1">
-        <Stepper step={1} t={t} />
-      </div>
-      {onCart && cartCount > 0 && (
-        <button
-          type="button"
-          onClick={onCart}
-          aria-label={t.liffBook.viewCart(cartCount)}
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-card transition-colors hover:bg-muted"
-        >
-          <ShoppingBag className="h-4 w-4" />
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] font-semibold text-primary-foreground">
-            {cartCount}
-          </span>
-        </button>
-      )}
+    <div className="relative flex h-11 items-center justify-center">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label={t.liff.backButton}
+        className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border bg-card shadow-sm transition-colors hover:bg-muted"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <h1 className="px-12 text-center text-base font-bold">{title}</h1>
+    </div>
+  );
+}
+
+const BOOKING_STEP_ICONS = [CalendarDays, FileText, QrCode, Check];
+
+/** ขั้นตอนการจองของหน้าแรก — วงกลมไอคอน 4 ขั้นเชื่อมด้วยเส้น ขั้นแรก (จองคิว) เป็นขั้นปัจจุบัน */
+function BookingSteps({ t }: { t: T }) {
+  const labels = [t.liff.stepBookQueue, t.liff.stepAwaitReview, t.liff.stepPayment, t.liff.stepInProgress];
+  return (
+    <div className="flex items-start">
+      {labels.map((label, i) => {
+        const Icon = BOOKING_STEP_ICONS[i];
+        const active = i === 0;
+        return (
+          <Fragment key={label}>
+            <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
+              <span
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full",
+                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground/60"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span
+                className={cn(
+                  "text-center text-[0.6875rem] leading-tight",
+                  active ? "font-semibold text-primary" : "text-muted-foreground"
+                )}
+              >
+                {label}
+              </span>
+            </div>
+            {i < labels.length - 1 && (
+              <div className={cn("mt-[1.0625rem] h-0.5 flex-1 rounded-full", i === 0 ? "bg-primary/60" : "bg-primary/15")} />
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -368,17 +421,24 @@ function BookingBody() {
   /* ---------- หน้ารายละเอียดรายการ ---------- */
   if (stage === "detail" && draft && draftPet && idToken) {
     const KindIcon = KIND_ICONS[draft.kind];
+    const petMeta = [draftPet.breed, draftPet.weightKg ? `${draftPet.weightKg} ${t.liffBook.weightUnit}` : null]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <div className="space-y-4 pb-28">
-        <Header onBack={() => setStage(editingKey ? "cart" : "start")} cartCount={cart.length} t={t} />
-        <div className="flex items-center gap-3 rounded-2xl border bg-card p-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/40">
-            <KindIcon className="h-5 w-5 text-primary" />
+        <AppBar title={t.liffBook.detailTitle} onBack={() => setStage(editingKey ? "cart" : "start")} t={t} />
+        <div className={cn("flex items-center gap-3 p-3.5", CARD)}>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <KindIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="font-semibold">{t.liffBook.kind[draft.kind]}</div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <SpeciesIcon species={draftPet.species} className="h-3.5 w-3.5" /> {draftPet.name}
+            <div className="font-bold leading-tight">{t.liffBook.kind[draft.kind]}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <SpeciesIcon species={draftPet.species} className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 truncate">
+                {draftPet.name}
+                {petMeta && ` (${petMeta})`}
+              </span>
             </div>
           </div>
         </div>
@@ -397,7 +457,7 @@ function BookingBody() {
         <BottomBar
           summary={
             <div className="leading-tight">
-              <div className="text-[0.6875rem] text-muted-foreground">{t.liffBook.estimate}</div>
+              <div className="text-[0.6875rem] text-muted-foreground">{t.liffBook.estimateShort}</div>
               <div className="text-lg font-bold tabular-nums text-primary">
                 {formatBaht(estimateDraft(draft, draftServices, rooms).estimate)}
               </div>
@@ -405,11 +465,12 @@ function BookingBody() {
           }
         >
           <Button
-            className="h-12 w-full rounded-xl text-base"
+            className="h-12 w-full rounded-2xl text-base font-semibold shadow-md"
             disabled={!draftReady(draft, draftServices, rooms)}
             onClick={addChecked}
           >
             {t.liffBook.addToCart}
+            <Plus className="h-5 w-5" />
           </Button>
         </BottomBar>
       </div>
@@ -418,79 +479,77 @@ function BookingBody() {
 
   /* ---------- ตะกร้า ---------- */
   if (stage === "cart") {
-    const totalEstimate = cart.reduce((s, e) => s + e.estimate, 0);
-    const totalDue = cart.reduce((s, e) => s + e.dueNow, 0);
+    const totalEstimate = cart.reduce((sum, e) => sum + e.estimate, 0);
+    const totalDue = cart.reduce((sum, e) => sum + e.dueNow, 0);
+    const remaining = Math.max(0, totalEstimate - totalDue);
+    // ป้าย "(มัดจำ N ตัว)" ใช้ได้เฉพาะเมื่อทุกรายการเป็นงานอาบน้ำที่จ่ายแค่มัดจำตอนแรก
+    const depositCount = cart.filter((e) => e.deposit > 0).length;
+    const allBath = cart.length > 0 && cart.every((e) => e.draft.kind === "BATH");
     const petOrder = new Map(pets.map((p, i) => [p.id, i]));
     const sorted = [...cart].sort((a, b) => (petOrder.get(a.draft.petId) ?? 99) - (petOrder.get(b.draft.petId) ?? 99));
     return (
       <div className="space-y-4 pb-28">
-        <Header onBack={() => setStage("start")} cartCount={0} t={t} />
-        <h1 className="text-lg font-semibold">{t.liffBook.cartTitle}</h1>
+        <AppBar title={t.liffBook.cartTitleCount(cart.length)} onBack={() => setStage("start")} t={t} />
 
         {sorted.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{t.liffBook.cartEmpty}</p>
         ) : (
           <div className="space-y-3">
-            {sorted.map((e) => {
-              const Icon = KIND_ICONS[e.draft.kind];
-              return (
-                <div key={e.key} className="rounded-2xl border bg-card p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/40">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </span>
-                    <div className="min-w-0 flex-1 space-y-0.5 text-sm">
-                      <div className="flex items-center gap-1 font-semibold">
-                        <SpeciesIcon species={e.species} className="h-4 w-4" /> {e.petName} · {t.liffBook.kind[e.draft.kind]}
+            {sorted.map((e) => (
+              <div key={e.key} className={cn("space-y-3 p-4", CARD)}>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <SpeciesIcon species={e.species} className="h-6 w-6" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold leading-tight">
+                      {e.petName} · {t.liffBook.kind[e.draft.kind]}
+                    </div>
+                    {(e.roomLabel || e.serviceNames.length > 0) && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {[e.roomLabel, ...e.serviceNames].filter(Boolean).join(" · ")}
                       </div>
-                      {e.roomLabel && <div>{e.roomLabel}</div>}
-                      {e.serviceNames.length > 0 && <div className="text-muted-foreground">{e.serviceNames.join(" · ")}</div>}
-                      {e.draft.kind === "BATH" && e.draft.styleNote && (
-                        <div className="text-muted-foreground">
-                          {t.liffBook.styleTitle}: {e.draft.styleNote}
-                        </div>
-                      )}
-                      {whenLabel(e.draft, t).map((l) => (
-                        <div key={l}>{l}</div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-dashed pt-3 text-sm">
-                    <div>
-                      <div>
-                        {t.liffBook.estimate} <span className="font-semibold">{formatBaht(e.estimate)}</span>
+                    )}
+                    {e.draft.kind === "BATH" && e.draft.styleNote && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {t.liffBook.styleTitle}: {e.draft.styleNote}
                       </div>
-                      {e.deposit > 0 && <div className="text-xs text-muted-foreground">{t.liffBook.bathDeposit}</div>}
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <Button variant="outline" size="sm" className="rounded-xl" onClick={() => editEntry(e)}>
-                        <Pencil className="h-3.5 w-3.5" /> {t.liffBook.edit}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl text-destructive"
-                        onClick={() => updateCart(cart.filter((x) => x.key !== e.key))}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> {t.liffBook.remove}
-                      </Button>
-                    </div>
+                    )}
                   </div>
+                  <div className="shrink-0 font-bold tabular-nums text-primary">{formatBaht(e.estimate)}</div>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2 rounded-2xl bg-primary/5 px-3 py-2 text-xs">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">{whenLabel(e.draft, t).join(" · ")}</span>
+                  <button type="button" className="font-semibold text-primary" onClick={() => editEntry(e)}>
+                    {t.liffBook.edit}
+                  </button>
+                  <span aria-hidden className="h-3 w-px bg-border" />
+                  <button
+                    type="button"
+                    className="text-muted-foreground"
+                    onClick={() => updateCart(cart.filter((x) => x.key !== e.key))}
+                  >
+                    {t.liffBook.remove}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: t.liffBook.addAnotherPet, kind: "BATH" as const },
-            { label: t.liffBook.addOtherService, kind: null },
+            { label: t.liffBook.addAnotherPet, kind: "BATH" as const, dashed: true },
+            { label: t.liffBook.addOtherService, kind: null, dashed: false },
           ].map((b) => (
             <Button
               key={b.label}
               variant="outline"
-              className="h-11 min-w-0 gap-1.5 rounded-xl px-2 text-[0.8125rem] sm:text-sm"
+              className={cn(
+                "h-11 min-w-0 gap-1.5 rounded-2xl bg-card px-2 text-[0.8125rem] sm:text-sm",
+                b.dashed ? "border-dashed border-primary/50 text-primary hover:text-primary" : "text-foreground/80"
+              )}
               onClick={() => {
                 setKind(b.kind);
                 setStage("start");
@@ -503,30 +562,39 @@ function BookingBody() {
         </div>
 
         {cart.length > 0 && (
-          <div className="space-y-3 rounded-2xl border bg-card p-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm text-muted-foreground">{t.liffBook.dueAfterApproval}</span>
-              <span className="font-semibold tabular-nums">{formatBaht(totalDue)}</span>
+          <div className={cn("space-y-3 p-4", CARD)}>
+            <h2 className="text-base font-bold">{t.liffBook.summaryTitle}</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span>{allBath && depositCount > 0 ? t.liffBook.dueDeposit(depositCount) : t.liffBook.dueAfterApproval}</span>
+                <span className="font-bold tabular-nums text-primary">{formatBaht(totalDue)}</span>
+              </div>
+              {remaining > 0 && (
+                <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
+                  <span>{t.liffBook.remainingAtShop}</span>
+                  <span className="tabular-nums">{formatBaht(remaining)}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-baseline justify-between gap-3 border-t pt-3">
-              <span className="text-sm">{t.liffBook.estimate}</span>
+              <span className="font-bold">{t.liffBook.estimate}</span>
               <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
             </div>
           </div>
         )}
 
         {cart.length > 0 && (
-          <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {t.liffBook.confirmNotice}
-          </p>
+          <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 p-3.5 text-amber-900">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="min-w-0 flex-1 text-xs leading-relaxed">{t.liffBook.confirmNotice}</p>
+          </div>
         )}
 
         {cart.length > 0 && (
           <BottomBar>
-            <Button className="h-12 w-full rounded-xl text-base" disabled={isPending} onClick={submit}>
-              {isPending && <Loader2 className="animate-spin" />}
-              {t.liffBook.submit}
+            <Button className="h-12 w-full rounded-2xl text-base font-semibold shadow-md" disabled={isPending} onClick={submit}>
+              {t.liffBook.submitWithCount(cart.length)}
+              {isPending ? <Loader2 className="animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </BottomBar>
         )}
@@ -545,12 +613,55 @@ function BookingBody() {
       : kind === "BATH");
 
   return (
-    <div className="space-y-5 pb-28">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="mx-auto h-20 w-auto" />
-      <Header cartCount={cart.length} onCart={() => setStage("cart")} t={t} />
+    <div className="space-y-5 pb-44">
+      <div className="flex items-center gap-3">
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm"
+          style={{
+            backgroundColor: "var(--primary)",
+            backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 60%, white))",
+          }}
+        >
+          <PawPrint className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-bold leading-tight text-primary">{t.liff.bookPageTitle}</div>
+          <div className="text-xs text-muted-foreground">{t.liff.bookTagline}</div>
+        </div>
+        {cart.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setStage("cart")}
+            aria-label={t.liffBook.viewCart(cart.length)}
+            className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm transition-colors hover:bg-muted"
+          >
+            <ShoppingBag className="h-5 w-5" />
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] font-semibold text-primary-foreground">
+              {cart.length}
+            </span>
+          </button>
+        )}
+      </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className={cn("p-4", CARD)}>
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-bold">{t.liffBook.stepsTitle}</span>
+          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            {t.liffBook.stepOf(1, 4)}
+          </span>
+        </div>
+        <BookingSteps t={t} />
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold leading-tight">{t.liff.chooseServiceTitle}</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t.liffBook.chooseServiceHint}</p>
+        </div>
+        <span className="shrink-0 pb-0.5 text-xs text-muted-foreground">{t.liffBook.stepNumber(1)}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2.5">
         {KIND_ORDER.map((k) => {
           const Icon = KIND_ICONS[k];
           const active = kind === k;
@@ -560,19 +671,30 @@ function BookingBody() {
               type="button"
               onClick={() => chooseKind(k)}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-card px-2 py-3 text-center text-sm transition-colors",
-                active ? "border-primary font-semibold text-primary" : "border-transparent"
+                "flex flex-col items-start gap-2 rounded-3xl border-2 p-3 text-left transition-colors",
+                active ? "border-primary bg-primary/5" : "border-border bg-card"
               )}
             >
               <span
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-xl transition-colors",
-                  active ? "bg-primary text-primary-foreground" : "bg-accent/40 text-primary"
+                  "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : k === "OTHER"
+                      ? "bg-amber-100 text-amber-600"
+                      : "bg-primary/10 text-primary"
                 )}
               >
                 <Icon className="h-5 w-5" />
               </span>
-              {t.liffBook.kind[k]}
+              <span className="min-w-0">
+                <span className={cn("block text-sm font-bold leading-tight", active && "text-primary")}>
+                  {t.liffBook.kind[k]}
+                </span>
+                <span className="mt-0.5 block text-[0.6875rem] leading-tight text-muted-foreground">
+                  {t.liffBook.kindSubtitle[k]}
+                </span>
+              </span>
             </button>
           );
         })}
@@ -609,25 +731,43 @@ function BookingBody() {
       )}
 
       {kind && ctx.linked && (
-        <div className="space-y-4">
+        <div className={cn("space-y-4 p-4", CARD)}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
+              <p className="text-xs text-muted-foreground">{t.liffBook.petSectionHint}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {t.liffBook.returningBadge}
+            </span>
+          </div>
+
           {pets.length > 0 || kind === "BATH" ? (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold">{t.liffBook.selectPet}</p>
-              <div className="flex flex-wrap gap-2">
-                {pets.map((p) => (
+            <div className="flex flex-wrap gap-2">
+              {pets.map((p) => {
+                const on = selectedPetId === p.id;
+                return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setSelectedPetId(p.id)}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition-colors",
-                      selectedPetId === p.id ? "border-primary bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted"
+                      "flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 text-sm transition-colors",
+                      on ? "border-primary bg-primary font-semibold text-primary-foreground" : "bg-card hover:bg-muted"
                     )}
                   >
-                    <SpeciesIcon species={p.species} className="h-4 w-4" /> {p.name}
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded-full",
+                        on ? "bg-white/25 text-primary-foreground" : "bg-primary/10 text-primary"
+                      )}
+                    >
+                      <SpeciesIcon species={p.species} className="h-4 w-4" />
+                    </span>
+                    {p.name}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t.liff.noPetsFound}</p>
@@ -640,8 +780,8 @@ function BookingBody() {
                 index={0}
                 catalog={catalog}
                 onChange={(v) => setNewPets([v])}
-                onRemove={pets.length > 0 ? () => setSelectedPetId(pets[0].id) : undefined}
                 invalidId={invalidId}
+                bare
                 t={t}
               />
             ) : (
@@ -669,15 +809,20 @@ function BookingBody() {
       )}
 
       {kind && !showRegister && (
-        <BottomBar>
-          <Button className="h-12 w-full rounded-xl text-base" disabled={!canNext || isPending} onClick={nextFromStart}>
+        <BottomBar aboveTabs={ctx.linked}>
+          <Button
+            className="h-12 w-full rounded-2xl text-base font-semibold shadow-md"
+            disabled={!canNext || isPending}
+            onClick={nextFromStart}
+          >
             {isPending && <Loader2 className="animate-spin" />}
             {kind === "BATH" ? t.liffBook.saveAndNext : t.liff.nextStepButton}
+            {!isPending && <ArrowRight className="h-5 w-5" />}
           </Button>
         </BottomBar>
       )}
 
-      {ctx.linked && !kind && <LiffTabs />}
+      {ctx.linked && <LiffTabs />}
     </div>
   );
 }

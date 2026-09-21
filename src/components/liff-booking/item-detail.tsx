@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bath, Check, Clock, Loader2, Scissors, Sparkles, Video, Wallet } from "lucide-react";
+import { Check, Loader2, Sparkles, Video, Wallet } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { formatBaht, formatDateLong } from "@/lib/format";
@@ -60,8 +60,8 @@ function OptionRow({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 rounded-xl border p-3 text-left text-sm transition-colors",
-        active ? "border-primary bg-accent/30" : "bg-card hover:bg-muted/60"
+        "flex items-center gap-3 rounded-2xl border p-3.5 text-left text-sm transition-colors",
+        active ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/60"
       )}
     >
       <span
@@ -79,9 +79,9 @@ function OptionRow({
             <Check className="h-3.5 w-3.5" strokeWidth={3} />
           ))}
       </span>
-      <span className={cn("min-w-0 flex-1", active && "font-medium")}>{label}</span>
+      <span className={cn("min-w-0 flex-1", active ? "font-semibold" : "font-medium")}>{label}</span>
       {price !== undefined && (
-        <span className={cn("shrink-0 tabular-nums", active ? "font-semibold text-primary" : "text-muted-foreground")}>
+        <span className={cn("shrink-0 font-bold tabular-nums", active && "text-primary")}>
           {formatBaht(price)}
         </span>
       )}
@@ -121,12 +121,11 @@ export function SlotPicker({
   }, [draft.date, queueType]);
 
   return (
-    <>
-      <MonthCalendar value={draft.date} min={todayStr()} onChange={(date) => set({ date, time: "" })} />
+    <Section>
+      <MonthCalendar title={t.liffBook.dateTimeTitle} value={draft.date} min={todayStr()} onChange={(date) => set({ date, time: "" })} />
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">{t.liff.selectSlotLabel}</span>
+          <span className="text-sm font-bold">{t.liffBook.slotsTitle}</span>
           {draft.time && (
             <span className="ml-auto rounded-full bg-accent/40 px-3 py-1 text-xs font-medium text-primary">
               ✓ {draft.time} {t.liff.timeUnitSuffix}
@@ -149,7 +148,7 @@ export function SlotPicker({
           />
         )}
       </div>
-    </>
+    </Section>
   );
 }
 
@@ -393,7 +392,7 @@ export function ItemDetail({
         <>
           <FleaTickSection draft={draft} set={set} pet={pet} catalog={catalog} invalidId={invalidId} t={t} />
 
-          <Section title={t.liffBook.bathType} icon={Bath}>
+          <Section title={t.liffBook.bathType}>
             <div className="grid gap-2">
               {groups.main.map((s) => (
                 <OptionRow
@@ -409,7 +408,7 @@ export function ItemDetail({
           </Section>
 
           {groups.groom.length > 0 && (
-            <Section title={t.liffBook.groomType} icon={Scissors}>
+            <Section title={t.liffBook.groomType}>
               <div className="grid gap-2">
                 <OptionRow mode="radio" active={!groomChosen} label={t.liffBook.noGroom} onClick={() => pickOne(groups.groom, null)} />
                 {groups.groom.map((s) => (
@@ -426,18 +425,22 @@ export function ItemDetail({
               {groomChosen && (
                 <div className="space-y-3 border-t pt-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="style-note">{t.liffBook.styleTitle}</Label>
-                    <p className="text-xs text-muted-foreground">{t.liffBook.styleHint}</p>
+                    <Label htmlFor="style-note" className="font-semibold">
+                      {t.liffBook.styleLabel}
+                    </Label>
                     <Textarea
                       id="style-note"
                       rows={2}
-                      className="rounded-xl bg-card"
+                      className="rounded-2xl border-primary/15 bg-primary/5"
+                      placeholder={t.liffBook.styleNotePlaceholder}
                       value={draft.styleNote}
                       onChange={(e) => set({ styleNote: e.target.value })}
                     />
                   </div>
                   <ImagePicker
+                    variant="button"
                     label={t.liffBook.styleImages}
+                    buttonLabel={t.liffBook.styleImagesButton}
                     images={draft.styleImages}
                     onChange={(styleImages) => set({ styleImages })}
                     max={3}

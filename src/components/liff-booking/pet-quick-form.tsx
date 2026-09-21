@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
 import { petAge } from "@/lib/pet-age";
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { declarationError, fleaDataOf, type FleaFieldIds } from "./flea-validation";
 import { ImagePicker } from "./image-picker";
-import { todayStr, type CtxPet, type Species, type T } from "./shared";
+import { CARD, todayStr, type CtxPet, type Species, type T } from "./shared";
 
 export type OwnerDraft = { name: string; phone: string; petInstagram: string };
 
@@ -196,8 +196,8 @@ export function OwnerFields({
 }) {
   const bad = (id: string) => invalidId === id;
   return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4">
-      <p className="text-sm font-semibold">{t.liffBook.ownerTitle}</p>
+    <div className={cn("space-y-3 p-4", CARD)}>
+      <p className="text-sm font-bold">{t.liffBook.ownerTitle}</p>
       <div className="space-y-1.5">
         <Label htmlFor="ow-name">{t.liffBook.ownerName}</Label>
         <Input
@@ -312,7 +312,7 @@ export function PetFields({
   const age = petAge(pet.birthDate, todayStr());
 
   return (
-    <div className={bare ? "space-y-3 border-t pt-3" : "space-y-3 rounded-2xl border bg-card p-4"}>
+    <div className={bare ? "space-y-3 border-t pt-3" : cn("space-y-3 p-4", CARD)}>
       {!bare && (
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold">{t.liffBook.petTitle}</p>
@@ -497,49 +497,62 @@ export function ExistingPetFields({
   // น้ำหนักหรือข้อมูลสุขภาพเดิมที่ยังไม่เคยกรอกครบ (สัตว์ที่พนักงานลงทะเบียนไว้ก่อนมีช่องเหล่านี้) ยืนยันว่า "ถูกต้อง" ไม่ได้ — ต้องกรอกเพิ่ม
   const incomplete = !(Number(pet.weightKg) > 0) || !pet.hasAllergies || !pet.hasCautions || !pet.hasChronicDisease;
   const shown = (has: HasDetail, note: string) => (has === "yes" ? note : has === "no" ? t.liffBook.diseaseNo : "-");
-  const rows: [string, string][] = [
-    [t.liffBook.weight, pet.weightKg || "-"],
+  const healthRows: [string, string][] = [
     [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
     [t.liffBook.disease, shown(pet.hasChronicDisease, pet.chronicDiseaseNote)],
     [t.liffBook.cautions, shown(pet.hasCautions, pet.groomingCautions)],
-    // ยาเห็บหมัดที่เคยแจ้งไว้ — ชื่อจากฐานข้อมูลยาถ้าเคยเลือกไว้ ไม่งั้นใช้ชื่อที่ลูกค้าพิมพ์
-    [
-      t.liffBook.fleaMedicine,
-      catalog.find((p) => p.id === pet.fleaTickProductId)?.name || pet.fleaTickMedicine.trim() || "-",
-    ],
-    [
-      t.liffBook.fleaDate,
-      pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-",
-    ],
   ];
+  // ยาเห็บหมัดที่เคยแจ้งไว้ — ชื่อจากฐานข้อมูลยาถ้าเคยเลือกไว้ ไม่งั้นใช้ชื่อที่ลูกค้าพิมพ์
+  const medicine = catalog.find((p) => p.id === pet.fleaTickProductId)?.name || pet.fleaTickMedicine.trim() || "-";
+  const ageText = age
+    ? [age.years > 0 ? t.register.ageYears(age.years) : null, age.months > 0 ? t.register.ageMonths(age.months) : null]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+  const summary = [pet.breed, ageText, Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="space-y-4 rounded-2xl border bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
       <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/50 text-primary">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-card text-primary ring-2 ring-primary/15">
           <SpeciesIcon species={pet.species} className="h-7 w-7" />
         </span>
-        <div className="min-w-0">
-          <p className="text-base font-semibold leading-tight">{pet.name}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {[t.labels.species[pet.species], pet.breed, age ? t.liffBook.age(age.years, age.months) : null]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold leading-tight">{pet.name}</p>
+          {summary && <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>}
         </div>
+        {pet.infoStatus === "same" && (
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+            <Check className="h-4 w-4" strokeWidth={3} />
+          </span>
+        )}
       </div>
 
       {pet.infoStatus !== "update" && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold">{t.liffBook.health}</p>
-          <dl className="divide-y rounded-xl border bg-muted/30 text-sm">
-            {rows.map(([label, value]) => (
-              <div key={label} className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <dt className="shrink-0 text-xs text-muted-foreground sm:max-w-[45%] sm:text-sm">{label}</dt>
-                <dd className="font-medium sm:text-right">{value}</dd>
-              </div>
-            ))}
-          </dl>
+        <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+          <div className="min-w-0 rounded-2xl bg-card p-3">
+            <p className="text-xs font-bold">{t.liffBook.healthShort}</p>
+            <dl className="mt-1.5 space-y-1.5">
+              {healthRows.map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[0.6875rem] font-light text-muted-foreground">{label}</dt>
+                  <dd className="text-xs font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <div className="min-w-0 rounded-2xl bg-card p-3">
+            <p className="text-xs font-bold">{t.fleaTick.title}</p>
+            <div className="mt-1.5 space-y-1.5">
+              <p className="text-xs font-semibold">{medicine}</p>
+              <p className="text-[0.6875rem] text-muted-foreground">
+                {t.fleaTick.lastGivenLabel}{" "}
+                {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
