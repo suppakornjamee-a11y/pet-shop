@@ -385,7 +385,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
           <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
             <Button className="h-14 w-full rounded-2xl text-base" disabled={!canResubmit || isPending} onClick={() => resubmit(selected)}>
               {isPending && <Loader2 className="animate-spin" />}
-              {t.liffBook.resubmit}
+              {t.common.confirm}
             </Button>
           </div>
         </>

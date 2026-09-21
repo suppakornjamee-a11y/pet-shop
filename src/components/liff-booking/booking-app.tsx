@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } fr
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ArrowRight,
   CalendarDays,
   Check,
   ChevronLeft,
@@ -12,11 +11,9 @@ import {
   Home,
   Info,
   Loader2,
-  PawPrint,
   Plus,
   QrCode,
   Scissors,
-  Send,
   ShoppingBag,
   Sparkles,
 } from "lucide-react";
@@ -469,8 +466,7 @@ function BookingBody() {
             disabled={!draftReady(draft, draftServices, rooms)}
             onClick={addChecked}
           >
-            {t.liffBook.addToCart}
-            <Plus className="h-5 w-5" />
+            {t.common.confirm}
           </Button>
         </BottomBar>
       </div>
@@ -593,8 +589,8 @@ function BookingBody() {
         {cart.length > 0 && (
           <BottomBar>
             <Button className="h-12 w-full rounded-2xl text-base font-semibold shadow-md" disabled={isPending} onClick={submit}>
-              {t.liffBook.submitWithCount(cart.length)}
-              {isPending ? <Loader2 className="animate-spin" /> : <Send className="h-4 w-4" />}
+              {isPending && <Loader2 className="animate-spin" />}
+              {t.common.confirm}
             </Button>
           </BottomBar>
         )}
@@ -615,18 +611,10 @@ function BookingBody() {
   return (
     <div className="space-y-5 pb-44">
       <div className="flex items-center gap-3">
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm"
-          style={{
-            backgroundColor: "var(--primary)",
-            backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 60%, white))",
-          }}
-        >
-          <PawPrint className="h-6 w-6" />
-        </span>
         <div className="min-w-0 flex-1">
-          <div className="text-lg font-bold leading-tight text-primary">{t.liff.bookPageTitle}</div>
-          <div className="text-xs text-muted-foreground">{t.liff.bookTagline}</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo-light.png" alt={t.liff.bookPageTitle} className="h-14 w-auto" />
+          <div className="mt-1 text-xs text-muted-foreground">{t.liff.bookTagline}</div>
         </div>
         {cart.length > 0 && (
           <button
@@ -816,8 +804,7 @@ function BookingBody() {
             onClick={nextFromStart}
           >
             {isPending && <Loader2 className="animate-spin" />}
-            {kind === "BATH" ? t.liffBook.saveAndNext : t.liff.nextStepButton}
-            {!isPending && <ArrowRight className="h-5 w-5" />}
+            {t.common.confirm}
           </Button>
         </BottomBar>
       )}

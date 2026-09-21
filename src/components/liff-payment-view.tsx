@@ -339,7 +339,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
           ) : (
             <Button className="w-full" onClick={confirmSlip} disabled={uploading}>
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {t.liff.confirmSlipButton}
+              {t.common.confirm}
             </Button>
           )}
         </div>
