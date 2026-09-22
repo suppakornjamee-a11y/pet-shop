@@ -1,18 +1,15 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
-  FileText,
   Home,
   Info,
   Loader2,
   Plus,
-  QrCode,
   Scissors,
   ShoppingBag,
   Sparkles,
@@ -67,7 +64,7 @@ import {
   type FleaDraft,
   type ItemDraft,
 } from "./cart";
-import { CARD, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
+import { CARD, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
 const KIND_ORDER: Kind[] = ["BATH", "BOARDING", "OTHER"];
 const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Scissors, OTHER: Sparkles };
@@ -140,46 +137,6 @@ function AppBar({ title, onBack, t }: { title: string; onBack: () => void; t: T 
         <ChevronLeft className="h-5 w-5" />
       </button>
       <h1 className="px-12 text-center text-base font-bold">{title}</h1>
-    </div>
-  );
-}
-
-const BOOKING_STEP_ICONS = [CalendarDays, FileText, QrCode, Check];
-
-/** ขั้นตอนการจองของหน้าแรก — วงกลมไอคอน 4 ขั้นเชื่อมด้วยเส้น ขั้นแรก (จองคิว) เป็นขั้นปัจจุบัน */
-function BookingSteps({ t }: { t: T }) {
-  const labels = [t.liff.stepBookQueue, t.liff.stepAwaitReview, t.liff.stepPayment, t.liff.stepInProgress];
-  return (
-    <div className="flex items-start">
-      {labels.map((label, i) => {
-        const Icon = BOOKING_STEP_ICONS[i];
-        const active = i === 0;
-        return (
-          <Fragment key={label}>
-            <div className="flex w-14 shrink-0 flex-col items-center gap-1.5">
-              <span
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full",
-                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground/60"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              <span
-                className={cn(
-                  "text-center text-[0.6875rem] leading-tight",
-                  active ? "font-semibold text-primary" : "text-muted-foreground"
-                )}
-              >
-                {label}
-              </span>
-            </div>
-            {i < labels.length - 1 && (
-              <div className={cn("mt-[1.0625rem] h-0.5 flex-1 rounded-full", i === 0 ? "bg-primary/60" : "bg-primary/15")} />
-            )}
-          </Fragment>
-        );
-      })}
     </div>
   );
 }
@@ -635,7 +592,7 @@ function BookingBody() {
             {t.liffBook.stepOf(1, 4)}
           </span>
         </div>
-        <BookingSteps t={t} />
+        <Stepper step={1} t={t} />
       </div>
 
       <div className="flex items-end justify-between gap-3">
