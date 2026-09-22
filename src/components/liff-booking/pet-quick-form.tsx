@@ -551,8 +551,8 @@ export function ExistingPetFields({
             <dl className="mt-1.5 space-y-1.5">
               {basicRows.map(([label, value]) => (
                 <div key={label}>
-                  <dt className="text-[0.6875rem] font-light text-muted-foreground">{label}</dt>
-                  <dd className="text-xs font-semibold">{value}</dd>
+                  <dt className="inline text-[0.6875rem] font-light text-muted-foreground">{label}</dt>{" "}
+                  <dd className="inline text-xs font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -562,8 +562,8 @@ export function ExistingPetFields({
             <dl className="mt-1.5 space-y-1.5">
               {healthRows.map(([label, value]) => (
                 <div key={label}>
-                  <dt className="text-[0.6875rem] font-light text-muted-foreground">{label}</dt>
-                  <dd className="text-xs font-semibold">{value}</dd>
+                  <dt className="inline text-[0.6875rem] font-light text-muted-foreground">{label}</dt>{" "}
+                  <dd className="inline text-xs font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -601,7 +601,7 @@ export function ExistingPetFields({
         <Label htmlFor={id("info")}>{t.liffBook.infoConfirmLabel}</Label>
         <select
           id={id("info")}
-          className={cn(SELECT, "pl-3 pr-8", bad("info") && INVALID)}
+          className={cn(SELECT, "sm:pr-8", bad("info") && INVALID)}
           value={pet.infoStatus}
           onChange={(e) => onChange({ ...pet, infoStatus: e.target.value as PetDraft["infoStatus"] })}
         >

@@ -609,7 +609,7 @@ function BookingBody() {
               type="button"
               onClick={() => chooseKind(k)}
               className={cn(
-                "flex flex-col items-start gap-2 rounded-3xl border-2 p-3 text-left transition-colors",
+                "flex flex-col items-start gap-2 rounded-3xl border-2 p-3 text-left transition-colors sm:flex-row sm:items-center sm:gap-3",
                 active ? "border-primary bg-primary/5" : "border-border bg-card"
               )}
             >
