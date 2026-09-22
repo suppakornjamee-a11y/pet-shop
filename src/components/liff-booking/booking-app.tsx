@@ -586,11 +586,8 @@ function BookingBody() {
       </div>
 
       <div className={cn("p-4", CARD)}>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3">
           <span className="text-sm font-bold">{t.liffBook.stepsTitle}</span>
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-            {t.liffBook.stepOf(1, 4)}
-          </span>
         </div>
         <Stepper step={1} t={t} />
       </div>
@@ -598,7 +595,6 @@ function BookingBody() {
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold leading-tight">{t.liff.chooseServiceTitle}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{t.liffBook.chooseServiceHint}</p>
         </div>
         <span className="shrink-0 pb-0.5 text-xs text-muted-foreground">{t.liffBook.stepNumber(1)}</span>
       </div>

@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 import { Bug } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, validateFleaDeclaration } from "@/lib/flea-tick-check";
 import { cn } from "@/lib/utils";
 import { MedicineNameField } from "@/components/medicine-name-field";
-import { VerifySeal } from "@/components/verify-seal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,89 +65,61 @@ export function FleaTickSection({
   invalidId?: string | null;
   t: T;
 }) {
-  const stored = useMemo(() => fleaDataOf(pet), [pet]);
   const today = todayStr();
   const flea = draft.flea ?? EMPTY_FLEA;
   const declared = flea.choice === "declare";
   const setFlea = (patch: Partial<FleaDraft>) => set({ flea: { ...flea, ...patch } });
   const bad = (id: string) => invalidId === id;
 
-  const assessed = useMemo(
-    () =>
-      assessFleaTick(
-        declared ? { ...stored, medicine: flea.medicine, productId: flea.productId, givenAt: flea.date || null } : stored,
-        catalog,
-        draft.date,
-        today
-      ),
-    [declared, stored, flea.medicine, flea.productId, flea.date, catalog, draft.date, today]
-  );
-  const passed = assessed.level === "GREEN";
+  // ตราผ่าน/รอตรวจสอบย้ายไปแสดงที่การ์ดข้อมูลสัตว์ในหน้าแรกแล้ว — หน้านี้เหลือแค่ฟอร์มแจ้งข้อมูลใหม่ (เมื่อลูกค้าเลือก "มีข้อมูลอัปเดต" จากหน้าแรก)
+  if (!declared) return null;
 
   return (
-    <Section
-      title={t.fleaTick.title}
-      icon={Bug}
-      titleExtra={
-        passed ? (
-          <span className="inline-flex items-center gap-1">
-            <VerifySeal passed label={t.liffBook.fleaPassed} />
-            <span className="text-xs font-medium text-emerald-700">{t.liffBook.fleaPassed}</span>
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1">
-            <VerifySeal passed={false} label={t.fleaTick.pending} />
-            <span className="text-xs font-medium text-amber-700">{t.fleaTick.pending}</span>
-          </span>
-        )
-      }
-    >
-      {declared && (
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="flea-medicine">{t.liffBook.fleaMedicine}</Label>
-            <MedicineNameField
-              inputId="flea-medicine"
-              invalid={bad("flea-medicine")}
-              value={flea.medicine}
-              productId={flea.productId}
-              species={pet.species}
-              catalog={catalog}
-              onChange={(patch) =>
-                setFlea({
-                  medicine: patch.fleaTickMedicine ?? flea.medicine,
-                  productId: patch.fleaTickProductId !== undefined ? patch.fleaTickProductId : flea.productId,
-                })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="flea-date">{t.liffBook.fleaDate}</Label>
-            <Input
-              id="flea-date"
-              type="date"
-              lang="en-GB"
-              max={today}
-              className={cn(FIELD, bad("flea-date") && INVALID)}
-              value={flea.date}
-              onChange={(e) => setFlea({ date: e.target.value })}
-            />
-          </div>
-          <ImagePicker
-            id="flea-evidence"
-            label={t.fleaTick.evidenceLabel}
-            images={flea.evidence}
-            onChange={(evidence) => setFlea({ evidence })}
-            max={3}
-            maxSide={1100}
-            invalid={bad("flea-evidence")}
-            t={t}
+    <Section title={t.fleaTick.title} icon={Bug}>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="flea-medicine">{t.liffBook.fleaMedicine}</Label>
+          <MedicineNameField
+            inputId="flea-medicine"
+            invalid={bad("flea-medicine")}
+            value={flea.medicine}
+            productId={flea.productId}
+            species={pet.species}
+            catalog={catalog}
+            onChange={(patch) =>
+              setFlea({
+                medicine: patch.fleaTickMedicine ?? flea.medicine,
+                productId: patch.fleaTickProductId !== undefined ? patch.fleaTickProductId : flea.productId,
+              })
+            }
           />
-          <Button type="button" variant="ghost" size="sm" onClick={() => setFlea({ choice: "" })}>
-            {t.common.cancel}
-          </Button>
         </div>
-      )}
+        <div className="space-y-1.5">
+          <Label htmlFor="flea-date">{t.liffBook.fleaDate}</Label>
+          <Input
+            id="flea-date"
+            type="date"
+            lang="en-GB"
+            max={today}
+            className={cn(FIELD, bad("flea-date") && INVALID)}
+            value={flea.date}
+            onChange={(e) => setFlea({ date: e.target.value })}
+          />
+        </div>
+        <ImagePicker
+          id="flea-evidence"
+          label={t.fleaTick.evidenceLabel}
+          images={flea.evidence}
+          onChange={(evidence) => setFlea({ evidence })}
+          max={3}
+          maxSide={1100}
+          invalid={bad("flea-evidence")}
+          t={t}
+        />
+        <Button type="button" variant="ghost" size="sm" onClick={() => setFlea({ choice: "" })}>
+          {t.common.cancel}
+        </Button>
+      </div>
     </Section>
   );
 }
