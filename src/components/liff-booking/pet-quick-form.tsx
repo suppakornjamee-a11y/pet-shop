@@ -545,7 +545,7 @@ export function ExistingPetFields({
       </div>
 
       {pet.infoStatus !== "update" && (
-        <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="min-w-0 rounded-2xl bg-card p-3">
             <p className="text-xs font-bold">{t.liffBook.basicInfoTitle}</p>
             <dl className="mt-1.5 space-y-1.5">
@@ -568,22 +568,25 @@ export function ExistingPetFields({
               ))}
             </dl>
             <div className="mt-3 space-y-1.5 border-t pt-3">
-              <p className="text-xs font-bold">{t.fleaTick.title}</p>
-              <span className="inline-flex items-center gap-1">
-                <VerifySeal
-                  passed={fleaPassed}
-                  label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                  className="h-[15px] w-[15px]"
-                />
-                <span
-                  className={cn(
-                    "text-[0.6875rem] font-medium",
-                    fleaPassed ? "text-emerald-700" : "text-amber-700"
-                  )}
-                >
-                  {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+              {/* จอแคบ (กล่องเต็มความกว้าง): หัวข้อกับตราอยู่บรรทัดเดียวกัน · จอกว้างขึ้น (กล่องครึ่งความกว้าง): แยกคนละบรรทัดกันบีบ */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 sm:flex-col sm:items-start sm:gap-1">
+                <p className="text-xs font-bold">{t.fleaTick.title}</p>
+                <span className="inline-flex items-center gap-1">
+                  <VerifySeal
+                    passed={fleaPassed}
+                    label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                    className="h-[15px] w-[15px]"
+                  />
+                  <span
+                    className={cn(
+                      "text-[0.6875rem] font-medium",
+                      fleaPassed ? "text-emerald-700" : "text-amber-700"
+                    )}
+                  >
+                    {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                  </span>
                 </span>
-              </span>
+              </div>
               <p className="text-xs font-semibold">{medicine}</p>
               <p className="text-[0.6875rem] text-muted-foreground">
                 {t.fleaTick.lastGivenLabel}{" "}
@@ -598,7 +601,7 @@ export function ExistingPetFields({
         <Label htmlFor={id("info")}>{t.liffBook.infoConfirmLabel}</Label>
         <select
           id={id("info")}
-          className={cn(SELECT, bad("info") && INVALID)}
+          className={cn(SELECT, "pl-3 pr-8", bad("info") && INVALID)}
           value={pet.infoStatus}
           onChange={(e) => onChange({ ...pet, infoStatus: e.target.value as PetDraft["infoStatus"] })}
         >

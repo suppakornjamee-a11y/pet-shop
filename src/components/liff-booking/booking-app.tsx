@@ -625,13 +625,8 @@ function BookingBody() {
               >
                 <Icon className="h-5 w-5" />
               </span>
-              <span className="min-w-0">
-                <span className={cn("block text-sm font-bold leading-tight", active && "text-primary")}>
-                  {t.liffBook.kind[k]}
-                </span>
-                <span className="mt-0.5 block text-[0.6875rem] leading-tight text-muted-foreground">
-                  {t.liffBook.kindSubtitle[k]}
-                </span>
+              <span className={cn("text-sm font-bold leading-tight", active && "text-primary")}>
+                {t.liffBook.kind[k]}
               </span>
             </button>
           );
@@ -670,14 +665,9 @@ function BookingBody() {
 
       {kind && ctx.linked && (
         <div className={cn("space-y-4 p-4", CARD)}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
-              <p className="text-xs text-muted-foreground">{t.liffBook.petSectionHint}</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-              {t.liffBook.returningBadge}
-            </span>
+          <div>
+            <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
+            <p className="text-xs text-muted-foreground">{t.liffBook.petSectionHint}</p>
           </div>
 
           {pets.length > 0 || kind === "BATH" ? (
@@ -690,17 +680,17 @@ function BookingBody() {
                     type="button"
                     onClick={() => setSelectedPetId(p.id)}
                     className={cn(
-                      "flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 text-sm transition-colors",
+                      "flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-xs transition-colors",
                       on ? "border-primary bg-primary font-semibold text-primary-foreground" : "bg-card hover:bg-muted"
                     )}
                   >
                     <span
                       className={cn(
-                        "flex h-7 w-7 items-center justify-center rounded-full",
+                        "flex h-5 w-5 items-center justify-center rounded-full",
                         on ? "bg-white/25 text-primary-foreground" : "bg-primary/10 text-primary"
                       )}
                     >
-                      <SpeciesIcon species={p.species} className="h-4 w-4" />
+                      <SpeciesIcon species={p.species} className="h-3 w-3" />
                     </span>
                     {p.name}
                   </button>
