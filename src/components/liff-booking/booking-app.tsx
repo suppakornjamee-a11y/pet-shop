@@ -519,21 +519,21 @@ function BookingBody() {
         {cart.length > 0 && (
           <div className={cn("space-y-3 p-4", CARD)}>
             <h2 className="text-base font-bold">{t.liffBook.summaryTitle}</h2>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-baseline justify-between gap-3">
-                <span>{allBath && depositCount > 0 ? t.liffBook.dueDeposit(depositCount) : t.liffBook.dueAfterApproval}</span>
-                <span className="font-bold tabular-nums text-primary">{formatBaht(totalDue)}</span>
-              </div>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span>{allBath && depositCount > 0 ? t.liffBook.dueDeposit() : t.liffBook.dueAfterApproval}</span>
+              <span className="font-bold tabular-nums text-primary">{formatBaht(totalDue)}</span>
+            </div>
+            <div className="space-y-2 border-t pt-3">
               {remaining > 0 && (
-                <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
+                <div className="flex items-baseline justify-between gap-3 text-sm text-muted-foreground">
                   <span>{t.liffBook.remainingAtShop}</span>
                   <span className="tabular-nums">{formatBaht(remaining)}</span>
                 </div>
               )}
-            </div>
-            <div className="flex items-baseline justify-between gap-3 border-t pt-3">
-              <span className="font-bold">{t.liffBook.estimate}</span>
-              <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-bold">{t.liffBook.estimate}</span>
+                <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
+              </div>
             </div>
           </div>
         )}

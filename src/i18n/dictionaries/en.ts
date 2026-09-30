@@ -620,7 +620,7 @@ const en: Dictionary = {
     estimateShort: "Estimate",
     cartTitleCount: (n: number) => `Booking list (${n} ${n === 1 ? "item" : "items"})`,
     summaryTitle: "Payment summary",
-    dueDeposit: (n: number) => `Amount due first (deposit for ${n} ${n === 1 ? "pet" : "pets"})`,
+    dueDeposit: () => "Amount due first (deposit per pet)",
     remainingAtShop: "Balance to pay at the shop",
     cartEmpty: "No bookings yet",
     addAnotherPet: "Add a bath",

@@ -635,7 +635,7 @@ const th = {
     estimateShort: "ยอดประมาณ",
     cartTitleCount: (n: number) => `รายการจอง (${n} รายการ)`,
     summaryTitle: "สรุปยอดค่าบริการ",
-    dueDeposit: (n: number) => `ยอดแรกที่ชำระ (มัดจำ ${n} ตัว)`,
+    dueDeposit: () => "ยอดแรกที่ชำระ (มัดจำต่อตัว)",
     remainingAtShop: "ยอดคงเหลือชำระหน้าร้าน",
     cartEmpty: "ยังไม่มีรายการจอง",
     addAnotherPet: "เพิ่มการอาบน้ำ",
