@@ -86,6 +86,7 @@ function petToDraft(p: CtxPet): PetDraft {
     breed: p.breed ?? "",
     birthDate: p.birthDate,
     weightKg: p.weightKg ? String(p.weightKg) : "",
+    photoUrl: p.photoUrl,
     hasAllergies: allergy.has,
     allergies: allergy.note,
     hasCautions: caution.has,

@@ -30,6 +30,8 @@ export type PetDraft = {
   breed: string;
   birthDate: string;
   weightKg: string;
+  /** รูปสัตว์เลี้ยงที่มีอยู่แล้ว — แสดงแทนไอคอนในการ์ดข้อมูลสัตว์ถ้ามี, สัตว์ใหม่ยังไม่มีรูป */
+  photoUrl: string | null;
   hasAllergies: HasDetail;
   allergies: string;
   hasCautions: HasDetail;
@@ -51,6 +53,7 @@ export const emptyPetDraft = (): PetDraft => ({
   breed: "",
   birthDate: "",
   weightKg: "",
+  photoUrl: null,
   hasAllergies: "",
   allergies: "",
   hasCautions: "",
@@ -535,9 +538,18 @@ export function ExistingPetFields({
   return (
     <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
       <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 p-2 text-primary">
-          <SpeciesIcon species={pet.species} className="h-full w-full object-contain" />
-        </span>
+        {pet.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={pet.photoUrl}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-full border border-primary/15 object-cover"
+          />
+        ) : (
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/15 p-2.5 text-primary">
+            <SpeciesIcon species={pet.species} className="h-full w-full object-contain" />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold leading-tight">{pet.name}</p>
           {pet.breed && <p className="truncate text-xs text-muted-foreground">{pet.breed}</p>}
@@ -555,7 +567,7 @@ export function ExistingPetFields({
             {statRows.map(([label, value]) => (
               <div key={label} className="min-w-0 rounded-2xl bg-card p-2.5 text-center">
                 <p className="text-[0.6875rem] text-muted-foreground">{label}</p>
-                <p className="mt-0.5 truncate text-sm font-bold">{value}</p>
+                <p className="mt-0.5 break-words text-sm font-bold leading-tight">{value}</p>
               </div>
             ))}
           </div>

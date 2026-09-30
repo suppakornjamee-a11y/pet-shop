@@ -43,6 +43,7 @@ export type CtxPet = {
   breed: string | null;
   birthDate: string;
   weightKg: number | null;
+  photoUrl: string | null;
   allergies: string | null;
   groomingCautions: string | null;
   hasChronicDisease: boolean | null;

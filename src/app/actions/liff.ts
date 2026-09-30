@@ -936,6 +936,7 @@ export async function liffGetBookingContext(idToken: string) {
           breed: true,
           birthDate: true,
           weightKg: true,
+          photoUrl: true,
           allergies: true,
           groomingCautions: true,
           hasChronicDisease: true,

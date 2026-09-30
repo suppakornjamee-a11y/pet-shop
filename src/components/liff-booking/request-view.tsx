@@ -61,15 +61,12 @@ function draftFor(o: RequestOrder): ItemDraft {
   return d;
 }
 
-/** กล่องข้อมูลย่อยในการ์ดสรุป — ไอคอน+ป้ายบรรทัดบน ค่าบรรทัดล่างตัวหนา ใช้คู่กันในกริด 2 คอลัมน์ */
-function InfoBox({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
+/** กล่องข้อมูลย่อยในการ์ดสรุป — ไอคอน + ค่า อยู่แถวเดียวกัน (ไม่มีป้ายชื่อ) ใช้คู่กันในกริด 2 คอลัมน์ */
+function InfoBox({ icon: Icon, children }: { icon: typeof Clock; children: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-2xl bg-accent/20 p-2.5">
-      <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-        <Icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{label}</span>
-      </div>
-      <p className="mt-1 truncate text-sm font-semibold">{children}</p>
+    <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-accent/20 p-2.5">
+      <Icon className="h-4 w-4 shrink-0 text-primary" />
+      <p className="truncate text-sm font-semibold">{children}</p>
     </div>
   );
 }
@@ -110,19 +107,17 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
       <div className="grid grid-cols-2 gap-2">
         {kind === "BOARDING" && order.checkInAt && order.checkOutAt ? (
           <>
-            <InfoBox icon={LogIn} label={t.orders.form.checkInLabel}>
+            <InfoBox icon={LogIn}>
               {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
             </InfoBox>
-            <InfoBox icon={LogOut} label={t.liff.summaryCheckOutLabel}>
+            <InfoBox icon={LogOut}>
               {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
             </InfoBox>
           </>
         ) : order.appointmentAt ? (
           <>
-            <InfoBox icon={CalendarDays} label={t.liff.summaryDateLabel}>
-              {formatDateLong(order.appointmentAt)}
-            </InfoBox>
-            <InfoBox icon={Clock} label={t.liff.summaryTimeLabel}>
+            <InfoBox icon={CalendarDays}>{formatDateLong(order.appointmentAt)}</InfoBox>
+            <InfoBox icon={Clock}>
               {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
             </InfoBox>
           </>
@@ -193,7 +188,7 @@ function StatusHero({ tone, title, children }: { tone: "ok" | "wait" | "bad"; ti
   const ok = tone === "ok";
   const Icon = bad ? X : tone === "wait" ? Hourglass : Check;
   return (
-    <div className={cn("space-y-3 rounded-2xl p-3.5", bad ? "bg-destructive/5" : ok ? "bg-emerald-50" : "bg-primary/5")}>
+    <div className={cn("space-y-3 rounded-2xl p-3.5", bad ? "bg-destructive/10" : ok ? "bg-emerald-50" : "bg-accent/40")}>
       <div className="flex items-center gap-2.5">
         <span
           className={cn(
