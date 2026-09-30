@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
   Home,
   Info,
@@ -613,19 +612,10 @@ function BookingBody() {
               type="button"
               onClick={() => chooseKind(k)}
               className={cn(
-                "relative flex flex-col items-center gap-2 rounded-3xl border-2 p-3 text-center transition-colors sm:flex-row sm:items-center sm:gap-3 sm:text-left",
+                "flex flex-col items-center gap-2 rounded-3xl border-2 p-3 text-center transition-colors sm:flex-row sm:items-center sm:gap-3 sm:text-left",
                 active ? "border-primary bg-primary/5" : "border-border bg-card"
               )}
             >
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute right-2 top-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                  active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/25"
-                )}
-              >
-                {active && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
-              </span>
               <span
                 className={cn(
                   "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",

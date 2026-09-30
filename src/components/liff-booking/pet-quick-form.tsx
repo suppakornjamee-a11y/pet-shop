@@ -566,7 +566,7 @@ export function ExistingPetFields({
             {statRows.map(([label, value]) => (
               <div key={label} className="min-w-0 rounded-2xl bg-card p-2.5 text-center">
                 <p className="text-[0.6875rem] text-muted-foreground">{label}</p>
-                <p className="mt-0.5 break-words text-sm font-bold leading-tight">{value}</p>
+                <p className="mt-0.5 break-words text-xs font-bold leading-tight">{value}</p>
               </div>
             ))}
           </div>
