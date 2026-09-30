@@ -937,6 +937,7 @@ export async function liffGetBookingContext(idToken: string) {
           birthDate: true,
           weightKg: true,
           photoUrl: true,
+          photoUrls: true,
           allergies: true,
           groomingCautions: true,
           hasChronicDisease: true,
@@ -961,6 +962,8 @@ export async function liffGetBookingContext(idToken: string) {
     },
     pets: customer.pets.map((p) => ({
       ...p,
+      // รูปที่ลูกค้าแนบไปอยู่ใน photoUrls (หลายรูป) แล้ว — photoUrl เดี่ยวเป็นข้อมูลเก่าก่อนเปลี่ยนมาเก็บหลายรูป เอาไว้ fallback เท่านั้น
+      photoUrl: p.photoUrls[0] ?? p.photoUrl,
       birthDate: p.birthDate ? toThaiDateStr(p.birthDate) : "",
       lastFleaTickAt: p.lastFleaTickAt ? toThaiDateStr(p.lastFleaTickAt) : "",
     })),

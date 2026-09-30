@@ -3,7 +3,6 @@
 import { Check, Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
-import { SpeciesIcon } from "@/components/species-icon";
 import { VerifySeal } from "@/components/verify-seal";
 import { petAge } from "@/lib/pet-age";
 import { formatDateLong } from "@/lib/format";
@@ -546,8 +545,8 @@ export function ExistingPetFields({
             className="h-14 w-14 shrink-0 rounded-full border border-primary/15 object-cover"
           />
         ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/15 p-2.5 text-primary">
-            <SpeciesIcon species={pet.species} className="h-full w-full object-contain" />
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted text-center text-[0.5625rem] leading-tight text-muted-foreground">
+            {t.liffBook.noPhoto}
           </span>
         )}
         <div className="min-w-0 flex-1">

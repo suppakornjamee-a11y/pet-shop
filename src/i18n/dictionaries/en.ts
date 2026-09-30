@@ -576,6 +576,7 @@ const en: Dictionary = {
     hideAddons: "Hide extra services",
     styleTitle: "Preferred style",
     serviceItemsTitle: "Service items",
+    noPhoto: "No photo",
     styleImages: "Example photos",
     services: "Choose services",
     infoConfirmLabel: "Confirm the information above",

@@ -591,6 +591,7 @@ const th = {
     hideAddons: "ซ่อนบริการเสริม",
     styleTitle: "ทรงที่ต้องการ",
     serviceItemsTitle: "รายการบริการ",
+    noPhoto: "ไม่มีรูป",
     styleImages: "ภาพตัวอย่าง",
     services: "เลือกบริการ",
     infoConfirmLabel: "ยืนยันข้อมูลข้างต้น",
