@@ -33,7 +33,7 @@ export type Room = {
   category: { id: string; name: string; billingUnit: "PER_NIGHT" | "PER_VISIT" };
 };
 
-export type SlotOption = { time: string; available: boolean };
+export type SlotOption = { time: string; available: boolean; reason?: "duplicate" };
 
 /** ข้อมูลสัตว์เลี้ยงจาก liffGetBookingContext */
 export type CtxPet = {
@@ -278,7 +278,7 @@ export function TimeSlotGroups({
                     {s.time}
                     {!s.available && (
                       <span className="absolute -top-1.5 right-1 rounded-full bg-destructive/10 px-1.5 text-[0.5625rem] font-medium leading-4 text-destructive no-underline">
-                        {t.liffBook.slotFull}
+                        {s.reason === "duplicate" ? t.liffBook.slotDuplicate : t.liffBook.slotFull}
                       </span>
                     )}
                   </button>

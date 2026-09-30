@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { bathGroups, estimateDraft, type ItemDraft } from "./cart";
+import { bathGroups, cartTimesTaken, estimateDraft, type CartEntry, type ItemDraft } from "./cart";
 import { FleaTickSection } from "./flea-section";
 import { ImagePicker } from "./image-picker";
 import {
@@ -94,15 +94,22 @@ function OptionRow({
 export function SlotPicker({
   draft,
   set,
+  cart,
+  editingKey,
   t,
 }: {
   draft: ItemDraft;
   set: (patch: Partial<ItemDraft>) => void;
+  /** ตะกร้าปัจจุบัน — ใช้เช็คว่าวันเวลาที่จะเลือกชนกับรายการอื่นที่เพิ่มไว้แล้วหรือไม่ */
+  cart: CartEntry[];
+  /** รายการที่กำลังแก้ไขอยู่ (ถ้ามี) — ไม่นับว่าชนกับตัวเอง */
+  editingKey: string | null;
   t: T;
 }) {
   const [slots, setSlots] = useState<SlotOption[]>([]);
   const [loading, setLoading] = useState(true);
   const queueType = draft.kind === "OTHER" ? "OTHER" : "BATH";
+  const taken = cartTimesTaken(cart, draft.date, draft.kind, editingKey);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +127,14 @@ export function SlotPicker({
     };
   }, [draft.date, queueType]);
 
+  // เวลาที่เลือกไว้เดิม (แก้รายการในตะกร้า) ยังกดค้างได้แม้คิวจะเต็มจากรายการของตัวเอง
+  // เวลาที่รายการอื่นในตะกร้าใช้ไปแล้ว (คิวเดียวกัน + วันเดียวกัน) กันไว้ไม่ให้เลือกซ้ำกับตัวเอง
+  const decoratedSlots = slots.map((s) => {
+    if (s.time === draft.time) return { ...s, available: true };
+    if (taken.has(s.time)) return { ...s, available: false, reason: "duplicate" as const };
+    return s;
+  });
+
   return (
     <Section>
       <MonthCalendar title={t.liffBook.dateTimeTitle} value={draft.date} min={todayStr()} onChange={(date) => set({ date, time: "" })} />
@@ -136,16 +151,10 @@ export function SlotPicker({
           <div className="flex justify-center py-6">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : slots.every((s) => !s.available) ? (
+        ) : decoratedSlots.every((s) => !s.available) ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t.liff.noSlotsAvailable}</p>
         ) : (
-          // เวลาที่เลือกไว้เดิม (แก้รายการในตะกร้า) ยังกดค้างได้แม้คิวจะเต็มจากรายการของตัวเอง
-          <TimeSlotGroups
-            slots={slots.map((s) => (s.time === draft.time ? { ...s, available: true } : s))}
-            value={draft.time}
-            onChange={(time) => set({ time })}
-            t={t}
-          />
+          <TimeSlotGroups slots={decoratedSlots} value={draft.time} onChange={(time) => set({ time })} t={t} />
         )}
       </div>
     </Section>
@@ -339,6 +348,8 @@ export function ItemDetail({
   invalidId,
   services,
   rooms,
+  cart,
+  editingKey,
   t,
 }: {
   draft: ItemDraft;
@@ -350,6 +361,9 @@ export function ItemDetail({
   /** บริการของประเภทนี้ที่กรองชนิดสัตว์แล้ว */
   services: Service[];
   rooms: Room[];
+  /** ตะกร้าปัจจุบัน — ส่งต่อให้ตัวเลือกวันเวลาเช็คว่าชนกับรายการอื่นหรือไม่ */
+  cart: CartEntry[];
+  editingKey: string | null;
   t: T;
 }) {
   const set = (patch: Partial<ItemDraft>) => onChange({ ...draft, ...patch });
@@ -386,7 +400,11 @@ export function ItemDetail({
 
   return (
     <div className="space-y-4">
-      {draft.kind === "BOARDING" ? <RoomPicker draft={draft} set={set} rooms={rooms} t={t} /> : <SlotPicker draft={draft} set={set} t={t} />}
+      {draft.kind === "BOARDING" ? (
+        <RoomPicker draft={draft} set={set} rooms={rooms} t={t} />
+      ) : (
+        <SlotPicker draft={draft} set={set} cart={cart} editingKey={editingKey} t={t} />
+      )}
 
       {draft.kind === "BATH" && (
         <>
@@ -505,20 +523,10 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <Section tone="accent">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary-foreground shadow-sm ring-4 ring-primary/10"
-                style={{
-                  backgroundColor: "var(--primary)",
-                  backgroundImage: "linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
-                }}
-              >
-                <Wallet className="h-5 w-5" />
-              </span>
-              <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
-            </div>
-            <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
+            <span className="ml-auto text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
           </div>
           <p className="rounded-xl bg-card px-3 py-2 text-sm font-medium">{t.liffBook.bathDeposit}</p>
           <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
@@ -532,9 +540,16 @@ export function ItemDetail({
 }
 
 /** ใช้ตัดสินว่ากดปุ่ม "ตรวจสอบรายการ" ได้หรือยัง */
-export function draftReady(draft: ItemDraft, services: Service[], rooms: Room[]): boolean {
+export function draftReady(
+  draft: ItemDraft,
+  services: Service[],
+  rooms: Room[],
+  cart: CartEntry[] = [],
+  editingKey: string | null = null
+): boolean {
   if (draft.kind === "BOARDING") return !!draft.roomId && rooms.some((r) => r.id === draft.roomId);
   if (!draft.time) return false;
+  if (cartTimesTaken(cart, draft.date, draft.kind, editingKey).has(draft.time)) return false;
   if (draft.kind === "BATH") return bathGroups(services).main.some((s) => draft.serviceIds.includes(s.id));
   return draft.serviceIds.some((id) => services.some((s) => s.id === id && !s.defaultOn));
 }

@@ -614,6 +614,7 @@ const en: Dictionary = {
     dateTimeTitle: "Choose date and time",
     slotsTitle: "Time",
     slotFull: "Full",
+    slotDuplicate: "Taken",
     styleLabel: "Preferred hairstyle",
     styleImagesButton: "Attach a style photo (optional)",
     estimateShort: "Estimate",

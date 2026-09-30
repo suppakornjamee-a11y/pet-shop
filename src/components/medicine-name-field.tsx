@@ -93,7 +93,7 @@ export function MedicineNameField({
     return (
       <div
         className={cn(
-          "flex min-h-11 items-center justify-between gap-2 rounded-xl border border-primary/40 bg-primary/5 py-1.5 pl-3 pr-1.5 text-sm",
+          "flex min-h-11 items-center justify-between gap-2 rounded-xl border border-input bg-card py-1.5 pl-3 pr-1.5 text-sm",
           inputClassName === "" && "min-h-8 rounded-lg"
         )}
       >

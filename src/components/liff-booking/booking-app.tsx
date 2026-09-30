@@ -405,6 +405,8 @@ function BookingBody() {
           invalidId={invalidId}
           services={draftServices}
           rooms={rooms}
+          cart={cart}
+          editingKey={editingKey}
           t={t}
         />
 
@@ -419,11 +421,11 @@ function BookingBody() {
           }
         >
           <Button
-            className="h-12 w-full rounded-2xl text-base font-semibold shadow-md"
-            disabled={!draftReady(draft, draftServices, rooms)}
+            className="h-11 w-full rounded-2xl text-sm font-semibold shadow-md"
+            disabled={!draftReady(draft, draftServices, rooms, cart, editingKey)}
             onClick={addChecked}
           >
-            {t.common.confirm}
+            {t.liff.confirmBookingButton}
           </Button>
         </BottomBar>
       </div>

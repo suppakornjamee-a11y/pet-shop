@@ -629,6 +629,7 @@ const th = {
     dateTimeTitle: "เลือกวันและเวลา",
     slotsTitle: "ช่วงเวลา",
     slotFull: "เต็ม",
+    slotDuplicate: "ซ้ำ",
     styleLabel: "ทรงขนที่ต้องการ",
     styleImagesButton: "แนบรูปตัวอย่างทรง (ไม่บังคับ)",
     estimateShort: "ยอดประมาณ",

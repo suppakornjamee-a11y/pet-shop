@@ -85,6 +85,26 @@ export function forSpecies(services: Service[], species: Species | undefined): S
   return services.filter((s) => !s.speciesScope || !species || s.speciesScope === species);
 }
 
+/** คิวที่ใช้แบ่งโควต้าเวลาต่อวัน (อาบน้ำ/บริการอื่นคนละคิว) — ห้องพักไม่มีคิวเวลาแบบนี้ */
+function queueTypeOf(kind: Kind): "BATH" | "OTHER" | null {
+  if (kind === "BOARDING") return null;
+  return kind === "OTHER" ? "OTHER" : "BATH";
+}
+
+/**
+ * เวลาที่ถูกใช้ไปแล้วโดยรายการอื่นในตะกร้า (คิวเดียวกัน + วันเดียวกัน) — กันลูกค้าเลือกวันเวลาซ้ำกับรายการของตัวเองที่เพิ่มไว้แล้ว
+ * excludeKey = รายการที่กำลังแก้ไขอยู่ (ไม่นับชนกับตัวเอง)
+ */
+export function cartTimesTaken(cart: CartEntry[], date: string, kind: Kind, excludeKey: string | null): Set<string> {
+  const q = queueTypeOf(kind);
+  if (!q || !date) return new Set();
+  return new Set(
+    cart
+      .filter((e) => e.key !== excludeKey && e.draft.date === date && e.draft.time && queueTypeOf(e.draft.kind) === q)
+      .map((e) => e.draft.time)
+  );
+}
+
 /** แยกบริการอาบน้ำเป็นกลุ่มตามหน้าจอ: อาบน้ำหลัก (ต้องเลือก 1) / ตัดขน (ไม่บังคับ) / บริการเสริม / บริการฟรี */
 export function bathGroups(services: Service[]) {
   const byPrice = (a: Service, b: Service) => a.price - b.price;
