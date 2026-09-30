@@ -3,6 +3,7 @@
 import { Check, Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
+import { SpeciesIcon } from "@/components/species-icon";
 import { VerifySeal } from "@/components/verify-seal";
 import { petAge } from "@/lib/pet-age";
 import { formatDateLong } from "@/lib/format";
@@ -503,9 +504,9 @@ export function ExistingPetFields({
         .filter(Boolean)
         .join(" ")
     : "-";
-  const basicRows: [string, string][] = [
+  // สามกล่องสถิติหัวการ์ด — สายพันธุ์ย้ายไปโชว์เป็นคำบรรยายใต้ชื่อแทนแล้ว
+  const statRows: [string, string][] = [
     [t.liffBook.species, t.labels.species[pet.species]],
-    [t.liffBook.breed, pet.breed || "-"],
     [t.liffBook.ageLabel, ageText],
     [t.orders.petWeightLabel, Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"],
   ];
@@ -534,8 +535,12 @@ export function ExistingPetFields({
   return (
     <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
       <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 p-2 text-primary">
+          <SpeciesIcon species={pet.species} className="h-full w-full object-contain" />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold leading-tight">{pet.name}</p>
+          {pet.breed && <p className="truncate text-xs text-muted-foreground">{pet.breed}</p>}
         </div>
         {pet.infoStatus === "same" && (
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
@@ -545,54 +550,52 @@ export function ExistingPetFields({
       </div>
 
       {pet.infoStatus !== "update" && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="min-w-0 rounded-2xl bg-card p-3">
-            <p className="text-xs font-bold">{t.liffBook.basicInfoTitle}</p>
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {statRows.map(([label, value]) => (
+              <div key={label} className="min-w-0 rounded-2xl bg-card p-2.5 text-center">
+                <p className="text-[0.6875rem] text-muted-foreground">{label}</p>
+                <p className="mt-0.5 truncate text-sm font-bold">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl bg-card p-3">
+            <p className="text-xs font-bold">{t.liffBook.healthShort}</p>
             <dl className="mt-1.5 space-y-1.5">
-              {basicRows.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="inline text-[0.6875rem] font-light text-muted-foreground">{label}</dt>{" "}
-                  <dd className="inline text-xs font-semibold">{value}</dd>
+              {healthRows.map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-3">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="shrink-0 text-xs font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
           </div>
-          <div className="min-w-0 rounded-2xl bg-card p-3">
-            <p className="text-xs font-bold">{t.liffBook.healthShort}</p>
-            <dl className="mt-1.5 space-y-1.5">
-              {healthRows.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="inline text-[0.6875rem] font-light text-muted-foreground">{label}</dt>{" "}
-                  <dd className="inline text-xs font-semibold">{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-3 space-y-1.5 border-t pt-3">
-              {/* จอแคบ (กล่องเต็มความกว้าง): หัวข้อกับตราอยู่บรรทัดเดียวกัน · จอกว้างขึ้น (กล่องครึ่งความกว้าง): แยกคนละบรรทัดกันบีบ */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 sm:flex-col sm:items-start sm:gap-1">
-                <p className="text-xs font-bold">{t.fleaTick.title}</p>
-                <span className="inline-flex items-center gap-1">
-                  <VerifySeal
-                    passed={fleaPassed}
-                    label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                    className="h-[15px] w-[15px]"
-                  />
-                  <span
-                    className={cn(
-                      "text-[0.6875rem] font-medium",
-                      fleaPassed ? "text-emerald-700" : "text-amber-700"
-                    )}
-                  >
-                    {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                  </span>
-                </span>
-              </div>
-              <p className="text-xs font-semibold">{medicine}</p>
-              <p className="text-[0.6875rem] text-muted-foreground">
-                {t.fleaTick.lastGivenLabel}{" "}
-                {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
-              </p>
+
+          <div className={cn("space-y-1 rounded-2xl p-3", fleaPassed ? "bg-emerald-50" : "bg-amber-50")}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold">
+                <VerifySeal
+                  passed={fleaPassed}
+                  label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                  className="h-[15px] w-[15px]"
+                />
+                {t.fleaTick.title}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold text-white",
+                  fleaPassed ? "bg-emerald-500" : "bg-amber-500"
+                )}
+              >
+                {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+              </span>
             </div>
+            <p className="text-xs font-semibold">{medicine}</p>
+            <p className="text-[0.6875rem] text-muted-foreground">
+              {t.fleaTick.lastGivenLabel}{" "}
+              {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
+            </p>
           </div>
         </div>
       )}

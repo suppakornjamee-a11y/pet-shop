@@ -61,134 +61,118 @@ function draftFor(o: RequestOrder): ItemDraft {
   return d;
 }
 
-const gradientFill = (color: "primary" | "destructive") =>
-  ({
-    backgroundColor: `var(--${color})`,
-    backgroundImage: `linear-gradient(135deg, var(--${color}), color-mix(in oklab, var(--${color}) 55%, white))`,
-  }) as const;
-
-const softGradient = (color: "primary" | "destructive") =>
-  ({
-    backgroundImage:
-      color === "primary"
-        ? "linear-gradient(135deg, color-mix(in oklab, var(--accent) 45%, white), color-mix(in oklab, var(--primary) 6%, white))"
-        : "linear-gradient(135deg, color-mix(in oklab, var(--destructive) 12%, white), color-mix(in oklab, var(--destructive) 4%, white))",
-  }) as const;
-
-/** แถวข้อมูลในการ์ดสรุป — ไอคอนในช่องสี่เหลี่ยมมนหน้าชื่อหัวข้อ ค่าชิดขวา */
-function InfoRow({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
+/** กล่องข้อมูลย่อยในการ์ดสรุป — ไอคอน+ป้ายบรรทัดบน ค่าบรรทัดล่างตัวหนา ใช้คู่กันในกริด 2 คอลัมน์ */
+function InfoBox({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="flex items-center gap-2.5 text-muted-foreground">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/40 text-primary">
-          <Icon className="h-4 w-4" />
-        </span>
-        {label}
-      </dt>
-      <dd className="text-right font-semibold">{children}</dd>
+    <div className="min-w-0 rounded-2xl bg-accent/20 p-2.5">
+      <div className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="mt-1 truncate text-sm font-semibold">{children}</p>
     </div>
   );
 }
 
-/** การ์ดสรุปรายการแบบตั๋ว — ส่วนบนบอกบริการ/ราคา ส่วนล่างบอกวันเวลา คั่นด้วยเส้นประและรอยบาก */
+/** การ์ดสรุปรายการ — หัวบอกบริการ/สัตว์/ราคา ตามด้วยกล่องวันเวลา แล้วเช็คลิสต์รายการบริการที่รวมอยู่ */
 function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T; showPaid?: boolean }) {
   const kind = orderKind(order);
   const Icon = KIND_ICONS[kind];
-  const names = [
-    ...(order.room ? [`${order.room.category.name} · ${order.room.name}`] : []),
-    ...order.items
-      .filter((it) => it.itemType === "SERVICE")
-      .sort((a, b) => b.subtotal - a.subtotal)
-      .map((it) => it.name),
-  ];
+  const services = order.items.filter((it) => it.itemType === "SERVICE").sort((a, b) => b.subtotal - a.subtotal);
   return (
-    <div className="overflow-hidden rounded-3xl border bg-card shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-      <div className="flex items-start gap-3 p-4">
-        <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-primary-foreground shadow-sm"
-          style={gradientFill("primary")}
-        >
-          <Icon className="h-6 w-6" />
+    <div className="space-y-3 rounded-3xl border bg-card p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
         </span>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <div className="font-semibold leading-tight">{t.liffBook.kind[kind]}</div>
-            {order.pet && (
-              <div className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
-                <SpeciesIcon species={order.pet.species} className="h-4 w-4" /> {order.pet.name}
-              </div>
-            )}
-          </div>
-          {names.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {names.map((n) => (
-                <span key={n} className="rounded-full bg-accent/30 px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  {n}
-                </span>
-              ))}
+        <div className="min-w-0 flex-1">
+          <div className="font-bold leading-tight">{t.liffBook.kind[kind]}</div>
+          {order.pet && (
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <SpeciesIcon species={order.pet.species} className="h-3.5 w-3.5" />
+              {order.pet.name} · {t.labels.species[order.pet.species]}
+            </div>
+          )}
+          {order.room && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {order.room.category.name} · {order.room.name}
             </div>
           )}
           {order.groomingStyleNote && (
-            <div className="text-xs text-muted-foreground">
+            <div className="mt-0.5 text-xs text-muted-foreground">
               {t.liffBook.styleTitle}: {order.groomingStyleNote}
             </div>
           )}
         </div>
-        <div className="text-lg font-bold tabular-nums text-primary">{formatBaht(order.total)}</div>
+        <div className="shrink-0 text-lg font-bold tabular-nums text-primary">{formatBaht(order.total)}</div>
       </div>
 
-      <div className="relative">
-        <div className="mx-4 border-t border-dashed" />
-        <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
-        <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border bg-background" />
-      </div>
-
-      <dl className="space-y-3 p-4 text-sm">
+      <div className="grid grid-cols-2 gap-2">
         {kind === "BOARDING" && order.checkInAt && order.checkOutAt ? (
           <>
-            <InfoRow icon={LogIn} label={t.orders.form.checkInLabel}>
+            <InfoBox icon={LogIn} label={t.orders.form.checkInLabel}>
               {formatDateLong(order.checkInAt)} {timeOf(order.checkInAt)} {t.liff.timeUnitSuffix}
-            </InfoRow>
-            <InfoRow icon={LogOut} label={t.liff.summaryCheckOutLabel}>
+            </InfoBox>
+            <InfoBox icon={LogOut} label={t.liff.summaryCheckOutLabel}>
               {formatDateLong(order.checkOutAt)} {timeOf(order.checkOutAt)} {t.liff.timeUnitSuffix}
-            </InfoRow>
+            </InfoBox>
           </>
         ) : order.appointmentAt ? (
           <>
-            <InfoRow icon={CalendarDays} label={t.liff.summaryDateLabel}>
+            <InfoBox icon={CalendarDays} label={t.liff.summaryDateLabel}>
               {formatDateLong(order.appointmentAt)}
-            </InfoRow>
-            <InfoRow icon={Clock} label={t.liff.summaryTimeLabel}>
+            </InfoBox>
+            <InfoBox icon={Clock} label={t.liff.summaryTimeLabel}>
               {timeOf(order.appointmentAt)} {t.liff.timeUnitSuffix}
-            </InfoRow>
+            </InfoBox>
           </>
         ) : null}
-        {showPaid && (
-          <div className="space-y-2 rounded-2xl bg-accent/20 p-3">
+      </div>
+
+      {services.length > 0 && (
+        <div className="space-y-2 border-t pt-3">
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            {t.liffBook.serviceItemsTitle}
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent/40 px-1.5 text-xs font-semibold text-primary">
+              {services.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+            {services.map((it, i) => (
+              <div key={`${it.name}-${i}`} className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={3} />
+                <span className="truncate">{it.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showPaid && (
+        <dl className="space-y-2 rounded-2xl bg-accent/20 p-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-muted-foreground">{t.liffBook.estimate}</dt>
+            <dd className="text-right font-semibold tabular-nums">{formatBaht(order.total)}</dd>
+          </div>
+          {order.paid >= order.total ? (
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-foreground">{t.liffBook.estimate}</dt>
-              <dd className="text-right font-semibold tabular-nums">{formatBaht(order.total)}</dd>
+              <dt className="text-muted-foreground">{t.orders.payment.fullyPaid}</dt>
+              <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
             </div>
-            {order.paid >= order.total ? (
+          ) : (
+            <>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted-foreground">{t.orders.payment.fullyPaid}</dt>
+                <dt className="text-muted-foreground">{t.liffBook.depositPaid}</dt>
                 <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">{t.liffBook.depositPaid}</dt>
-                  <dd className="text-right font-semibold tabular-nums">{formatBaht(order.paid)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3 border-t border-dashed border-primary/30 pt-2">
-                  <dt className="font-medium">{t.liffBook.remaining}</dt>
-                  <dd className="text-right text-base font-bold tabular-nums text-primary">{formatBaht(order.total - order.paid)}</dd>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </dl>
+              <div className="flex items-center justify-between gap-3 border-t border-dashed border-primary/30 pt-2">
+                <dt className="font-medium">{t.liffBook.remaining}</dt>
+                <dd className="text-right text-base font-bold tabular-nums text-primary">{formatBaht(order.total - order.paid)}</dd>
+              </div>
+            </>
+          )}
+        </dl>
+      )}
     </div>
   );
 }
@@ -203,28 +187,24 @@ function StatusPill({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** หัวหน้าสถานะ — wait = รอแอดมินตรวจสอบ (นาฬิกาทราย) · ok = สำเร็จ · bad = มีปัญหา — ไม่มีอะไรกะพริบ/เคลื่อนไหว */
+/** หัวสถานะ — wait = รอแอดมินตรวจสอบ (นาฬิกาทราย) · ok = สำเร็จ · bad = มีปัญหา — กล่องแบนสีพื้น ไม่มีไล่สี/เคลื่อนไหว */
 function StatusHero({ tone, title, children }: { tone: "ok" | "wait" | "bad"; title: string; children?: React.ReactNode }) {
   const bad = tone === "bad";
+  const ok = tone === "ok";
   const Icon = bad ? X : tone === "wait" ? Hourglass : Check;
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-3.5 rounded-3xl border px-4 py-7 text-center",
-        bad ? "border-destructive/20" : "border-primary/20"
-      )}
-      style={softGradient(bad ? "destructive" : "primary")}
-    >
-      <div className="relative flex h-20 w-20 items-center justify-center">
-        <span className={cn("absolute inset-0 rounded-full", bad ? "bg-destructive/10" : "bg-primary/10")} />
+    <div className={cn("space-y-3 rounded-2xl p-3.5", bad ? "bg-destructive/5" : ok ? "bg-emerald-50" : "bg-primary/5")}>
+      <div className="flex items-center gap-2.5">
         <span
-          className="relative flex h-14 w-14 items-center justify-center rounded-full text-primary-foreground shadow-md ring-4 ring-white/80"
-          style={gradientFill(bad ? "destructive" : "primary")}
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+            bad ? "bg-destructive/10 text-destructive" : ok ? "bg-emerald-100 text-emerald-600" : "bg-primary/10 text-primary"
+          )}
         >
-          <Icon className="h-7 w-7" strokeWidth={tone === "wait" ? 2.25 : 3} />
+          <Icon className="h-4 w-4" strokeWidth={tone === "wait" ? 2.25 : 3} />
         </span>
+        <h1 className="text-sm font-bold">{title}</h1>
       </div>
-      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
       {children}
     </div>
   );
@@ -313,10 +293,11 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
 
   return (
     <div className={cn("space-y-5 py-2", selected.status === "RESCHEDULE_REQUIRED" ? "pb-28" : "pb-20")}>
+      <h1 className="text-lg font-bold">{t.liff.ordersPageTitle}</h1>
       <Stepper step={stepOf(selected)} t={t} />
 
       {data.orders.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-1 rounded-2xl bg-muted/60 p-1">
           {data.orders.map((o) => {
             const active = o.id === selected.id;
             return (
@@ -325,14 +306,16 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
                 type="button"
                 onClick={() => setSelectedId(o.id)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
-                  active ? "border-primary bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted",
+                  "relative min-w-0 flex-1 rounded-xl px-2 py-2 text-center transition-colors",
+                  active ? "bg-card font-semibold text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                   o.status === "CANCELLED" && "opacity-50"
                 )}
               >
-                {o.pet && <SpeciesIcon species={o.pet.species} className="h-4 w-4" />}
-                {o.pet?.name} · {t.liffBook.kind[orderKind(o)]}
-                {needsAction(o) && <span className="h-2 w-2 rounded-full bg-destructive" />}
+                <span className="block truncate text-sm">{o.pet?.name}</span>
+                <span className="block truncate text-[0.6875rem] font-normal text-muted-foreground">
+                  {t.liffBook.kind[orderKind(o)]}
+                </span>
+                {needsAction(o) && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-destructive" />}
               </button>
             );
           })}
