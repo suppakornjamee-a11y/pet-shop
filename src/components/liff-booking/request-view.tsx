@@ -14,7 +14,7 @@ import { LiffPaymentBody } from "@/components/liff-payment-view";
 import { LiffTabs } from "@/components/liff-tabs";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SlotPicker } from "./item-detail";
@@ -236,31 +236,19 @@ function RefundOrCreditDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && !pending && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t.liff.refundOrCreditTitle}</DialogTitle>
           <DialogDescription>{t.liff.refundOrCreditDescription(formatBaht(amount))}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onChoose("refund")}
-            className="w-full rounded-2xl border p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
-          >
-            <p className="font-semibold">{t.liff.chooseRefund}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t.liff.chooseRefundHint}</p>
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onChoose("credit")}
-            className="w-full rounded-2xl border p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
-          >
-            <p className="font-semibold">{t.liff.chooseCredit}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t.liff.chooseCreditHint}</p>
-          </button>
-        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onChoose("refund")}>
+            {t.liff.chooseRefund}
+          </Button>
+          <Button type="button" disabled={pending} onClick={() => onChoose("credit")}>
+            {t.liff.chooseCredit}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -359,7 +347,6 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
   async function handleCancelClick(orderId: string) {
     const ok = await confirm({
       title: t.liff.confirmCancelBookingTitle,
-      description: t.liff.cancelOrderConfirmDescription,
       confirmLabel: t.liff.cancelBookingButton,
       cancelLabel: t.common.no,
       tone: "danger",
