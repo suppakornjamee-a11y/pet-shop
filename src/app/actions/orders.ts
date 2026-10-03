@@ -521,7 +521,8 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
   await prisma.$transaction([
     prisma.order.update({
       where: { id: orderId },
-      data: { status: "PENDING_PAYMENT", updatedById: user.id },
+      // กันคิว 1 ชม. ใช้แค่ระหว่างรอขั้นนี้ — อนุมัติแล้วตัดทิ้ง (ขั้นถัดไปกันคิวด้วย Payment.expiresAt จริงแทน)
+      data: { status: "PENDING_PAYMENT", queueHoldExpiresAt: null, updatedById: user.id },
     }),
     prisma.orderActivityLog.create({
       data: { orderId, action: "ยืนยันคิว", createdById: user.id },
@@ -550,6 +551,52 @@ export async function approveOrderQueue(orderId: string): Promise<ActionResult> 
   return { ok: true, message: "ยืนยันคิวแล้ว" };
 }
 
+/**
+ * แกนหลักของ "ปฏิเสธคิว" — ใช้ทั้งตอนพนักงานกดเอง (rejectOrderQueue) และตอนระบบตีกลับอัตโนมัติเพราะ
+ * เกินเวลากันคิว 1 ชม. แล้วไม่มีใครอนุมัติ/ปฏิเสธ (expireStaleQueueHolds) — updatedById = null เมื่อระบบทำเอง
+ */
+async function rejectQueueInternal(
+  order: { id: string; bookingRequestId: string | null },
+  note: string,
+  updatedById: string | null
+) {
+  // ออเดอร์ในคำขอจอง: ไม่ยกเลิก — ให้ลูกค้าเลือกวันเวลาใหม่ของรายการนี้แล้วส่งกลับ (สัตว์/บริการคงเดิม ไม่กันคิว)
+  if (order.bookingRequestId) {
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: { status: "RESCHEDULE_REQUIRED", queueHoldExpiresAt: null, updatedById },
+      }),
+      prisma.orderActivityLog.create({
+        data: { orderId: order.id, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: updatedById },
+      }),
+      prisma.bookingRequest.update({ where: { id: order.bookingRequestId }, data: { rescheduleReason: note } }),
+    ]);
+    await syncBookingRequestStatus(order.bookingRequestId);
+    const link = buildLiffDeepLink(`/requests/${order.bookingRequestId}?order=${order.id}`);
+    await notifyCustomerLine(order.id, `คิวที่เลือกไม่ว่างค่ะ
+เหตุผล : ${note}${link ? `
+เลือกวันเวลาใหม่ที่ : ${link}` : ""}`);
+    revalidateOrderViews(order.id);
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: order.id },
+      data: { status: "CANCELLED", queueHoldExpiresAt: null, updatedById },
+    }),
+    prisma.orderActivityLog.create({
+      data: { orderId: order.id, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: updatedById },
+    }),
+  ]);
+
+  // ไม่ส่งข้อความ LINE แล้ว — หน้าจองของลูกค้าถามสถานะเองเป็นรอบ พอเจอว่าถูกปฏิเสธจะเด้ง popup
+  // พร้อมเหตุผลนี้ และพาไปเลือกวันเวลาใหม่ให้เอง (อ่านเหตุผลกลับจาก activity log ด้วย prefix เดียวกัน)
+
+  revalidateOrderViews(order.id);
+}
+
 /** ปฏิเสธคิวที่ลูกค้าจองมา — ยกเลิกออเดอร์ เหตุผลไปขึ้นเป็น popup บนหน้าจองของลูกค้า */
 export async function rejectOrderQueue(orderId: string, reason: string): Promise<ActionResult> {
   const user = await requireUser();
@@ -568,39 +615,30 @@ export async function rejectOrderQueue(orderId: string, reason: string): Promise
   const note = reason.trim();
   if (!note) return { ok: false, error: "กรุณาระบุเหตุผลที่ปฏิเสธคิว" };
 
-  // ออเดอร์ในคำขอจอง: ไม่ยกเลิก — ให้ลูกค้าเลือกวันเวลาใหม่ของรายการนี้แล้วส่งกลับ (สัตว์/บริการคงเดิม ไม่กันคิว)
-  if (order.bookingRequestId) {
-    await prisma.$transaction([
-      prisma.order.update({ where: { id: orderId }, data: { status: "RESCHEDULE_REQUIRED", updatedById: user.id } }),
-      prisma.orderActivityLog.create({
-        data: { orderId, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: user.id },
-      }),
-      prisma.bookingRequest.update({ where: { id: order.bookingRequestId }, data: { rescheduleReason: note } }),
-    ]);
-    await syncBookingRequestStatus(order.bookingRequestId);
-    const link = buildLiffDeepLink(`/requests/${order.bookingRequestId}?order=${orderId}`);
-    await notifyCustomerLine(orderId, `คิวที่เลือกไม่ว่างค่ะ
-เหตุผล : ${note}${link ? `
-เลือกวันเวลาใหม่ที่ : ${link}` : ""}`);
-    revalidateOrderViews(orderId);
-    return { ok: true, message: "แจ้งลูกค้าให้เลือกวันเวลาใหม่แล้ว" };
+  await rejectQueueInternal(order, note, user.id);
+  return { ok: true, message: order.bookingRequestId ? "แจ้งลูกค้าให้เลือกวันเวลาใหม่แล้ว" : "ปฏิเสธคิวแล้ว" };
+}
+
+const STALE_QUEUE_HOLD_REASON = "หมดเวลารอพนักงานยืนยันคิว (เกิน 1 ชั่วโมง) ระบบเปิดช่วงเวลานี้ให้ลูกค้าคนอื่นจองแทนแล้ว";
+
+/**
+ * ตีกลับคำขอที่ "กันคิว" มาเกิน 1 ชม. แล้วไม่มีใครอนุมัติ/ปฏิเสธ ให้เป็น "ต้องเลือกวันใหม่" (หรือยกเลิกถ้าเป็น
+ * ออเดอร์เดี่ยวนอกคำขอจอง) อัตโนมัติ — ไม่ปล่อยให้ช่วงเวลานั้นถูกกันไว้ไม่มีกำหนดจนลูกค้าคนอื่นจองไม่ได้เลย
+ *
+ * เรียกจาก cron รายวัน (ตาข่ายกันพลาดสุดท้าย) และจากจุดที่พนักงาน/ลูกค้าอ่านคิวบ่อยๆ (เช่น getOpenSlots)
+ * เพื่อให้สถานะอัปเดตเร็วกว่ารอบ cron เยอะ — เรียกซ้ำได้เสมอ ไม่มีผลข้างเคียงถ้าไม่มีออเดอร์ไหนหมดเวลา
+ */
+export async function expireStaleQueueHolds({ dryRun = false }: { dryRun?: boolean } = {}): Promise<string[]> {
+  const stale = await prisma.order.findMany({
+    where: { status: "PENDING_APPROVAL", queueHoldExpiresAt: { lt: new Date() } },
+    select: { id: true, code: true, bookingRequestId: true },
+  });
+  if (!dryRun) {
+    for (const order of stale) {
+      await rejectQueueInternal(order, STALE_QUEUE_HOLD_REASON, null);
+    }
   }
-
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: orderId },
-      data: { status: "CANCELLED", updatedById: user.id },
-    }),
-    prisma.orderActivityLog.create({
-      data: { orderId, action: `${QUEUE_REJECT_LOG_PREFIX}${note}`, createdById: user.id },
-    }),
-  ]);
-
-  // ไม่ส่งข้อความ LINE แล้ว — หน้าจองของลูกค้าถามสถานะเองเป็นรอบ พอเจอว่าถูกปฏิเสธจะเด้ง popup
-  // พร้อมเหตุผลนี้ และพาไปเลือกวันเวลาใหม่ให้เอง (อ่านเหตุผลกลับจาก activity log ด้วย prefix เดียวกัน)
-
-  revalidateOrderViews(orderId);
-  return { ok: true, message: "ปฏิเสธคิวแล้ว" };
+  return stale.map((o) => o.code);
 }
 
 export type UpdateOrderStatusResult = ActionResult & { cctvReminder?: boolean };

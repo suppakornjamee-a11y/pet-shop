@@ -16,6 +16,10 @@ const NANNY_REGULAR_RATE = 300; // พี่เลี้ยงดูแลพิ
 const NANNY_VIP_RATE = 400; // พี่เลี้ยงดูแลพิเศษ VIP ต่อตัวต่อการเข้าพัก (ไม่คูณจำนวนคืน)
 const CCTV_ROOM_RATE = 100; // ห้องกล้องวงจรปิด
 
+/** กันคิวชั่วคราว 1 ชม. ตอนลูกค้าจองเองผ่าน LINE แล้วรอพนักงานอนุมัติคิว (PENDING_APPROVAL) — หมดอายุแล้ว
+ * ยังไม่ถูกอนุมัติ/ปฏิเสธ ระบบจะตีกลับเป็น "ต้องเลือกวันใหม่" ให้เอง (ดู expireStaleQueueHolds ใน src/app/actions/orders.ts) */
+export const QUEUE_HOLD_TTL_MS = 60 * 60 * 1000;
+
 export const createOrderSchema = z.object({
   customerId: z.string().min(1, "กรุณาเลือกลูกค้า"),
   petId: z.string().optional().nullable(),
@@ -348,6 +352,8 @@ export async function persistOrder(
           updatedById: meta.createdById,
           createdVia: meta.createdVia,
           status: meta.status ?? "PENDING_PAYMENT",
+          // กันคิวชั่วคราว 1 ชม. เฉพาะตอนรอพนักงานอนุมัติคิว (ลูกค้าจองเองผ่าน LINE) — พนักงานสร้างเองไม่ต้องมีกำหนด
+          queueHoldExpiresAt: meta.status === "PENDING_APPROVAL" ? new Date(Date.now() + QUEUE_HOLD_TTL_MS) : null,
           bookingRequestId: meta.bookingRequestId ?? null,
           groomingStyleNote: meta.groomingStyleNote || null,
           groomingStyleImages: meta.groomingStyleImages ?? [],

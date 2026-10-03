@@ -42,6 +42,7 @@ export async function CalendarSlotPanel({
       id: true,
       appointmentAt: true,
       status: true,
+      queueHoldExpiresAt: true,
       orderType: true,
       roomId: true,
       queueType: true,

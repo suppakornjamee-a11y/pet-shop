@@ -5,5 +5,9 @@ export function buildBookingConfirmedText(p: {
   time: string;
   depositAmount: number;
 }): string {
-  return `ยืนยันการจองของน้อง${p.petName ?? ""} วันที่ ${p.date} เวลา ${p.time} น. เรียบร้อยแล้วค่ะ รับมัดจำแล้ว ${p.depositAmount.toLocaleString("th-TH")} บาท ซึ่งจะนำไปหักจากค่าบริการทั้งหมด โดยสรุปราคาสุทธิหลังอาบน้ำเสร็จ แล้วพบกันค่ะ`;
+  return `ยืนยันการจองของน้อง${p.petName ?? ""}
+วันที่ ${p.date} เวลา ${p.time} น.
+เรียบร้อยแล้วค่ะ รับมัดจำแล้ว ${p.depositAmount.toLocaleString("th-TH")} บาท
+ซึ่งจะนำไปหักจากค่าบริการทั้งหมด
+โดยสรุปราคาสุทธิหลังอาบน้ำเสร็จ แล้วพบกันค่ะ`;
 }

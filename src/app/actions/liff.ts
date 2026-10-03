@@ -16,6 +16,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { verifyLiffIdToken } from "@/lib/line";
+import { formatBaht } from "@/lib/format";
 import { customerSchema, petRegisterSchema } from "@/lib/customer-schema";
 import { petCreateInput, petUpdateInput } from "@/lib/pet-write";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
@@ -27,7 +28,7 @@ import {
   syncBookingRequestStatus,
 } from "@/lib/booking-request";
 import { quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
-import { createInitialPayments } from "./orders";
+import { createInitialPayments, expireStaleQueueHolds } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
 import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
@@ -346,6 +347,9 @@ export async function checkRoomAvailability(
 /** คิวที่ว่างของวันนั้น (อาบน้ำ/บริการอื่นๆ) — ใช้ตรรกะเดียวกับปฏิทินฝั่งพนักงาน กันไม่ให้ขัดกัน */
 export async function getOpenSlots(dateStr: string, queueType: "BATH" | "OTHER" = "BATH") {
   if (!isValidDateStr(dateStr)) return [];
+  // เก็บกวาดคำขอที่กันคิวเกิน 1 ชม. แล้วไม่มีใครอนุมัติ/ปฏิเสธก่อนเช็คคิวว่างทุกครั้ง — ลูกค้าคนอื่นที่มาดูช่วงเวลา
+  // นี้จะได้เห็นคิวว่างจริงไว เร็วกว่ารอรอบ cron รายวันเยอะ (ดูรายละเอียดที่ expireStaleQueueHolds)
+  await expireStaleQueueHolds();
   return Promise.all(
     LIFF_TIME_SLOTS.map(async (time) => ({
       time,
@@ -416,12 +420,11 @@ export async function liffCreateOrder(idToken: string, input: unknown): Promise<
   const plan = await buildOrderPlan(planInput);
   if (!plan.ok) return plan;
 
-  const result = await persistOrder(plan, planInput, { createdById: null, createdVia: "LIFF" });
-  if (!result.ok) return result;
-
   // ลูกค้าจองเองต้องให้พนักงานยืนยันคิวก่อนถึงจะจ่ายเงินได้ — คิวส่วนกลาง/ห้องพักมีเงื่อนไขหน้างาน
-  // (ช่างว่างจริงไหม สัตว์เข้ากับตัวอื่นได้ไหม) ที่ระบบเช็คแทนไม่ได้ทั้งหมด
-  await prisma.order.update({ where: { id: result.id }, data: { status: "PENDING_APPROVAL" } });
+  // (ช่างว่างจริงไหม สัตว์เข้ากับตัวอื่นได้ไหม) ที่ระบบเช็คแทนไม่ได้ทั้งหมด — persistOrder ตั้งกำหนดกันคิว 1 ชม.
+  // ให้เองตามสถานะนี้ (ดู QUEUE_HOLD_TTL_MS ใน src/lib/order-plan.ts)
+  const result = await persistOrder(plan, planInput, { createdById: null, createdVia: "LIFF", status: "PENDING_APPROVAL" });
+  if (!result.ok) return result;
 
   // สร้างรายการชำระเงินไว้เลย แต่ยังไม่ออก QR — ตอนอนุมัติค่อยปล่อยให้จ่าย
   await createInitialPayments(result.id, result.total, plan.depositAmount);
@@ -629,17 +632,27 @@ export async function liffSubmitPaymentSlip(
   return { ok: true, message: "ส่งสลิปเรียบร้อย รอร้านตรวจสอบ" };
 }
 
+/** สถานะที่ลูกค้ายกเลิกเองได้ — ทุกสถานะที่ยังไม่เริ่มดำเนินการจริง ไม่ว่าจะจ่ายไปแล้วแค่ไหนก็ตาม */
+const CUSTOMER_CANCELLABLE_STATUSES = new Set(["PENDING_APPROVAL", "RESCHEDULE_REQUIRED", "PENDING_PAYMENT", "DEPOSIT_PAID", "PAID"]);
+
+export type CancelOrderResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string; code?: string; needsChoice?: true; refundableAmount?: number };
+
 /**
- * ลูกค้ายกเลิกการจองของตัวเอง — ทำได้เฉพาะตอนที่ยังเป็น "รอเช็คคิว" เท่านั้น
+ * ลูกค้ายกเลิกการจองของตัวเอง — ทำได้ตราบใดที่ยังไม่เริ่มดำเนินการจริง (ก่อน IN_PROGRESS) ไม่ว่าจะยังไม่จ่าย
+ * จ่ายมัดจำแล้ว หรือจ่ายเต็มแล้วก็ตาม
  *
- * จงใจไม่ให้ยกเลิกหลังพนักงานยืนยันคิวแล้ว เพราะจากจุดนั้นไปมีทั้งเงินมัดจำและคิวที่ร้านกันไว้
- * ให้แล้ว ต้องคุยกับร้านเป็นรายกรณี (กฎการคืนเงิน/แจ้งล่วงหน้ายังไม่มีในระบบ) — ปล่อยให้กดเองไม่ได้
+ * ถ้ามีเงินที่ยืนยันแล้ว (มัดจำ/เต็มจำนวน) ต้องระบุ choice ด้วยว่า "refund" (คืนเงิน — ติดธง refundPending
+ * ไว้ให้พนักงานเห็นแล้วโอนคืนเอง ระบบยังไม่มีการโอนเงินอัตโนมัติ) หรือ "credit" (เก็บเป็นเครดิตในบัญชีลูกค้า
+ * ใช้ตัดกับออเดอร์ถัดไปได้เลย — ดู CustomerCredit/Customer.creditBalance) ยังไม่มีเงินเข้าเลยไม่ต้องเลือก
+ * ไม่ระบุ choice มาทั้งที่ต้องเลือก จะได้ needsChoice กลับไปพร้อมยอดที่เลือกได้ ให้ฝั่งหน้าจอเปิด dialog เลือกต่อ
  */
 export async function liffCancelOrder(
   idToken: string,
   orderId: string,
-  reason?: string
-): Promise<ActionResult> {
+  options?: { reason?: string; choice?: "refund" | "credit" }
+): Promise<CancelOrderResult> {
   const identity = await verifyLiffIdToken(idToken);
   if (!identity) {
     return { ok: false, error: "เซสชัน LINE หมดอายุ กรุณาเปิดหน้านี้ใหม่จากแอป LINE", code: "LIFF_AUTH_EXPIRED" };
@@ -651,8 +664,9 @@ export async function liffCancelOrder(
       id: true,
       code: true,
       status: true,
+      customerId: true,
       customer: { select: { lineUserId: true } },
-      payments: { select: { status: true } },
+      payments: { select: { status: true, amount: true } },
     },
   });
   // ตอบข้อความเดียวกันทั้งกรณีไม่มีออเดอร์และกรณีเป็นของคนอื่น จะได้ไม่กลายเป็นเครื่องมือเดาว่า
@@ -663,26 +677,58 @@ export async function liffCancelOrder(
   if (order.status === "CANCELLED") {
     return { ok: false, error: "การจองนี้ถูกยกเลิกไปแล้ว" };
   }
-  // เส้นแบ่งคือ "จ่ายเงินมาแล้วหรือยัง" ไม่ใช่ "ผ่านการเช็คคิวหรือยัง" — ตราบใดที่ยังไม่มีเงินเข้า
-  // ลูกค้ายกเลิกเองได้ ไม่ต้องโทรหาร้าน พอมีเงินเข้าแล้วต้องคุยเรื่องคืนเงินซึ่งระบบยังไม่มีกฎรองรับ
-  if (order.payments.some((p) => p.status === "VERIFIED")) {
-    return { ok: false, error: "การจองนี้ชำระเงินแล้ว กรุณาติดต่อร้านเพื่อยกเลิกและคืนเงิน" };
-  }
-  if (order.status !== "PENDING_APPROVAL" && order.status !== "PENDING_PAYMENT") {
+  if (!CUSTOMER_CANCELLABLE_STATUSES.has(order.status)) {
     return { ok: false, error: "การจองนี้เริ่มดำเนินการแล้ว กรุณาติดต่อร้าน" };
   }
 
-  const note = (reason ?? "").trim();
+  const verifiedSum = order.payments.filter((p) => p.status === "VERIFIED").reduce((sum, p) => sum + p.amount, 0);
+  const choice = options?.choice;
+  if (verifiedSum > 0 && choice !== "refund" && choice !== "credit") {
+    return {
+      ok: false,
+      needsChoice: true,
+      refundableAmount: verifiedSum,
+      error: "มีเงินที่ชำระไปแล้ว กรุณาเลือกว่าจะคืนเงินหรือเก็บเป็นเครดิต",
+    };
+  }
+
+  const note = (options?.reason ?? "").trim();
+  const cancelAction = note ? `ลูกค้ายกเลิกการจองเองผ่าน LINE: ${note}` : "ลูกค้ายกเลิกการจองเองผ่าน LINE";
+  const creditReason = `ยกเลิกออเดอร์ ${order.code} เก็บเป็นเครดิต`;
+
+  // ทุกอย่าง (เปลี่ยนสถานะ + เครดิต/ธงคืนเงิน) อยู่ในทรานแซกชันเดียวกัน — ไม่มีช่วงที่ออเดอร์ถูกยกเลิกไปแล้ว
+  // แต่เครดิตยังไม่เข้าบัญชี หรือกลับกัน
   await prisma.$transaction([
-    prisma.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } }),
-    prisma.orderActivityLog.create({
+    prisma.order.update({
+      where: { id: orderId },
       data: {
-        orderId,
-        action: note
-          ? `ลูกค้ายกเลิกการจองเองผ่าน LINE: ${note}`
-          : "ลูกค้ายกเลิกการจองเองผ่าน LINE",
+        status: "CANCELLED",
+        queueHoldExpiresAt: null,
+        ...(choice === "refund" && verifiedSum > 0 ? { refundPending: true } : {}),
       },
     }),
+    prisma.orderActivityLog.create({ data: { orderId, action: cancelAction } }),
+    ...(choice === "refund" && verifiedSum > 0
+      ? [
+          prisma.orderActivityLog.create({
+            data: { orderId, action: `ลูกค้าเลือกคืนเงิน ยอด ${formatBaht(verifiedSum)} — รอพนักงานโอนคืน` },
+          }),
+        ]
+      : []),
+    ...(choice === "credit" && verifiedSum > 0 && order.customerId
+      ? [
+          prisma.customer.update({
+            where: { id: order.customerId },
+            data: { creditBalance: { increment: verifiedSum } },
+          }),
+          prisma.customerCredit.create({
+            data: { customerId: order.customerId, amount: verifiedSum, reason: creditReason, orderId },
+          }),
+          prisma.orderActivityLog.create({
+            data: { orderId, action: `${creditReason} (${formatBaht(verifiedSum)})` },
+          }),
+        ]
+      : []),
   ]);
 
   await syncBookingRequestForOrder(orderId);

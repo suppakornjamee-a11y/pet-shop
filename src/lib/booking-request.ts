@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { buildOrderPlan, persistOrder, type OrderFormData } from "@/lib/order-plan";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import {
-  FLEA_GREEN_TEXT,
   FLEA_YELLOW_TEXT,
   assessFleaTick,
   fleaResultText,
@@ -318,29 +317,28 @@ export async function createBookingRequest(
       }
       createdOrderIds.push(result.id);
 
-      if (item.kind === "BATH" && (item.petInfo === "SAME" || item.petInfo === "UPDATED")) {
+      // ลูกค้ายืนยันว่าข้อมูลเดิม "ถูกต้องอยู่แล้ว" ไม่ต้องจดลงประวัติ (ไม่มีอะไรให้พนักงานต้องรู้) —
+      // จดเฉพาะตอนมีการอัปเดตข้อมูลจริงเท่านั้น
+      if (item.kind === "BATH" && item.petInfo === "UPDATED") {
         const weight = petMap.get(item.petId)?.weightKg;
         await prisma.orderActivityLog.create({
           data: {
             orderId: result.id,
-            action: `${
-              item.petInfo === "SAME" ? "ลูกค้ายืนยันว่าข้อมูลสัตว์เลี้ยงเดิมยังถูกต้อง" : "ลูกค้าอัปเดตข้อมูลสัตว์เลี้ยงก่อนจอง"
-            }${weight ? ` (น้ำหนัก ${weight} กก.)` : ""}`,
+            action: `ลูกค้าอัปเดตข้อมูลสัตว์เลี้ยงก่อนจอง${weight ? ` (น้ำหนัก ${weight} กก.)` : ""}`,
           },
         });
       }
 
-      // จดผลตรวจยาเห็บหมัดตอนจองลงประวัติ (ระดับเขียว/เหลือง/แดง) — พนักงานเห็นตอนเช็คคิว
-      if (fleaPlan) {
+      // จดผลตรวจยาเห็บหมัดตอนจองลงประวัติเฉพาะระดับเหลือง/แดง (ต้องตรวจซ้ำตอนเช็คคิว) — ระดับเขียว (ผ่านปกติ)
+      // ไม่มีอะไรต้องตามต่อ จึงไม่ต้องจดไว้ให้รก
+      if (fleaPlan && fleaPlan.result.level !== "GREEN") {
         const d = fleaPlan.declaration;
         const due = fleaPlan.dueDate ? ` (ครบกำหนด ${dayLabel(fleaPlan.dueDate)})` : "";
         const declared = d ? ` (${d.medicine.trim() || "ยาที่เลือกจากรายการ"} · ให้เมื่อ ${dayLabel(d.date)})` : "";
         const text =
-          fleaPlan.result.level === "GREEN"
-            ? `${FLEA_GREEN_TEXT}${due}`
-            : fleaPlan.result.level === "YELLOW"
-              ? `${FLEA_YELLOW_TEXT}${declared}${due}`
-              : `${fleaResultText(fleaPlan.result)}${declared}`;
+          fleaPlan.result.level === "YELLOW"
+            ? `${FLEA_YELLOW_TEXT}${declared}${due}`
+            : `${fleaResultText(fleaPlan.result)}${declared}`;
         await prisma.orderActivityLog.create({
           data: { orderId: result.id, action: fleaCheckLog(fleaPlan.result.level, text) },
         });

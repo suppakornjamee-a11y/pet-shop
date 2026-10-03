@@ -36,6 +36,7 @@ export default async function CalendarOtherPage(props: PageProps<"/calendar-othe
     select: {
       appointmentAt: true,
       status: true,
+      queueHoldExpiresAt: true,
       payments: { select: { status: true, expiresAt: true } },
     },
   });

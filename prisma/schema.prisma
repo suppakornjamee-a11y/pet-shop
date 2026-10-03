@@ -167,6 +167,7 @@ model User {
   bookingRequestsApproved  BookingRequest[]        @relation("BookingRequestApprovedBy")
   bookingRequestsConfirmed BookingRequest[]        @relation("BookingRequestConfirmedBy")
   bookingPaymentsVerified  BookingRequestPayment[] @relation("BookingRequestPaymentVerifiedBy")
+  customerCredits          CustomerCredit[]
 }
 
 // ---------- Customers & Pets ----------
@@ -184,12 +185,16 @@ model Customer {
   preferredLanguage Locale          @default(TH) // ภาษาที่ลูกค้าใช้สื่อสารด้วย
   createdVia        CreationChannel @default(STAFF) // สร้างโดยพนักงาน หรือลูกค้าลงทะเบียนเองผ่าน LINE LIFF
   note              String?
+  // ยอดเครดิตคงเหลือ (เช่น จากยกเลิกออเดอร์ที่มัดจำ/จ่ายไปแล้วแล้วเลือกเก็บเป็นเครดิตแทนคืนเงิน) — หักกับออเดอร์ถัดไปได้
+  // เป็นยอดรวมที่คำนวณไว้ล่วงหน้า (denormalized) อัปเดตพร้อมกับทุกแถวใน CustomerCredit เสมอ ไม่ต้องรวมยอดเองทุกครั้ง
+  creditBalance     Int             @default(0)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   pets            Pet[]
   orders          Order[]
   bookingRequests BookingRequest[]
+  credits         CustomerCredit[]
 
   @@index([phone])
   @@index([name])
@@ -519,10 +524,17 @@ model Order {
   groomingStyleImages   String[]  @default([])
   groomingStyleImagesAt DateTime?
 
+  // กันคิวชั่วคราวระหว่างรอพนักงานอนุมัติคิว (PENDING_APPROVAL เท่านั้น) — null = ไม่มีกำหนดหมดอายุ (ออเดอร์ที่พนักงานสร้างเอง)
+  // หมดอายุแล้วยังไม่ถูกอนุมัติ/ปฏิเสธ → ถือเป็น RESCHEDULE_REQUIRED ไปเอง (ดู isSlotHolding ใน src/lib/booking.ts)
+  queueHoldExpiresAt DateTime?
+  // ลูกค้าเลือก "คืนเงิน" ตอนยกเลิกออเดอร์ที่มีมัดจำ/ชำระแล้ว — ค้างไว้จนพนักงานโอนเงินคืนจริงแล้วกดล้างค่านี้
+  refundPending      Boolean   @default(false)
+
   items        OrderItem[]
   payments     Payment[]
   extraCharges OrderExtraCharge[]
   activityLogs OrderActivityLog[]
+  credits      CustomerCredit[]
 
   @@index([customerId])
   @@index([bookingRequestId])
@@ -533,6 +545,7 @@ model Order {
   @@index([roomId])
   @@index([checkInAt])
   @@index([checkOutAt])
+  @@index([queueHoldExpiresAt])
 }
 
 // log ว่าใครเพิ่ม/แก้ไขรายการอะไรในออเดอร์ เมื่อไหร่ (ไว้ตรวจสอบย้อนหลัง โดยเฉพาะตอนช่างเพิ่มรายการเอง)
@@ -608,6 +621,24 @@ model Payment {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  @@index([orderId])
+}
+
+// ประวัติเครดิตของลูกค้า (ยอดรวมปัจจุบันอยู่ที่ Customer.creditBalance) — แถวบวก = ได้เครดิตเพิ่ม (เช่น ยกเลิกออเดอร์ที่จ่ายไปแล้วแล้วเลือกเก็บเป็นเครดิต)
+// แถวลบ = ใช้เครดิตไปหักกับออเดอร์ใหม่ — order คือออเดอร์ที่เกี่ยวข้องของแถวนั้น (ต้นทางเครดิต หรือออเดอร์ที่เอาเครดิตไปใช้)
+model CustomerCredit {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId  String
+  amount      Int
+  reason      String
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId     String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
   @@index([orderId])
 }
 

@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Bath, CalendarDays, Check, Clock, Home, Hourglass, Loader2, LogIn, LogOut, Scissors, X } from "lucide-react";
-import { liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
+import { liffCancelOrder, liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
 import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { toThaiDateStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
 import { useI18n } from "@/components/i18n-provider";
+import { useConfirm } from "@/components/confirm-provider";
 import { LiffPaymentBody } from "@/components/liff-payment-view";
 import { LiffTabs } from "@/components/liff-tabs";
 import { SpeciesIcon } from "@/components/species-icon";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SlotPicker } from "./item-detail";
@@ -24,6 +26,8 @@ type RequestOrder = RequestData["orders"][number];
 
 const POLL_MS = 8000;
 const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Bath, OTHER: Scissors };
+/** สถานะที่ลูกค้ายกเลิกเองได้ — ตรงกับ CUSTOMER_CANCELLABLE_STATUSES ใน src/app/actions/liff.ts เป๊ะๆ */
+const CANCELLABLE_STATUSES = new Set(["PENDING_APPROVAL", "RESCHEDULE_REQUIRED", "PENDING_PAYMENT", "DEPOSIT_PAID", "PAID"]);
 
 /** ขั้นของแถบด้านบน ตามสถานะของรายการที่กำลังดู — แต่ละรายการเดินหน้าแยกกัน (แอดมินอนุมัติทีละรายการ) */
 function stepOf(o: RequestOrder): Step {
@@ -205,6 +209,63 @@ function StatusHero({ tone, title, children }: { tone: "ok" | "wait" | "bad"; ti
   );
 }
 
+/** ปุ่มยกเลิกการจอง — แบบเดียวใช้ซ้ำทุกสถานะที่ยกเลิกได้ ไม่เน้นสี (ไม่ใช่ปุ่มหลักของหน้า) */
+function CancelOrderButton({ onClick, t }: { onClick: () => void; t: T }) {
+  return (
+    <Button type="button" variant="outline" className="w-full rounded-2xl" onClick={onClick}>
+      {t.liff.cancelBookingButton}
+    </Button>
+  );
+}
+
+/** เลือกคืนเงินหรือเก็บเป็นเครดิต — ขึ้นเฉพาะตอนยกเลิกออเดอร์ที่มีเงินชำระไปแล้ว (มัดจำ/เต็มจำนวน) */
+function RefundOrCreditDialog({
+  open,
+  amount,
+  pending,
+  onChoose,
+  onClose,
+  t,
+}: {
+  open: boolean;
+  amount: number;
+  pending: boolean;
+  onChoose: (choice: "refund" | "credit") => void;
+  onClose: () => void;
+  t: T;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && !pending && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t.liff.refundOrCreditTitle}</DialogTitle>
+          <DialogDescription>{t.liff.refundOrCreditDescription(formatBaht(amount))}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onChoose("refund")}
+            className="w-full rounded-2xl border p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
+          >
+            <p className="font-semibold">{t.liff.chooseRefund}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t.liff.chooseRefundHint}</p>
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onChoose("credit")}
+            className="w-full rounded-2xl border p-3.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
+          >
+            <p className="font-semibold">{t.liff.chooseCredit}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t.liff.chooseCreditHint}</p>
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RequestBody({ requestId, initialOrderId }: { requestId: string; initialOrderId?: string }) {
   const { t } = useI18n();
   const { idToken } = useLiff();
@@ -213,6 +274,10 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
   const [selectedId, setSelectedId] = useState<string | null>(initialOrderId ?? null);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>({});
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm();
+  // ออเดอร์ที่กำลังยกเลิกอยู่ + ยอดที่เลือกคืนเงิน/เก็บเครดิตได้ — ไม่ null เมื่อต้องเปิด dialog เลือก
+  const [cancelChoice, setCancelChoice] = useState<{ orderId: string; amount: number } | null>(null);
+  const [cancelPending, setCancelPending] = useState(false);
 
   const load = useCallback(async () => {
     if (!idToken) return;
@@ -271,6 +336,37 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
     });
   }
 
+  /** ยกเลิกออเดอร์ — ถ้ามีเงินชำระไปแล้ว server จะตอบ needsChoice กลับมาแทนที่จะยกเลิกทันที ให้เปิด dialog เลือกต่อ */
+  async function runCancel(orderId: string, choice?: "refund" | "credit") {
+    if (!idToken) return;
+    setCancelPending(true);
+    const res = await liffCancelOrder(idToken, orderId, { choice });
+    setCancelPending(false);
+    if (!res.ok && res.needsChoice) {
+      setCancelChoice({ orderId, amount: res.refundableAmount ?? 0 });
+      return;
+    }
+    if (!res.ok) {
+      handleLiffAuthExpiry(res);
+      toast.error(res.error);
+      return;
+    }
+    setCancelChoice(null);
+    toast.success(res.message);
+    await load();
+  }
+
+  async function handleCancelClick(orderId: string) {
+    const ok = await confirm({
+      title: t.liff.confirmCancelBookingTitle,
+      description: t.liff.cancelOrderConfirmDescription,
+      confirmLabel: t.liff.cancelBookingButton,
+      cancelLabel: t.common.no,
+      tone: "danger",
+    });
+    if (ok) await runCancel(orderId);
+  }
+
   if (error) return <p className="py-16 text-center text-sm text-muted-foreground">{error}</p>;
   if (!data || !selected) {
     return (
@@ -322,6 +418,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
           {/* หน้าชำระเงินแบบเดิมของออเดอร์ — ถามสถานะเองทุก 8 วินาที อัปเดตต่อเองทั้งตอนส่งสลิปและตอนร้านยืนยันเงิน */}
           <LiffPaymentBody key={selected.id} orderId={selected.id} />
           {isBath && <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>}
+          <CancelOrderButton onClick={() => handleCancelClick(selected.id)} t={t} />
         </>
       ) : selected.status === "RESCHEDULE_REQUIRED" ? (
         <>
@@ -360,11 +457,12 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
             ) : (
               <SlotPicker key={selected.id} draft={draft} set={setDraft} cart={[]} editingKey={null} t={t} />
             ))}
-          <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+          <div className="fixed inset-x-3 bottom-3 z-10 mx-auto max-w-md space-y-2 sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
             <Button className="h-14 w-full rounded-2xl text-base" disabled={!canResubmit || isPending} onClick={() => resubmit(selected)}>
               {isPending && <Loader2 className="animate-spin" />}
               {t.common.confirm}
             </Button>
+            <CancelOrderButton onClick={() => handleCancelClick(selected.id)} t={t} />
           </div>
         </>
       ) : selected.status === "PENDING_APPROVAL" ? (
@@ -373,6 +471,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
             <StatusPill>{t.labels.bookingRequestStatus.PENDING_APPROVAL}</StatusPill>
           </StatusHero>
           <SummaryCard order={selected} t={t} />
+          <CancelOrderButton onClick={() => handleCancelClick(selected.id)} t={t} />
         </>
       ) : selected.status === "CANCELLED" ? (
         <>
@@ -388,10 +487,22 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
           {isBath && selected.paid < selected.total && (
             <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
           )}
+          {CANCELLABLE_STATUSES.has(selected.status) && (
+            <CancelOrderButton onClick={() => handleCancelClick(selected.id)} t={t} />
+          )}
         </>
       )}
 
       {selected.status !== "RESCHEDULE_REQUIRED" && <LiffTabs />}
+
+      <RefundOrCreditDialog
+        open={cancelChoice !== null}
+        amount={cancelChoice?.amount ?? 0}
+        pending={cancelPending}
+        onChoose={(choice) => cancelChoice && void runCancel(cancelChoice.orderId, choice)}
+        onClose={() => setCancelChoice(null)}
+        t={t}
+      />
     </div>
   );
 }

@@ -23,6 +23,7 @@ export async function isRoomAvailable(
     },
     select: {
       status: true,
+      queueHoldExpiresAt: true,
       payments: { select: { status: true, expiresAt: true } },
     },
   });

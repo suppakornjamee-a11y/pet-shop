@@ -13,26 +13,27 @@ import {
 
 export type OrderForHold = {
   status: OrderStatus;
+  queueHoldExpiresAt?: Date | null;
   payments: { status: PaymentStatus; expiresAt: Date | null }[];
 };
 
 /**
  * ออเดอร์นี้ "กันคิว" อยู่หรือไม่
  * - ชำระแล้ว/มัดจำแล้ว/กำลังทำ/เสร็จสิ้น → กันแน่นอน
+ * - รอตรวจคิว + ยังไม่ครบกำหนด queueHoldExpiresAt (1 ชม. นับจากลูกค้าจอง) → กันชั่วคราว
  * - รอชำระ + มี payment ที่ยืนยันแล้ว/ส่งสลิปแล้ว/ยังไม่หมดอายุ → กันชั่วคราว
  * - ยกเลิก หรือไม่มี payment ไหนกันคิวอยู่เลย → ไม่กัน (คืนคิว)
  */
 export function isSlotHolding(o: OrderForHold, now: Date = new Date()): boolean {
   // ยกเลิก / รอเลือกวันเวลาใหม่ (แอดมินแจ้งคิวไม่ว่าง) — ไม่กันคิว ให้คนอื่นจองช่วงนั้นได้
   if (o.status === "CANCELLED" || o.status === "RESCHEDULE_REQUIRED") return false;
-  if (
-    // รอเช็คคิว = ลูกค้าจองไว้แล้วรอพนักงานยืนยัน ต้องกันคิวไว้ ไม่งั้นคนอื่นจองทับระหว่างรอ
-    o.status === "PENDING_APPROVAL" ||
-    o.status === "PAID" ||
-    o.status === "DEPOSIT_PAID" ||
-    o.status === "IN_PROGRESS" ||
-    o.status === "COMPLETED"
-  ) {
+  if (o.status === "PENDING_APPROVAL") {
+    // รอเช็คคิว = ลูกค้าจองเองผ่าน LINE รอพนักงานยืนยัน ต้องกันคิวไว้ ไม่งั้นคนอื่นจองทับระหว่างรอ
+    // แต่กันไว้ไม่เกิน 1 ชม. (queueHoldExpiresAt) — เลยกำหนดแล้วพนักงานยังไม่อนุมัติ/ปฏิเสธ ถือว่าไม่กันคิวอีกต่อไป
+    // (ออเดอร์ที่พนักงานสร้างเอง ไม่มีกำหนดนี้ — queueHoldExpiresAt เป็น null จึงกันไว้ไม่มีกำหนดเหมือนเดิม)
+    return !o.queueHoldExpiresAt || o.queueHoldExpiresAt.getTime() > now.getTime();
+  }
+  if (o.status === "PAID" || o.status === "DEPOSIT_PAID" || o.status === "IN_PROGRESS" || o.status === "COMPLETED") {
     return true;
   }
   // PENDING_PAYMENT
@@ -67,6 +68,7 @@ export async function isSlotAvailable(
     },
     select: {
       status: true,
+      queueHoldExpiresAt: true,
       payments: { select: { status: true, expiresAt: true } },
     },
   });
@@ -97,6 +99,7 @@ export async function firstOpenSlot(
     select: {
       appointmentAt: true,
       status: true,
+      queueHoldExpiresAt: true,
       payments: { select: { status: true, expiresAt: true } },
     },
   });
