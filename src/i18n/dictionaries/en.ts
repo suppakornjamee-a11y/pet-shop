@@ -627,7 +627,7 @@ const en: Dictionary = {
     cartEmpty: "No bookings yet",
     addAnotherPet: "Add a bath",
     addOtherService: "Add other services",
-    dueAfterApproval: "Amount due first",    confirmNotice: "An admin will check the queue and send the payment amount through a link.",
+    dueAfterApproval: "Amount due first",
     viewCart: (n: number) => `Booking list (${n})`,
     requestTitle: (code: string) => `Booking request ${code}`,
     rescheduleReason: (r: string) => `Reason: ${r}`,

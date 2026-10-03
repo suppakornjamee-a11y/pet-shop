@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CalendarDays,
+  Check,
   ChevronLeft,
   Home,
-  Info,
   Loader2,
   Plus,
   Scissors,
@@ -319,6 +319,7 @@ function BookingBody() {
       draft,
       petName: draftPet.name,
       species: draftPet.species,
+      photoUrl: draftPet.photoUrl,
       serviceNames: est.serviceNames,
       roomLabel: est.room ? `${est.room.category.name} · ${est.room.name}` : null,
       nights: est.nights,
@@ -454,16 +455,32 @@ function BookingBody() {
             {sorted.map((e) => (
               <div key={e.key} className={cn("space-y-3 p-4", CARD)}>
                 <div className="flex items-start gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <SpeciesIcon species={e.species} className="h-6 w-6" />
-                  </span>
+                  {e.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={e.photoUrl}
+                      alt=""
+                      className="h-11 w-11 shrink-0 rounded-full border border-primary/15 object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 p-2 text-primary">
+                      <SpeciesIcon species={e.species} className="h-full w-full object-contain" />
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="font-bold leading-tight">
                       {e.petName} · {t.liffBook.kind[e.draft.kind]}
                     </div>
                     {(e.roomLabel || e.serviceNames.length > 0) && (
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {[e.roomLabel, ...e.serviceNames].filter(Boolean).join(" · ")}
+                      <div className="mt-1 space-y-0.5">
+                        {[e.roomLabel, ...e.serviceNames]
+                          .filter((name): name is string => !!name)
+                          .map((name, i) => (
+                            <div key={`${name}-${i}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Check className="h-3 w-3 shrink-0 text-primary" strokeWidth={3} />
+                              <span className="truncate">{name}</span>
+                            </div>
+                          ))}
                       </div>
                     )}
                     {e.draft.kind === "BATH" && e.draft.styleNote && (
@@ -536,13 +553,6 @@ function BookingBody() {
                 <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(totalEstimate)}</span>
               </div>
             </div>
-          </div>
-        )}
-
-        {cart.length > 0 && (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 p-3.5 text-amber-900">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <p className="min-w-0 flex-1 text-xs leading-relaxed">{t.liffBook.confirmNotice}</p>
           </div>
         )}
 

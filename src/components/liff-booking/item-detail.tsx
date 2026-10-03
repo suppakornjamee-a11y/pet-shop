@@ -449,7 +449,7 @@ export function ItemDetail({
                     <Textarea
                       id="style-note"
                       rows={2}
-                      className="rounded-2xl border-primary/15 bg-primary/5"
+                      className="rounded-2xl bg-card"
                       value={draft.styleNote}
                       onChange={(e) => set({ styleNote: e.target.value })}
                     />
@@ -559,5 +559,5 @@ export function whenLabel(draft: ItemDraft, t: T): string[] {
   if (draft.kind === "BOARDING") {
     return [t.liff.confirmCheckInLine(day(draft.date), draft.checkInTime), t.liff.confirmCheckOutLine(day(draft.checkOutDate), draft.checkOutTime)];
   }
-  return [`${day(draft.date)} ${draft.time} ${t.liff.timeUnitSuffix}`];
+  return [`${day(draft.date)} · ${t.liff.summaryTimeLabel} ${draft.time} ${t.liff.timeUnitSuffix}`];
 }

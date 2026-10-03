@@ -642,7 +642,7 @@ const th = {
     cartEmpty: "ยังไม่มีรายการจอง",
     addAnotherPet: "เพิ่มการอาบน้ำ",
     addOtherService: "เพิ่มบริการอื่นๆ",
-    dueAfterApproval: "ยอดแรกที่ชำระ",    confirmNotice: "แอดมินจะตรวจสอบคิวและแจ้งยอดชำระเงินผ่านลิ้งค์ค่ะ",
+    dueAfterApproval: "ยอดแรกที่ชำระ",
     viewCart: (n: number) => `รายการจอง (${n})`,
     requestTitle: (code: string) => `คำขอจอง ${code}`,
     rescheduleReason: (r: string) => `เหตุผล: ${r}`,

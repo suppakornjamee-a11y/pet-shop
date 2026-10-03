@@ -73,6 +73,8 @@ export type CartEntry = {
   draft: ItemDraft;
   petName: string;
   species: Species;
+  /** รูปสัตว์เลี้ยงที่มีอยู่แล้ว — แสดงแทนไอคอนในรายการตะกร้าถ้ามี ไม่มีก็ fallback เป็นไอคอน */
+  photoUrl: string | null;
   serviceNames: string[];
   roomLabel: string | null;
   nights: number;
