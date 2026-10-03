@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
   Home,
   Loader2,
@@ -452,13 +451,17 @@ function BookingBody() {
           <p className="py-8 text-center text-sm text-muted-foreground">{t.liffBook.cartEmpty}</p>
         ) : (
           <div className="space-y-3">
-            {sorted.map((e) => (
+            {sorted.map((e) => {
+              // รูปสัตว์เอาจากข้อมูลล่าสุดใน pets เสมอ (ไม่ใช่ snapshot ที่ค้างอยู่ในตะกร้าตอนเพิ่ม) กันกรณีตะกร้าเก่า
+              // ที่บันทึกไว้ในเครื่องตั้งแต่ก่อนมีช่อง photoUrl หรือสัตว์เพิ่งอัปโหลดรูปทีหลัง
+              const photoUrl = pets.find((p) => p.id === e.draft.petId)?.photoUrl ?? e.photoUrl;
+              return (
               <div key={e.key} className={cn("space-y-3 p-4", CARD)}>
                 <div className="flex items-start gap-3">
-                  {e.photoUrl ? (
+                  {photoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={e.photoUrl}
+                      src={photoUrl}
                       alt=""
                       className="h-11 w-11 shrink-0 rounded-full border border-primary/15 object-cover"
                     />
@@ -477,7 +480,7 @@ function BookingBody() {
                           .filter((name): name is string => !!name)
                           .map((name, i) => (
                             <div key={`${name}-${i}`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Check className="h-3 w-3 shrink-0 text-primary" strokeWidth={3} />
+                              <span className="w-3.5 shrink-0 text-right text-[0.6875rem] font-bold text-primary">{i + 1}.</span>
                               <span className="truncate">{name}</span>
                             </div>
                           ))}
@@ -507,7 +510,8 @@ function BookingBody() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -537,13 +541,13 @@ function BookingBody() {
         {cart.length > 0 && (
           <div className={cn("space-y-3 p-4", CARD)}>
             <h2 className="text-base font-bold">{t.liffBook.summaryTitle}</h2>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
+            <div className="flex items-baseline justify-between gap-3 text-xs">
               <span>{allBath && depositCount > 0 ? t.liffBook.dueDeposit() : t.liffBook.dueAfterApproval}</span>
-              <span className="font-bold tabular-nums text-primary">{formatBaht(totalDue)}</span>
+              <span className="tabular-nums text-primary">{formatBaht(totalDue)}</span>
             </div>
             <div className="space-y-2 border-t pt-3">
               {remaining > 0 && (
-                <div className="flex items-baseline justify-between gap-3 text-sm text-muted-foreground">
+                <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
                   <span>{t.liffBook.remainingAtShop}</span>
                   <span className="tabular-nums">{formatBaht(remaining)}</span>
                 </div>
