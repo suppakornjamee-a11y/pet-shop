@@ -45,7 +45,7 @@ export type ReminderResult = {
 /**
  * ส่ง LINE แจ้งเตือนออเดอร์โรงแรมที่ "พรุ่งนี้" เช็คอิน / เช็คเอาท์ (นับวันตามเวลาไทย) — เรียกวันละครั้งจาก cron
  *
- * ส่งเฉพาะออเดอร์ที่ร้านรับแล้ว (ไม่นับรอเช็คคิว / ยกเลิก / เสร็จสิ้น) และลูกค้าผูก LINE ไว้
+ * ส่งเฉพาะออเดอร์ที่ชำระมัดจำหรือชำระครบแล้ว (ไม่นับรอเช็คคิว / รอชำระ / ยกเลิก / เสร็จสิ้น) และลูกค้าผูก LINE ไว้
  * - เช็คอิน: ไม่ส่งถ้าทำรายการวันเดียวกับวันเข้าพัก (จองแล้วเข้าพักเลย ไม่ต้องคอนเฟิร์มล่วงหน้า)
  * - เช็คเอาท์: ไม่ส่งถ้าเข้าและออกวันเดียวกัน (Daycare / Pawsome) เพราะวันก่อนเช็คเอาท์คือวันก่อนเข้าพัก
  *   ลูกค้าจะได้ข้อความเช็คอินกับข้อความขอรีวิวพร้อมกันทั้งที่ยังไม่ได้มาใช้บริการ
@@ -59,7 +59,8 @@ export async function runStayReminders({
   const today = toThaiDateStr(now);
   const tomorrow = addDaysThai(today, 1);
   const { start, end } = thaiDayRange(tomorrow);
-  const activeStatuses = ["PENDING_PAYMENT", "DEPOSIT_PAID", "PAID", "IN_PROGRESS"] as const;
+  // ส่งเฉพาะที่ชำระมัดจำหรือชำระครบแล้ว (ตรงกับนัดอาบน้ำ) — ยังไม่จ่ายเงินไม่ส่ง
+  const activeStatuses = ["DEPOSIT_PAID", "PAID", "IN_PROGRESS"] as const;
 
   const select = {
     id: true,
