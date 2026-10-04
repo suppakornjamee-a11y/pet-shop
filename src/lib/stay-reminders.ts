@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatDateLong } from "@/lib/format";
 import { sendLinePush } from "@/lib/line";
-import { CHECKIN_REMINDER_LOG, CHECKOUT_REMINDER_LOG } from "@/lib/order-log";
+import { CHECKIN_REMINDER_LOG, CHECKOUT_REMINDER_LOG, SCHEDULE_CHANGED_LOG } from "@/lib/order-log";
 import { addDaysThai, thaiDayRange, toThaiDateStr } from "@/lib/slots";
 
 /** ข้อความตามที่ร้านกำหนด — แก้ถ้อยคำที่นี่ที่เดียว */
@@ -69,7 +69,7 @@ export async function runStayReminders({
     checkOutAt: true,
     customer: { select: { lineUserId: true } },
     activityLogs: {
-      where: { action: { in: [CHECKIN_REMINDER_LOG, CHECKOUT_REMINDER_LOG] as string[] } },
+      where: { action: { in: [CHECKIN_REMINDER_LOG, CHECKOUT_REMINDER_LOG, SCHEDULE_CHANGED_LOG] as string[] } },
       select: { action: true },
     },
   } as const;
@@ -97,6 +97,11 @@ export async function runStayReminders({
     const base = { kind, orderCode: order.code };
     if (order.activityLogs.some((l) => l.action === logAction)) {
       results.push({ ...base, outcome: "already-sent" });
+      return;
+    }
+    // ยกเลิกไม่ต้องเข้ามาถึงตรงนี้ (สถานะกรองออกแล้ว) — ที่เลื่อนวันแล้วไม่ส่งแจ้งเตือนของวันใหม่
+    if (order.activityLogs.some((l) => l.action === SCHEDULE_CHANGED_LOG)) {
+      results.push({ ...base, outcome: "skipped", note: "วันเข้าพักถูกเลื่อน ไม่ส่งแจ้งเตือนอัตโนมัติ" });
       return;
     }
     if (skipReason) {

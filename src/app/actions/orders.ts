@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { buildPromptPayPayload } from "@/lib/promptpay";
 import { sendLinePush, buildLiffDeepLink } from "@/lib/line";
-import { CUSTOMER_CONFIRMED_LOG_SUFFIX, QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
+import { CUSTOMER_CONFIRMED_LOG_SUFFIX, QUEUE_REJECT_LOG_PREFIX, SCHEDULE_CHANGED_LOG } from "@/lib/order-log";
 import { buildBookingConfirmedText } from "@/lib/booking-messages";
 import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
 import { getOrderKind, isOrderFullyPaid, canCheckoutOrder, canStartOrder, isBeforeServiceDay } from "@/lib/order-kind";
@@ -143,10 +143,16 @@ export async function updateOrder(orderId: string, input: unknown): Promise<Acti
   const total = plan.subtotal + plan.holidaySurcharge;
   const fleaTick = await petFleaTickSnapshot(data.petId);
 
+  const sameTime = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
+  const scheduleMoved = !sameTime(existing.appointmentAt, plan.appointmentAt) || !sameTime(existing.checkInAt, plan.checkInAt);
+
   await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
     // สถานะยังเป็น PENDING_PAYMENT แน่นอน (เช็คไว้ข้างบน) จึงยังไม่มี payment ที่ VERIFIED
     await tx.payment.deleteMany({ where: { orderId, status: { not: "VERIFIED" } } });
+    if (scheduleMoved) {
+      await tx.orderActivityLog.create({ data: { orderId, action: SCHEDULE_CHANGED_LOG, createdById: user.id } });
+    }
     await tx.order.update({
       where: { id: orderId },
       data: {

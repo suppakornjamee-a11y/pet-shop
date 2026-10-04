@@ -31,7 +31,7 @@ import { quickPetSchema, quickPetWriteData } from "@/lib/pet-quick";
 import { createInitialPayments, expireStaleQueueHolds } from "./orders";
 import { isSlotAvailable } from "@/lib/booking";
 import { isRoomAvailable } from "@/lib/room-availability";
-import { QUEUE_REJECT_LOG_PREFIX } from "@/lib/order-log";
+import { QUEUE_REJECT_LOG_PREFIX, SCHEDULE_CHANGED_LOG } from "@/lib/order-log";
 import { MAX_SLIPS, encodeSlipUrls, parseSlipUrls } from "@/lib/slip-urls";
 import { isPastSlot, isValidDateStr, isValidTimeStr, buildSlotDate, toThaiDateStr } from "@/lib/slots";
 import type { ActionResult } from "./customers";
@@ -944,6 +944,7 @@ export async function liffRescheduleBookingRequest(idToken: string, requestId: s
         },
       });
       await tx.orderActivityLog.create({ data: { orderId, action: "ลูกค้าเลือกวันเวลาใหม่ ส่งให้ตรวจสอบคิวอีกครั้ง" } });
+      await tx.orderActivityLog.create({ data: { orderId, action: SCHEDULE_CHANGED_LOG } });
     }
     await tx.bookingRequest.update({ where: { id: requestId }, data: { submittedAt: new Date() } });
   });

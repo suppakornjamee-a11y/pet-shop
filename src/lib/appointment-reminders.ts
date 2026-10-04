@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { sendLinePush } from "@/lib/line";
-import { APPOINTMENT_REMINDER_LOG_PREFIX, appointmentReminderLog } from "@/lib/order-log";
+import { APPOINTMENT_REMINDER_LOG_PREFIX, SCHEDULE_CHANGED_LOG, appointmentReminderLog } from "@/lib/order-log";
 import { addDaysThai, thaiDayRange, toThaiDateStr } from "@/lib/slots";
 
 /** ข้อความเตือนนัด — แก้ถ้อยคำที่นี่ที่เดียว */
@@ -61,7 +61,10 @@ export async function runAppointmentReminders({
       customer: { select: { lineUserId: true } },
       pet: { select: { name: true } },
       items: { where: { itemType: "SERVICE" }, orderBy: { subtotal: "desc" }, select: { name: true, subtotal: true } },
-      activityLogs: { where: { action: { startsWith: APPOINTMENT_REMINDER_LOG_PREFIX } }, select: { action: true } },
+      activityLogs: {
+        where: { OR: [{ action: { startsWith: APPOINTMENT_REMINDER_LOG_PREFIX } }, { action: SCHEDULE_CHANGED_LOG }] },
+        select: { action: true },
+      },
     },
   });
 
@@ -71,6 +74,10 @@ export async function runAppointmentReminders({
     const marker = appointmentReminderLog(tomorrow);
     if (o.activityLogs.some((l) => l.action === marker)) {
       results.push({ ...base, outcome: "already-sent" });
+      continue;
+    }
+    if (o.activityLogs.some((l) => l.action === SCHEDULE_CHANGED_LOG)) {
+      results.push({ ...base, outcome: "skipped", note: "วันนัดถูกเลื่อน ไม่ส่งแจ้งเตือนอัตโนมัติ" });
       continue;
     }
     const lineUserId = o.customer?.lineUserId;
