@@ -467,9 +467,15 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         </>
       ) : (
         <>
-          <StatusHero tone="ok" title={t.liff.inProgressTitle}>
-            <StatusPill>{t.labels.bookingRequestStatus.CONFIRMED}</StatusPill>
-          </StatusHero>
+          <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-bold leading-tight">{t.labels.bookingRequestStatus.CONFIRMED}</p>
+              <p className="mt-0.5 text-xs font-medium text-primary">{t.liff.inProgressTitle}</p>
+            </div>
+          </div>
           <SummaryCard order={selected} t={t} showPaid />
           {isBath && selected.paid < selected.total && (
             <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
