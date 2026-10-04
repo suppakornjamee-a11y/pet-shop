@@ -563,6 +563,7 @@ const th = {
   },
   liffBook: {
     kind: { BOARDING: "โรงแรมสัตว์", BATH: "อาบน้ำตัดขน", OTHER: "บริการอื่น" },
+    summaryKind: { BOARDING: "โรงแรมสัตว์", BATH: "บริการอาบน้ำตัดขน", OTHER: "บริการอื่น" },
     ownerTitle: "ข้อมูลเจ้าของ",
     ownerName: "ชื่อ–นามสกุลเจ้าของ",
     phone: "เบอร์โทรศัพท์",
@@ -590,7 +591,7 @@ const th = {
     showAddons: "เพิ่มบริการเสริม",
     hideAddons: "ซ่อนบริการเสริม",
     styleTitle: "ทรงที่ต้องการ",
-    serviceItemsTitle: "รายการบริการ",
+    servicesCount: (n: number) => `ทั้งหมด ${n} รายการ`,
     noPhoto: "ไม่มีรูป",
     styleImages: "ภาพตัวอย่าง",
     services: "เลือกบริการ",

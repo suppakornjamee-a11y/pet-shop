@@ -87,7 +87,7 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="font-bold leading-tight">{t.liffBook.kind[kind]}</div>
+          <div className="font-bold leading-tight">{t.liffBook.summaryKind[kind]}</div>
           {order.pet && (
             <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <SpeciesIcon species={order.pet.species} className="h-3.5 w-3.5" />
@@ -105,7 +105,6 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
             </div>
           )}
         </div>
-        <div className="shrink-0 text-lg font-bold tabular-nums text-primary">{formatBaht(order.total)}</div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -130,12 +129,7 @@ function SummaryCard({ order, t, showPaid = false }: { order: RequestOrder; t: T
 
       {services.length > 0 && (
         <div className="space-y-2 border-t pt-3">
-          <div className="flex items-center gap-1.5 text-sm font-bold">
-            {t.liffBook.serviceItemsTitle}
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent/40 px-1.5 text-xs font-semibold text-primary">
-              {services.length}
-            </span>
-          </div>
+          <div className="text-sm font-bold">{t.liffBook.servicesCount(services.length)}</div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             {services.map((it, i) => (
               <div key={`${it.name}-${i}`} className="flex items-center gap-1.5">

@@ -548,6 +548,7 @@ const en: Dictionary = {
   },
   liffBook: {
     kind: { BOARDING: "Pet hotel", BATH: "Bath & grooming", OTHER: "Other services" },
+    summaryKind: { BOARDING: "Pet hotel", BATH: "Bath & grooming service", OTHER: "Other services" },
     ownerTitle: "Owner",
     ownerName: "Owner's full name",
     phone: "Phone number",
@@ -575,7 +576,7 @@ const en: Dictionary = {
     showAddons: "Add extra services",
     hideAddons: "Hide extra services",
     styleTitle: "Preferred style",
-    serviceItemsTitle: "Service items",
+    servicesCount: (n: number) => `Total ${n} items`,
     noPhoto: "No photo",
     styleImages: "Example photos",
     services: "Choose services",
