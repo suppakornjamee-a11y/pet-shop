@@ -410,6 +410,7 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
       petName: order.pet?.name ?? null,
       // ใช้ตัดสินว่าจะส่งข้อความ "ยืนยันการจอง" (คิวอาบน้ำที่จองผ่านคำขอจองใน LINE) หรือใบเสร็จมัดจำตามปกติ
       isRequestBath: !!order.bookingRequestId && !order.roomId && order.queueType === "BATH",
+      bookingRequestId: order.bookingRequestId,
       appointmentAt: order.appointmentAt,
       orderTotal: order.total,
       depositAmount: payment.amount,
@@ -455,6 +456,9 @@ export async function verifyPayment(paymentId: string): Promise<ActionResult> {
         date: formatDateLong(result.appointmentAt),
         time: formatTime(result.appointmentAt),
         depositAmount: result.depositAmount,
+        link: result.bookingRequestId
+          ? buildLiffDeepLink(`/requests/${result.bookingRequestId}?order=${orderId}`)
+          : null,
       })
     );
   } else if (result.justDepositPaid) {

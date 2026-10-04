@@ -4,10 +4,16 @@ export function buildBookingConfirmedText(p: {
   date: string;
   time: string;
   depositAmount: number;
+  /** ลิงก์หน้ารอดำเนินการของคำขอจองนี้ (ถ้ามี) */
+  link?: string | null;
 }): string {
-  return `ยืนยันการจองของน้อง${p.petName ?? ""}
-วันที่ ${p.date} เวลา ${p.time} น.
-เรียบร้อยแล้วค่ะ รับมัดจำแล้ว ${p.depositAmount.toLocaleString("th-TH")} บาท
-ซึ่งจะนำไปหักจากค่าบริการทั้งหมด
-โดยสรุปราคาสุทธิหลังอาบน้ำเสร็จ แล้วพบกันค่ะ`;
+  const lines = [
+    `ยืนยันการจองของน้อง${p.petName ?? ""}`,
+    `วันที่ ${p.date} เวลา ${p.time} น.`,
+    `เรียบร้อยแล้วค่ะ รับมัดจำแล้ว ${p.depositAmount.toLocaleString("th-TH")} บาท`,
+    `ซึ่งจะนำไปหักจากค่าบริการทั้งหมด`,
+    `โดยสรุปราคาสุทธิหลังอาบน้ำเสร็จ แล้วพบกันค่ะ`,
+  ];
+  if (p.link) lines.push("", `ดูสถานะการจองที่ : ${p.link}`);
+  return lines.join("\n");
 }
