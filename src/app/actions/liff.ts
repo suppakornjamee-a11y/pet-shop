@@ -629,7 +629,10 @@ export async function liffSubmitPaymentSlip(
 
   await syncBookingRequestForOrder(payment.order.id);
   revalidatePath(`/orders/${payment.order.id}`);
-  return { ok: true, message: "ส่งสลิปเรียบร้อย รอร้านตรวจสอบ" };
+  return {
+    ok: true,
+    message: payment.purpose === "DEPOSIT" ? "ส่งสลิปเรียบร้อย รอตรวจสอบมัดจำ" : "ส่งสลิปเรียบร้อย รอตรวจสอบยอดคงเหลือ",
+  };
 }
 
 /** สถานะที่ลูกค้ายกเลิกเองได้ — ทุกสถานะที่ยังไม่เริ่มดำเนินการจริง ไม่ว่าจะจ่ายไปแล้วแค่ไหนก็ตาม */
