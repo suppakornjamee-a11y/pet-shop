@@ -362,7 +362,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
           {t.liff.qrExpiredContactShop}
         </p>
       ) : isSubmitted ? (
-        <p className="rounded-lg bg-emerald-50 p-3 text-center text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+        <p className="rounded-lg bg-amber-50 p-3 text-center text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
           {submittedLabel}
         </p>
       ) : null}
