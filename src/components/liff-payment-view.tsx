@@ -179,6 +179,10 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
   const account = payment.bankAccount;
+  // ป้ายสถานะ "รอชำระ/รอตรวจสอบ" แยกคำตามประเภทเงิน — มัดจำ vs ยอดคงเหลือ ไม่ใช้คำเดียวกันเพราะความหมายต่างกัน
+  const isDeposit = payment.purpose === "DEPOSIT";
+  const pendingLabel = isDeposit ? t.labels.bookingRequestStatus.PENDING_DEPOSIT : t.liff.pendingBalanceLabel;
+  const submittedLabel = isDeposit ? t.labels.bookingRequestStatus.DEPOSIT_SUBMITTED : t.liff.balanceSubmittedLabel;
 
   return (
     <div className="space-y-4">
@@ -195,6 +199,14 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
             </p>
           )}
           <p className="text-xs text-rose-700/80 dark:text-rose-400/80">{t.liff.slipRejectedHint}</p>
+        </div>
+      )}
+
+      {!isUnusable && !isSubmitted && (
+        <div className="text-center">
+          <span className="inline-flex items-center rounded-full bg-accent/40 px-3 py-1 text-xs font-medium text-primary">
+            {pendingLabel}
+          </span>
         </div>
       )}
 
@@ -351,7 +363,7 @@ function QrBlock({ payment, orderStatus }: { payment: PaymentRow; orderStatus: O
         </p>
       ) : isSubmitted ? (
         <p className="rounded-lg bg-emerald-50 p-3 text-center text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-          {t.liff.slipSubmittedNotice}
+          {submittedLabel}
         </p>
       ) : null}
 
