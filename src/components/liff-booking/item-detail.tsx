@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, CreditCard, Loader2, Sparkles, Video } from "lucide-react";
+import { Check, CreditCard, Info, Loader2, Sparkles, Video } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
@@ -22,6 +22,7 @@ import {
 import { bathGroups, cartTimesTaken, estimateDraft, type CartEntry, type ItemDraft } from "./cart";
 import { ImagePicker } from "./image-picker";
 import {
+  BATH_DEPOSIT_AMOUNT,
   CCTV_ROOM_RATE,
   MonthCalendar,
   NANNY_REGULAR_RATE,
@@ -389,13 +390,36 @@ export function ItemDetail({
 
   const groomChosen = groups.groom.some((s) => has(s.id));
   const mainChosen = groups.main.find((s) => has(s.id));
+  const groomChosenService = groups.groom.find((s) => has(s.id));
+  const addonsChosen = groups.addons.filter((s) => has(s.id));
+  const addonsTotal = addonsChosen.reduce((sum, s) => sum + s.price, 0);
   const freeActiveCount = groups.free.filter((s) => has(s.id)).length;
-  const { estimate } = estimateDraft(draft, services, rooms);
   const pickable = services.filter((s) => !s.defaultOn).sort((a, b) => a.price - b.price);
   const serviceTabs: { key: "main" | "groom" | "addons"; label: string }[] = [
     { key: "main", label: t.liffBook.bathType },
     ...(groups.groom.length > 0 ? [{ key: "groom" as const, label: t.liffBook.groomType }] : []),
     ...(groups.addons.length > 0 ? [{ key: "addons" as const, label: t.liffBook.addonsTitle }] : []),
+  ];
+  const summaryRows: { label: string; price: number; sub: string }[] = [
+    { label: t.liffBook.mainCostLabel, price: mainChosen?.price ?? 0, sub: mainChosen ? mainChosen.name : t.liffBook.notChosen },
+    ...(groups.groom.length > 0
+      ? [
+          {
+            label: t.liffBook.groomCostLabel,
+            price: groomChosenService?.price ?? 0,
+            sub: groomChosenService ? groomChosenService.name : t.liffBook.notChosen,
+          },
+        ]
+      : []),
+    ...(groups.addons.length > 0
+      ? [
+          {
+            label: t.liffBook.addonsCostLabel,
+            price: addonsTotal,
+            sub: addonsChosen.length > 0 ? addonsChosen.map((s) => s.name).join(", ") : t.liffBook.notChosen,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -552,29 +576,40 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <Section title={t.liffBook.summaryShort}>
-          <dl className="space-y-1.5 text-sm">
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-muted-foreground">{mainChosen ? mainChosen.name : t.liffBook.noMainChosen}</dt>
-              <dd className="shrink-0 font-semibold">{mainChosen ? formatBaht(mainChosen.price) : "-"}</dd>
-            </div>
+          <div className="divide-y">
+            {summaryRows.map((row) => (
+              <div key={row.label} className="flex items-start justify-between gap-3 py-2.5 first:pt-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{row.label}</p>
+                  <p className="truncate text-xs text-muted-foreground">{row.sub}</p>
+                </div>
+                <p className="shrink-0 text-sm text-muted-foreground">{formatBaht(row.price)}</p>
+              </div>
+            ))}
             {groups.free.length > 0 && (
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-muted-foreground">{t.liffBook.freeServicesCount(freeActiveCount)}</dt>
-                <dd className="shrink-0 font-semibold text-emerald-600">{t.liffBook.free}</dd>
+              <div className="flex items-center justify-between gap-3 py-2.5 last:pb-0">
+                <p className="text-sm font-semibold">{t.liffBook.freeServicesCount(freeActiveCount)}</p>
+                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600">
+                  {t.liffBook.free}
+                </span>
               </div>
             )}
-          </dl>
-          <div className="flex items-center justify-between gap-3 border-t pt-3">
-            <span className="text-sm font-bold">{t.liffBook.estimate}</span>
-            <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
           </div>
-          <div className="flex items-start gap-2 rounded-xl bg-accent/40 px-3 py-2">
-            <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <p className="text-sm font-medium">{t.liffBook.bathDeposit}</p>
+
+          <div className="flex items-center gap-2 rounded-xl bg-accent/40 px-3 py-2.5">
+            <CreditCard className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">{t.liffBook.depositLabel}</p>
+              <p className="truncate text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
+            </div>
+            <p className="shrink-0 text-lg font-bold text-primary">
+              {formatBaht(BATH_DEPOSIT_AMOUNT)} {t.liffBook.perPet}
+            </p>
           </div>
-          <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+
+          <div className="flex items-start gap-2 border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <p>{t.liffBook.priceNote}</p>
-            <p>{t.liffBook.depositNote}</p>
           </div>
         </Section>
       )}

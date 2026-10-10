@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Check, ChevronLeft, Loader2, PawPrint, Plus, ShoppingBag } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, Clock, Loader2, PawPrint, Plus, ShoppingBag } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -54,7 +54,7 @@ import {
   type FleaDraft,
   type ItemDraft,
 } from "./cart";
-import { CARD, MaskIcon, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
+import { BATH_DEPOSIT_AMOUNT, CARD, MaskIcon, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
 const KIND_ORDER: Kind[] = ["BATH", "BOARDING", "OTHER"];
 /** ไอคอนการ์ดเลือกบริการหน้าแรก — ใช้ซ้ำที่หัวหน้ารายละเอียดรายการด้วย */
@@ -98,26 +98,32 @@ function petToDraft(p: CtxPet): PetDraft {
 /** แถบปุ่มที่แปะขอบล่างจอ — summary = ข้อความสรุปด้านซ้าย (เช่น ยอดโดยประมาณ) · aboveTabs = ยกขึ้นเหนือแถบเมนูล่าง */
 function BottomBar({
   summary,
+  caption,
   aboveTabs = false,
   children,
 }: {
   summary?: React.ReactNode;
+  /** บรรทัดเล็กเหนือแถบ บอกสถานะว่าทำไมกดปุ่มไม่ได้/พร้อมแล้ว */
+  caption?: React.ReactNode;
   aboveTabs?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "fixed inset-x-3 z-10 mx-auto flex max-w-md items-center gap-3 sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
+        "fixed inset-x-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
         aboveTabs ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-3"
       )}
     >
-      {summary && (
-        <div className="min-w-0 shrink-0 rounded-2xl border bg-card/95 px-3 py-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
-          {summary}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">{children}</div>
+      {caption && <p className="mb-1.5 px-1 text-xs font-medium text-muted-foreground">{caption}</p>}
+      <div className="flex items-center gap-3">
+        {summary && (
+          <div className="min-w-0 shrink-0 rounded-2xl border bg-card/95 px-3 py-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
+            {summary}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
     </div>
   );
 }
@@ -373,6 +379,8 @@ function BookingBody() {
 
   /* ---------- หน้ารายละเอียดรายการ ---------- */
   if (stage === "detail" && draft && draftPet && idToken) {
+    const detailEstimate = estimateDraft(draft, draftServices, rooms).estimate;
+    const detailReady = draftReady(draft, draftServices, rooms, cart, editingKey);
     return (
       <div className="space-y-4 pb-28">
         <div>
@@ -441,18 +449,23 @@ function BookingBody() {
         />
 
         <BottomBar
+          caption={detailReady ? t.liff.detailReadyCaption : t.liff.detailNotReadyCaption}
           summary={
             <div className="leading-tight">
               <div className="text-[0.6875rem] text-muted-foreground">{t.liffBook.estimateShort}</div>
-              <div className="text-lg font-bold tabular-nums text-primary">
-                {formatBaht(estimateDraft(draft, draftServices, rooms).estimate)}
-              </div>
+              <div className="text-lg font-bold tabular-nums text-primary">{formatBaht(detailEstimate)}</div>
+              {draft.kind === "BATH" && detailReady && detailEstimate > 0 && (
+                <div className="flex items-center gap-1 text-[0.6875rem] font-medium text-amber-600">
+                  <Clock className="h-3 w-3" />
+                  {t.liffBook.depositHint(formatBaht(Math.min(BATH_DEPOSIT_AMOUNT, detailEstimate)))}
+                </div>
+              )}
             </div>
           }
         >
           <Button
             className="h-11 w-full rounded-2xl text-sm font-semibold shadow-md"
-            disabled={!draftReady(draft, draftServices, rooms, cart, editingKey)}
+            disabled={!detailReady}
             onClick={addChecked}
           >
             {draft.kind !== "BOARDING" && !draft.time ? t.liff.chooseTimeFirstButton : t.liff.confirmBookingButton}
