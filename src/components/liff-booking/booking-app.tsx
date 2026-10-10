@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Check, ChevronLeft, Loader2, Plus, ShoppingBag } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, Loader2, PawPrint, Plus, ShoppingBag } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -373,32 +373,59 @@ function BookingBody() {
 
   /* ---------- หน้ารายละเอียดรายการ ---------- */
   if (stage === "detail" && draft && draftPet && idToken) {
-    const petMeta = [draftPet.name, draftPet.breed, draftPet.weightKg ? `${draftPet.weightKg} ${t.liffBook.weightUnit}` : null]
-      .filter(Boolean)
-      .join(" · ");
     return (
       <div className="space-y-4 pb-28">
         <div>
-          <div className="rounded-t-3xl bg-primary px-4 pb-8 pt-4 text-primary-foreground">
-            <div className="relative flex h-8 items-center justify-center">
+          <div className="relative h-[200px] overflow-hidden rounded-b-[36px] bg-[#B8456F]">
+            <PawPrint
+              aria-hidden
+              fill="currentColor"
+              strokeWidth={0}
+              className="absolute -right-3 -top-2 h-[120px] w-[120px] -rotate-[18deg] text-white opacity-10"
+            />
+            <PawPrint
+              aria-hidden
+              fill="currentColor"
+              strokeWidth={0}
+              className="absolute left-3 top-20 h-16 w-16 rotate-[22deg] text-white opacity-[0.08]"
+            />
+            <div className="absolute inset-x-4 top-4 flex h-11 items-center justify-center">
               <button
                 type="button"
                 onClick={() => setStage(editingKey ? "cart" : "start")}
                 aria-label={t.liff.backButton}
-                className="absolute left-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                className="absolute left-0 flex h-11 w-11 items-center justify-center rounded-full bg-white/[0.18]"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-5 w-5 text-white" />
               </button>
-              <h1 className="text-base font-bold">{t.liffBook.detailTitle}</h1>
+              <h1 className="text-[18px] font-bold text-white">{t.liffBook.detailTitle}</h1>
             </div>
           </div>
-          <div className="relative">
-            <span className="absolute left-1/2 top-0 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card text-primary shadow-md">
-              <MaskIcon src={KIND_TILE_ICON_SRC[draft.kind]} className="h-9 w-9" />
+          <div className="relative -mt-[72px]">
+            <span className="absolute left-1/2 top-0 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white p-1.5 shadow-[0_8px_18px_-10px_rgba(120,40,70,0.45)]">
+              <span className="flex h-full w-full items-center justify-center rounded-full bg-[#FBE6EE]">
+                <MaskIcon src={KIND_TILE_ICON_SRC[draft.kind]} className="h-10 w-10 text-[#B8456F]" />
+              </span>
             </span>
-            <div className="space-y-1 rounded-b-3xl border bg-card px-4 pb-4 pt-10 text-center shadow-[0_2px_12px_rgba(190,60,110,0.06)]">
-              <p className="text-lg font-bold">{t.liffBook.kind[draft.kind]}</p>
-              <p className="truncate text-xs text-muted-foreground">{petMeta}</p>
+            <div className="mx-5 space-y-[10px] rounded-[26px] bg-white px-[18px] pb-5 pt-[50px] text-center shadow-[0_16px_32px_-16px_rgba(120,40,70,0.40)]">
+              <p className="text-[21px] font-bold text-[#2A1A20]">{t.liffBook.kind[draft.kind]}</p>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-[#6B5A61]">
+                <span className="font-semibold text-[#2A1A20]">{draftPet.name}</span>
+                {draftPet.breed && (
+                  <>
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-[#DCC3CD]" />
+                    <span>{draftPet.breed}</span>
+                  </>
+                )}
+                {draftPet.weightKg ? (
+                  <>
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-[#DCC3CD]" />
+                    <span>
+                      {draftPet.weightKg} {t.liffBook.weightUnit}
+                    </span>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
