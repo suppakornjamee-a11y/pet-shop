@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
@@ -477,6 +478,8 @@ export function PetFields({
   );
 }
 
+type InfoTab = "general" | "health" | "flea";
+
 /**
  * สัตว์เลี้ยงที่มีข้อมูลอยู่แล้ว — แสดงน้ำหนักเดิมให้ยืนยันหรือแก้เป็นน้ำหนักล่าสุด แสดงประวัติแพ้ โรคประจำตัว
  * และข้อควรระวังเดิม แล้วให้เลือก "ข้อมูลเดิมยังถูกต้อง" หรือ "มีข้อมูลอัปเดต" (เลือกอัปเดตถึงจะแก้ข้อมูลอื่นได้)
@@ -506,15 +509,9 @@ export function ExistingPetFields({
         .filter(Boolean)
         .join(" ")
     : "-";
-  const statRows: [string, string][] = [
-    [t.liffBook.species, t.labels.species[pet.species]],
-    [t.liffBook.breed, pet.breed || "-"],
-    [t.liffBook.ageLabel, ageText],
-    [t.orders.petWeightLabel, Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"],
-  ];
   const healthRows: [string, string][] = [
-    [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
     [t.liffBook.disease, shown(pet.hasChronicDisease, pet.chronicDiseaseNote)],
+    [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
     [t.liffBook.cautions, shown(pet.hasCautions, pet.groomingCautions)],
   ];
   // ยาเห็บหมัดที่เคยแจ้งไว้ — ชื่อจากฐานข้อมูลยาถ้าเคยเลือกไว้ ไม่งั้นใช้ชื่อที่ลูกค้าพิมพ์
@@ -533,56 +530,107 @@ export function ExistingPetFields({
     today
   );
   const fleaPassed = fleaAssessed.level === "GREEN";
+  const tabs: { key: InfoTab; label: string }[] = [
+    { key: "general", label: t.liffBook.basicInfoTitle },
+    { key: "health", label: t.liffBook.healthShort },
+    { key: "flea", label: t.fleaTick.title },
+  ];
+  const [tab, setTab] = useState<InfoTab>("general");
 
   return (
     <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
       {pet.infoStatus !== "update" && (
-        <div className="space-y-2">
-          <div className="rounded-2xl bg-card p-3">
-            <dl className="space-y-1.5">
-              {statRows.map(([label, value]) => (
-                <div key={label} className="flex items-baseline gap-3">
-                  <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-                  <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{value}</dd>
-                </div>
-              ))}
-            </dl>
+        <div className="space-y-3">
+          <div className="flex gap-1 rounded-2xl bg-muted/60 p-1">
+            {tabs.map((tb) => (
+              <button
+                key={tb.key}
+                type="button"
+                onClick={() => setTab(tb.key)}
+                className={cn(
+                  "min-w-0 flex-1 rounded-xl px-2 py-1.5 text-center text-xs transition-colors",
+                  tab === tb.key
+                    ? "bg-card font-semibold text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tb.label}
+              </button>
+            ))}
           </div>
 
-          <div className="rounded-2xl bg-card p-3">
-            <p className="text-xs font-bold">{t.liffBook.healthShort}</p>
-            <dl className="mt-1.5 space-y-1.5">
-              {healthRows.map(([label, value]) => (
-                <div key={label} className="flex items-baseline gap-3">
-                  <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-                  <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{value}</dd>
+          {tab === "general" && (
+            <div className="rounded-2xl bg-card p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t.liffBook.species}</p>
+                  <p className="mt-0.5 text-sm font-bold">{t.labels.species[pet.species]}</p>
                 </div>
-              ))}
-            </dl>
-          </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t.liffBook.breed}</p>
+                  <p className="mt-0.5 text-sm font-bold">{pet.breed || "-"}</p>
+                </div>
+              </div>
+              <div className="my-3 border-t" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t.liffBook.ageLabel}</p>
+                  <p className="mt-0.5 text-sm font-bold">{ageText}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t.orders.petWeightLabel}</p>
+                  <p className="mt-0.5 text-sm font-bold">
+                    {Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-          <div className={cn("space-y-1 rounded-2xl p-3", fleaPassed ? "bg-emerald-50" : "bg-amber-50")}>
-            <span className="inline-flex items-center gap-1 text-xs font-bold">
-              {t.fleaTick.title}
-              <VerifySeal
-                passed={fleaPassed}
-                label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                className="h-3 w-3"
-              />
-            </span>
-            <dl className="space-y-1">
-              <div className="flex items-baseline gap-3">
-                <dt className="shrink-0 text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</dt>
-                <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{medicine}</dd>
+          {tab === "health" && (
+            <div className="rounded-2xl bg-card p-3">
+              <div className="divide-y">
+                {healthRows.map(([label, value]) => (
+                  <div key={label} className="py-2.5 first:pt-0 last:pb-0">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-0.5 break-words text-sm font-semibold">{value}</p>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-baseline gap-3">
-                <dt className="shrink-0 text-xs text-muted-foreground">{t.liffBook.fleaReceivedLabel}</dt>
-                <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">
-                  {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
-                </dd>
+            </div>
+          )}
+
+          {tab === "flea" && (
+            <div className="space-y-3">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+                  fleaPassed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                )}
+              >
+                <VerifySeal
+                  passed={fleaPassed}
+                  label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                  className="h-3.5 w-3.5"
+                />
+                {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+              </span>
+              <div className="rounded-2xl bg-card p-3">
+                <div className="divide-y">
+                  <div className="pb-2.5">
+                    <p className="text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</p>
+                    <p className="mt-0.5 break-words text-sm font-semibold">{medicine}</p>
+                  </div>
+                  <div className="pt-2.5">
+                    <p className="text-xs text-muted-foreground">{t.liffBook.fleaReceivedLabel}</p>
+                    <p className="mt-0.5 text-sm font-semibold">
+                      {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </dl>
-          </div>
+            </div>
+          )}
         </div>
       )}
 

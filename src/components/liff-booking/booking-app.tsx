@@ -722,10 +722,7 @@ function BookingBody() {
                       )}
                     </span>
                     <span
-                      className={cn(
-                        "max-w-full truncate text-xs",
-                        on ? "font-bold text-primary" : "text-muted-foreground"
-                      )}
+                      className={cn("max-w-full truncate text-xs text-foreground", on && "font-bold")}
                     >
                       {p.name}
                     </span>
