@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Bell, BellRing, CalendarClock, Receipt } from "lucide-react";
 import { getStaffAlerts, type StaffAlert } from "@/app/actions/notifications";
 import { onStaffAlertsChanged } from "@/lib/staff-alerts-signal";
-import { formatBaht, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
@@ -126,9 +126,7 @@ export function NotificationBell() {
                     {it.petName && <span className="text-muted-foreground"> · {it.petName}</span>}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {it.code}
-                    {it.amount !== null && ` · ${formatBaht(it.amount)}`} ·{" "}
-                    {it.when ?? formatDateTime(new Date(it.at))}
+                    {it.code} · {it.when ?? formatDateTime(new Date(it.at))}
                   </span>
                 </span>
               </DropdownMenuItem>
