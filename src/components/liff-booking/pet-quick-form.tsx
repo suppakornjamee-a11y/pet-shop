@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Hourglass, Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
 import { VerifySeal } from "@/components/verify-seal";
@@ -509,6 +509,12 @@ export function ExistingPetFields({
         .filter(Boolean)
         .join(" ")
     : "-";
+  const statRows: [string, string][] = [
+    [t.liffBook.species, t.labels.species[pet.species]],
+    [t.liffBook.breed, pet.breed || "-"],
+    [t.liffBook.ageLabel, ageText],
+    [t.orders.petWeightLabel, Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"],
+  ];
   const healthRows: [string, string][] = [
     [t.liffBook.disease, shown(pet.hasChronicDisease, pet.chronicDiseaseNote)],
     [t.liffBook.allergies, shown(pet.hasAllergies, pet.allergies)],
@@ -561,29 +567,14 @@ export function ExistingPetFields({
 
           {tab === "general" && (
             <div className="rounded-2xl bg-card p-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs font-bold text-foreground">{t.liffBook.species}</p>
-                  <p className="mt-0.5 text-sm">{t.labels.species[pet.species]}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-foreground">{t.liffBook.breed}</p>
-                  <p className="mt-0.5 text-sm">{pet.breed || "-"}</p>
-                </div>
-              </div>
-              <div className="my-3 border-t" />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs font-bold text-foreground">{t.liffBook.ageLabel}</p>
-                  <p className="mt-0.5 text-sm">{ageText}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-foreground">{t.orders.petWeightLabel}</p>
-                  <p className="mt-0.5 text-sm">
-                    {Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"}
-                  </p>
-                </div>
-              </div>
+              <dl className="space-y-3">
+                {statRows.map(([label, value]) => (
+                  <div key={label} className="flex items-baseline gap-3">
+                    <dt className="shrink-0 text-sm font-bold">{label}</dt>
+                    <dd className="min-w-0 flex-1 break-words text-right text-sm">{value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )}
 
@@ -608,12 +599,17 @@ export function ExistingPetFields({
                   fleaPassed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                 )}
               >
-                <VerifySeal
-                  passed={fleaPassed}
-                  label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                  className="h-3.5 w-3.5"
-                />
-                {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                {fleaPassed ? (
+                  <>
+                    <VerifySeal passed label={t.liffBook.fleaPassed} className="h-3.5 w-3.5" />
+                    {t.liffBook.fleaPassed}
+                  </>
+                ) : (
+                  <>
+                    {t.fleaTick.pending}
+                    <Hourglass className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  </>
+                )}
               </span>
               <div className="rounded-2xl bg-card p-3">
                 <div className="divide-y">
