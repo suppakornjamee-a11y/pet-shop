@@ -119,14 +119,16 @@ function BottomBar({
   return (
     <div
       className={cn(
-        "fixed inset-x-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
+        "fixed inset-x-3 z-10 mx-auto flex max-w-md items-center gap-3 sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
         aboveTabs ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-3"
       )}
     >
-      <div className="flex items-center gap-3 rounded-3xl border bg-card/95 p-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
-        {summary && <div className="min-w-0 shrink-0 pl-2">{summary}</div>}
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+      {summary && (
+        <div className="min-w-0 shrink-0 rounded-2xl border bg-card/95 px-3 py-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
+          {summary}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
