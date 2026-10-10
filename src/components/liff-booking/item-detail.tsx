@@ -7,7 +7,6 @@ import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -357,11 +356,15 @@ export function ItemDetail({
   t: T;
 }) {
   const set = (patch: Partial<ItemDraft>) => onChange({ ...draft, ...patch });
-  const [addonsOpen, setAddonsOpen] = useState(() => {
-    const addonIds = new Set(bathGroups(services).addons.map((s) => s.id));
-    return draft.serviceIds.some((id) => addonIds.has(id));
-  });
   const groups = bathGroups(services);
+  // เปิดแท็บที่มีรายการเลือกอยู่แล้วก่อน (เช่นแก้ไขรายการเดิมที่เลือกบริการเสริมไว้) ไม่งั้นเริ่มที่ประเภทบริการ
+  const [serviceTab, setServiceTab] = useState<"main" | "groom" | "addons">(() => {
+    const addonIds = new Set(groups.addons.map((s) => s.id));
+    const groomIds = new Set(groups.groom.map((s) => s.id));
+    if (draft.serviceIds.some((id) => addonIds.has(id))) return "addons";
+    if (draft.serviceIds.some((id) => groomIds.has(id))) return "groom";
+    return "main";
+  });
   const has = (id: string) => draft.serviceIds.includes(id);
 
   // ติ๊กบริการฟรีให้ครั้งเดียวตอนเริ่มรายการใหม่ (ลูกค้าถอนออกเองได้) — state อยู่ที่หน้าแม่ จึงต้องทำใน effect
@@ -387,6 +390,11 @@ export function ItemDetail({
   const groomChosen = groups.groom.some((s) => has(s.id));
   const { estimate } = estimateDraft(draft, services, rooms);
   const pickable = services.filter((s) => !s.defaultOn).sort((a, b) => a.price - b.price);
+  const serviceTabs: { key: "main" | "groom" | "addons"; label: string }[] = [
+    { key: "main", label: t.liffBook.bathType },
+    ...(groups.groom.length > 0 ? [{ key: "groom" as const, label: t.liffBook.groomType }] : []),
+    ...(groups.addons.length > 0 ? [{ key: "addons" as const, label: t.liffBook.addonsTitle }] : []),
+  ];
 
   return (
     <div className="space-y-4">
@@ -397,24 +405,44 @@ export function ItemDetail({
       )}
 
       {draft.kind === "BATH" && (
-        <>
-          <Section title={t.liffBook.bathType}>
-            <div className="grid gap-2">
-              {groups.main.map((s) => (
-                <OptionRow
-                  key={s.id}
-                  mode="radio"
-                  active={has(s.id)}
-                  label={s.name}
-                  price={s.price}
-                  onClick={() => pickOne(groups.main, s.id)}
-                />
-              ))}
-            </div>
-          </Section>
+        <div className="space-y-3 rounded-3xl border border-primary/10 bg-primary/5 p-4">
+          <div className="flex gap-1 rounded-2xl bg-muted/60 p-1">
+            {serviceTabs.map((tb) => (
+              <button
+                key={tb.key}
+                type="button"
+                onClick={() => setServiceTab(tb.key)}
+                className={cn(
+                  "min-w-0 flex-1 rounded-xl px-2 py-1.5 text-center text-xs transition-colors",
+                  serviceTab === tb.key
+                    ? "bg-card font-semibold text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tb.label}
+              </button>
+            ))}
+          </div>
 
-          {groups.groom.length > 0 && (
-            <Section title={t.liffBook.groomType}>
+          {serviceTab === "main" && (
+            <div className="rounded-2xl bg-card p-3">
+              <div className="grid gap-2">
+                {groups.main.map((s) => (
+                  <OptionRow
+                    key={s.id}
+                    mode="radio"
+                    active={has(s.id)}
+                    label={s.name}
+                    price={s.price}
+                    onClick={() => pickOne(groups.main, s.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {serviceTab === "groom" && groups.groom.length > 0 && (
+            <div className="space-y-3 rounded-2xl bg-card p-3">
               <div className="grid gap-2">
                 <OptionRow mode="radio" active={!groomChosen} label={t.liffBook.noGroom} onClick={() => pickOne(groups.groom, null)} />
                 {groups.groom.map((s) => (
@@ -453,33 +481,26 @@ export function ItemDetail({
                   />
                 </div>
               )}
-            </Section>
-          )}
-
-          {groups.addons.length > 0 && (
-            <div className="space-y-3">
-              <Button type="button" variant="outline" className="w-full rounded-2xl" onClick={() => setAddonsOpen((v) => !v)}>
-                {addonsOpen ? t.liffBook.hideAddons : t.liffBook.showAddons}
-              </Button>
-              {addonsOpen && (
-                <Section>
-                  <div className="grid gap-2">
-                    {groups.addons.map((s) => (
-                      <OptionRow
-                        key={s.id}
-                        mode="check"
-                        active={has(s.id)}
-                        label={s.name}
-                        price={s.price}
-                        onClick={() => toggle(s.id)}
-                      />
-                    ))}
-                  </div>
-                </Section>
-              )}
             </div>
           )}
-        </>
+
+          {serviceTab === "addons" && groups.addons.length > 0 && (
+            <div className="rounded-2xl bg-card p-3">
+              <div className="grid gap-2">
+                {groups.addons.map((s) => (
+                  <OptionRow
+                    key={s.id}
+                    mode="check"
+                    active={has(s.id)}
+                    label={s.name}
+                    price={s.price}
+                    onClick={() => toggle(s.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {draft.kind !== "BATH" && pickable.length > 0 && (
