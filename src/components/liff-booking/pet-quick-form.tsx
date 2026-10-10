@@ -541,9 +541,9 @@ export function ExistingPetFields({
           <div className="rounded-2xl bg-card p-3">
             <dl className="space-y-1.5">
               {statRows.map(([label, value]) => (
-                <div key={label} className="flex items-baseline justify-between gap-3">
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd className="shrink-0 text-xs font-semibold">{value}</dd>
+                <div key={label} className="flex items-baseline gap-3">
+                  <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+                  <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -553,9 +553,9 @@ export function ExistingPetFields({
             <p className="text-xs font-bold">{t.liffBook.healthShort}</p>
             <dl className="mt-1.5 space-y-1.5">
               {healthRows.map(([label, value]) => (
-                <div key={label} className="flex items-baseline justify-between gap-3">
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd className="shrink-0 text-xs font-semibold">{value}</dd>
+                <div key={label} className="flex items-baseline gap-3">
+                  <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+                  <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -571,13 +571,13 @@ export function ExistingPetFields({
               />
             </span>
             <dl className="space-y-1">
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</dt>
-                <dd className="shrink-0 text-xs font-semibold">{medicine}</dd>
+              <div className="flex items-baseline gap-3">
+                <dt className="shrink-0 text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</dt>
+                <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">{medicine}</dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-xs text-muted-foreground">{t.liffBook.fleaReceivedLabel}</dt>
-                <dd className="shrink-0 text-xs font-semibold">
+              <div className="flex items-baseline gap-3">
+                <dt className="shrink-0 text-xs text-muted-foreground">{t.liffBook.fleaReceivedLabel}</dt>
+                <dd className="min-w-0 flex-1 break-words text-right text-xs font-semibold">
                   {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
                 </dd>
               </div>

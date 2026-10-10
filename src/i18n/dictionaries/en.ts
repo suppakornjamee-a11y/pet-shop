@@ -609,7 +609,7 @@ const en: Dictionary = {
     cartTitle: "Booking list",
     stepsTitle: "Booking steps",
     stepNumber: (n: number) => `Step ${n}`,
-    petSectionTitle: "Choose your pet",
+    petSectionTitle: "Choose the pet for this service",
     healthShort: "Health",
     basicInfoTitle: "Basic pet info",
     ageLabel: "Age",
