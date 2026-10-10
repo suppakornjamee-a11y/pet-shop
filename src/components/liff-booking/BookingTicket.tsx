@@ -130,14 +130,14 @@ export default function BookingTicket({
 
         {/* วันที่ + เวลา */}
         <div className="relative grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 rounded-[14px] bg-white/[0.16] px-3 py-[11px] text-[14.5px] font-semibold">
+          <div className="flex items-center gap-2 rounded-[14px] bg-white/[0.16] px-3 py-[11px] text-[13px] font-semibold">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="3" y="4" width="18" height="17" rx="3" />
               <path d="M3 9h18M8 2v4M16 2v4" />
             </svg>
             {dateText}
           </div>
-          <div className="flex items-center gap-2 rounded-[14px] bg-white/[0.16] px-3 py-[11px] text-[14.5px] font-semibold">
+          <div className="flex items-center gap-2 rounded-[14px] bg-white/[0.16] px-3 py-[11px] text-[13px] font-semibold">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" />
@@ -162,9 +162,9 @@ export default function BookingTicket({
           <span className="text-[13px] text-[#8A6B76]">{count} รายการ</span>
         </div>
 
-        <ItemGroup title="บริการหลัก" items={mainItems} dotClass="bg-[#B8456F]" />
+        <ItemGroup title="บริการหลัก" items={mainItems} dotClass="bg-[#E0A3BA]" />
         <ItemGroup title="บริการเสริม" items={extraItems} dotClass="bg-[#E0A3BA]" />
-        <ItemGroup title="บริการฟรี" items={freeItems} dotClass="bg-[#9CCFAE]" free />
+        <ItemGroup title="บริการฟรี" items={freeItems} dotClass="bg-[#E0A3BA]" free />
 
         {/* สรุปยอด */}
         <div className="flex flex-col gap-2.5 rounded-[18px] bg-[#FBF5F7] p-4">

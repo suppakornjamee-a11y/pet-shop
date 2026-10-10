@@ -469,7 +469,7 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         <>
           <BookingTicket
             statusLabel={t.liff.inProgressTitle}
-            serviceName={t.liffBook.summaryKind[orderKind(selected)]}
+            serviceName={t.liffBook.ticketServiceName[orderKind(selected)]}
             petName={selected.pet?.name ?? ""}
             petType={selected.pet ? t.labels.species[selected.pet.species] : ""}
             dateText={selected.appointmentAt ? formatDateWeekday(selected.appointmentAt) : ""}

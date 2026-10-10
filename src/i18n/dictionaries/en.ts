@@ -549,6 +549,7 @@ const en: Dictionary = {
   liffBook: {
     kind: { BOARDING: "Pet hotel", BATH: "Bath & grooming", OTHER: "Other services" },
     summaryKind: { BOARDING: "Pet hotel", BATH: "Bath & grooming service", OTHER: "Other services" },
+    ticketServiceName: { BOARDING: "Pet hotel", BATH: "Bath service", OTHER: "Other services" },
     ownerTitle: "Owner",
     ownerName: "Owner's full name",
     phone: "Phone number",
