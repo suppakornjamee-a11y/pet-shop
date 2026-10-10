@@ -593,7 +593,6 @@ const th = {
     hideAddons: "ซ่อนบริการเสริม",
     styleTitle: "ทรงที่ต้องการ",
     servicesCount: (n: number) => `ทั้งหมด ${n} รายการ`,
-    noPhoto: "ไม่มีรูป",
     styleImages: "ภาพตัวอย่าง",
     services: "เลือกบริการ",
     fleaPassed: "ได้รับยาเห็บหมัดแล้ว",

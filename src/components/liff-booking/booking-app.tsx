@@ -706,14 +706,12 @@ function BookingBody() {
                           on && "ring-2 ring-primary"
                         )}
                       >
-                        {p.photoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.photoUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="px-1 text-center text-[0.5rem] leading-tight text-muted-foreground">
-                            {t.liffBook.noPhoto}
-                          </span>
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.photoUrl ?? "/images/icons/no-photo.png"}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
                       </span>
                       {on && (
                         <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-white ring-2 ring-card">

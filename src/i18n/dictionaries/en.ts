@@ -578,7 +578,6 @@ const en: Dictionary = {
     hideAddons: "Hide extra services",
     styleTitle: "Preferred style",
     servicesCount: (n: number) => `Total ${n} items`,
-    noPhoto: "No photo",
     styleImages: "Example photos",
     services: "Choose services",
     fleaPassed: "Medicine received",
