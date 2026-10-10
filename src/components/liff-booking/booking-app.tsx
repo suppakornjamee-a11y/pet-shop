@@ -3,17 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  Home,
-  Loader2,
-  Plus,
-  Scissors,
-  ShoppingBag,
-  Sparkles,
-} from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, Loader2, Plus, ShoppingBag } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -67,8 +57,7 @@ import {
 import { CARD, MaskIcon, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
 const KIND_ORDER: Kind[] = ["BATH", "BOARDING", "OTHER"];
-const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Scissors, OTHER: Sparkles };
-/** ไอคอนการ์ดเลือกบริการหน้าแรก — คนละชุดกับ KIND_ICONS (ใช้ที่หัวหน้ารายละเอียดรายการ) */
+/** ไอคอนการ์ดเลือกบริการหน้าแรก — ใช้ซ้ำที่หัวหน้ารายละเอียดรายการด้วย */
 const KIND_TILE_ICON_SRC: Record<Kind, string> = {
   BATH: "/images/icons/cat-grooming.png",
   BOARDING: "/images/icons/dog-house.png",
@@ -384,25 +373,32 @@ function BookingBody() {
 
   /* ---------- หน้ารายละเอียดรายการ ---------- */
   if (stage === "detail" && draft && draftPet && idToken) {
-    const KindIcon = KIND_ICONS[draft.kind];
-    const petMeta = [draftPet.breed, draftPet.weightKg ? `${draftPet.weightKg} ${t.liffBook.weightUnit}` : null]
+    const petMeta = [draftPet.name, draftPet.breed, draftPet.weightKg ? `${draftPet.weightKg} ${t.liffBook.weightUnit}` : null]
       .filter(Boolean)
       .join(" · ");
     return (
       <div className="space-y-4 pb-28">
-        <AppBar title={t.liffBook.detailTitle} onBack={() => setStage(editingKey ? "cart" : "start")} t={t} />
-        <div className={cn("flex items-center gap-3 p-3.5", CARD)}>
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <KindIcon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="font-bold leading-tight">{t.liffBook.kind[draft.kind]}</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-              <SpeciesIcon species={draftPet.species} className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 truncate">
-                {draftPet.name}
-                {petMeta && ` (${petMeta})`}
-              </span>
+        <div>
+          <div className="rounded-t-3xl bg-primary px-4 pb-8 pt-4 text-primary-foreground">
+            <div className="relative flex h-8 items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setStage(editingKey ? "cart" : "start")}
+                aria-label={t.liff.backButton}
+                className="absolute left-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <h1 className="text-base font-bold">{t.liffBook.detailTitle}</h1>
+            </div>
+          </div>
+          <div className="relative">
+            <span className="absolute left-1/2 top-0 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card text-primary shadow-md">
+              <MaskIcon src={KIND_TILE_ICON_SRC[draft.kind]} className="h-9 w-9" />
+            </span>
+            <div className={cn("space-y-1 rounded-b-3xl px-4 pb-4 pt-10 text-center", CARD)}>
+              <p className="text-lg font-bold">{t.liffBook.kind[draft.kind]}</p>
+              <p className="truncate text-xs text-muted-foreground">{petMeta}</p>
             </div>
           </div>
         </div>
@@ -432,7 +428,7 @@ function BookingBody() {
             disabled={!draftReady(draft, draftServices, rooms, cart, editingKey)}
             onClick={addChecked}
           >
-            {t.liff.confirmBookingButton}
+            {draft.kind !== "BOARDING" && !draft.time ? t.liff.chooseTimeFirstButton : t.liff.confirmBookingButton}
           </Button>
         </BottomBar>
       </div>

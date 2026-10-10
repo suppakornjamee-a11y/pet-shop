@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Sparkles, Video, Wallet } from "lucide-react";
+import { Check, CreditCard, Loader2, Sparkles, Video } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
@@ -388,6 +388,8 @@ export function ItemDetail({
   }
 
   const groomChosen = groups.groom.some((s) => has(s.id));
+  const mainChosen = groups.main.find((s) => has(s.id));
+  const freeActiveCount = groups.free.filter((s) => has(s.id)).length;
   const { estimate } = estimateDraft(draft, services, rooms);
   const pickable = services.filter((s) => !s.defaultOn).sort((a, b) => a.price - b.price);
   const serviceTabs: { key: "main" | "groom" | "addons"; label: string }[] = [
@@ -406,6 +408,7 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <div className="space-y-3 rounded-3xl border border-primary/10 bg-primary/5 p-4">
+          <p className="text-base font-bold">{t.liffBook.services}</p>
           <div className="flex gap-1 rounded-2xl bg-muted/60 p-1">
             {serviceTabs.map((tb) => (
               <button
@@ -514,11 +517,28 @@ export function ItemDetail({
       )}
 
       {groups.free.length > 0 && (
-        <Section title={t.liff.defaultServicesTitle} icon={Sparkles}>
-          <div className="grid gap-2">
-            {groups.free.map((s) => (
-              <OptionRow key={s.id} mode="check" active={has(s.id)} label={s.name} price={s.price} onClick={() => toggle(s.id)} />
-            ))}
+        <Section
+          title={t.liff.defaultServicesTitle}
+          titleExtra={<span className="ml-auto text-xs font-normal text-muted-foreground">{t.liff.defaultServicesHint}</span>}
+        >
+          <div className="flex flex-wrap gap-2">
+            {groups.free.map((s) => {
+              const active = has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => toggle(s.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                    active ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                  )}
+                >
+                  {active && <Check className="h-3 w-3" strokeWidth={3} />}
+                  {s.name}
+                </button>
+              );
+            })}
           </div>
         </Section>
       )}
@@ -531,13 +551,27 @@ export function ItemDetail({
       )}
 
       {draft.kind === "BATH" && (
-        <Section tone="accent">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 shrink-0 text-primary" />
-            <span className="text-sm font-semibold">{t.liffBook.estimate}</span>
-            <span className="ml-auto text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
+        <Section title={t.liffBook.summaryShort}>
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-muted-foreground">{mainChosen ? mainChosen.name : t.liffBook.noMainChosen}</dt>
+              <dd className="shrink-0 font-semibold">{mainChosen ? formatBaht(mainChosen.price) : "-"}</dd>
+            </div>
+            {groups.free.length > 0 && (
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted-foreground">{t.liffBook.freeServicesCount(freeActiveCount)}</dt>
+                <dd className="shrink-0 font-semibold text-emerald-600">{t.liffBook.free}</dd>
+              </div>
+            )}
+          </dl>
+          <div className="flex items-center justify-between gap-3 border-t pt-3">
+            <span className="text-sm font-bold">{t.liffBook.estimate}</span>
+            <span className="text-2xl font-bold tabular-nums text-primary">{formatBaht(estimate)}</span>
           </div>
-          <p className="rounded-xl bg-card px-3 py-2 text-sm font-medium">{t.liffBook.bathDeposit}</p>
+          <div className="flex items-start gap-2 rounded-xl bg-accent/40 px-3 py-2">
+            <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p className="text-sm font-medium">{t.liffBook.bathDeposit}</p>
+          </div>
           <div className="space-y-1.5 text-xs leading-relaxed text-muted-foreground">
             <p>{t.liffBook.priceNote}</p>
             <p>{t.liffBook.depositNote}</p>
