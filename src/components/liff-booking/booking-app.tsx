@@ -700,7 +700,7 @@ function BookingBody() {
                     <span className="relative">
                       <span
                         className={cn(
-                          "flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary transition-colors",
+                          "flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary transition-colors",
                           on && "ring-2 ring-primary"
                         )}
                       >
@@ -708,12 +708,14 @@ function BookingBody() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={p.photoUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <SpeciesIcon species={p.species} className="h-full w-full object-contain p-3" />
+                          <span className="px-1 text-center text-[0.5rem] leading-tight text-muted-foreground">
+                            {t.liffBook.noPhoto}
+                          </span>
                         )}
                       </span>
                       {on && (
-                        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white ring-2 ring-card">
-                          <Check className="h-3 w-3" strokeWidth={3} />
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-white ring-2 ring-card">
+                          <Check className="h-2.5 w-2.5" strokeWidth={3} />
                         </span>
                       )}
                     </span>
@@ -737,8 +739,8 @@ function BookingBody() {
                   }}
                   className="flex w-16 flex-col items-center gap-1.5 transition-opacity hover:opacity-80"
                 >
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary/40 text-primary">
-                    <Plus className="h-6 w-6" />
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-primary/40 text-primary">
+                    <Plus className="h-5 w-5" />
                   </span>
                   <span className="max-w-full truncate text-xs text-primary">{t.liffBook.addPetShort}</span>
                 </button>

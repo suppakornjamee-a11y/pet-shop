@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { assessFleaTick, fleaInfoChanged, validateFleaDeclaration, type FleaDeclaration } from "@/lib/flea-tick-check";
 import { VerifySeal } from "@/components/verify-seal";
@@ -506,9 +506,9 @@ export function ExistingPetFields({
         .filter(Boolean)
         .join(" ")
     : "-";
-  // สามกล่องสถิติหัวการ์ด — สายพันธุ์ย้ายไปโชว์เป็นคำบรรยายใต้ชื่อแทนแล้ว
   const statRows: [string, string][] = [
     [t.liffBook.species, t.labels.species[pet.species]],
+    [t.liffBook.breed, pet.breed || "-"],
     [t.liffBook.ageLabel, ageText],
     [t.orders.petWeightLabel, Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"],
   ];
@@ -536,39 +536,17 @@ export function ExistingPetFields({
 
   return (
     <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
-      <div className="flex items-center gap-3">
-        {pet.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={pet.photoUrl}
-            alt=""
-            className="h-14 w-14 shrink-0 rounded-2xl border border-primary/15 object-cover"
-          />
-        ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted text-center text-[0.5625rem] leading-tight text-muted-foreground">
-            {t.liffBook.noPhoto}
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold leading-tight">{pet.name}</p>
-          {pet.breed && <p className="truncate text-xs text-muted-foreground">{pet.breed}</p>}
-        </div>
-        {pet.infoStatus === "same" && (
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-            <Check className="h-4 w-4" strokeWidth={3} />
-          </span>
-        )}
-      </div>
-
       {pet.infoStatus !== "update" && (
         <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            {statRows.map(([label, value]) => (
-              <div key={label} className="min-w-0 rounded-2xl bg-card p-2.5 text-center">
-                <p className="text-[0.6875rem] text-muted-foreground">{label}</p>
-                <p className="mt-0.5 break-words text-xs font-bold leading-tight">{value}</p>
-              </div>
-            ))}
+          <div className="rounded-2xl bg-card p-3">
+            <dl className="space-y-1.5">
+              {statRows.map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-3">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="shrink-0 text-xs font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           <div className="rounded-2xl bg-card p-3">
