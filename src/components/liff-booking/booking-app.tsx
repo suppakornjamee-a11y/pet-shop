@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   CalendarDays,
+  Check,
   ChevronLeft,
   Home,
   Loader2,
@@ -686,7 +687,7 @@ function BookingBody() {
           <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
 
           {pets.length > 0 || kind === "BATH" ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-4">
               {pets.map((p) => {
                 const on = selectedPetId === p.id;
                 return (
@@ -694,23 +695,54 @@ function BookingBody() {
                     key={p.id}
                     type="button"
                     onClick={() => setSelectedPetId(p.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-xs transition-colors",
-                      on ? "border-primary bg-primary font-semibold text-primary-foreground" : "bg-card hover:bg-muted"
-                    )}
+                    className="flex w-16 flex-col items-center gap-1.5 transition-opacity hover:opacity-80"
                   >
+                    <span className="relative">
+                      <span
+                        className={cn(
+                          "flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary transition-colors",
+                          on && "ring-2 ring-primary"
+                        )}
+                      >
+                        {p.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.photoUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <SpeciesIcon species={p.species} className="h-full w-full object-contain p-3" />
+                        )}
+                      </span>
+                      {on && (
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white ring-2 ring-card">
+                          <Check className="h-3 w-3" strokeWidth={3} />
+                        </span>
+                      )}
+                    </span>
                     <span
                       className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full",
-                        on ? "bg-white/25 text-primary-foreground" : "bg-primary/10 text-primary"
+                        "max-w-full truncate text-xs",
+                        on ? "font-bold text-primary" : "text-muted-foreground"
                       )}
                     >
-                      <SpeciesIcon species={p.species} className="h-3 w-3" />
+                      {p.name}
                     </span>
-                    {p.name}
                   </button>
                 );
               })}
+              {kind === "BATH" && selectedPetId !== "new" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewPets([emptyPetDraft()]);
+                    setSelectedPetId("new");
+                  }}
+                  className="flex w-16 flex-col items-center gap-1.5 transition-opacity hover:opacity-80"
+                >
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-primary/40 text-primary">
+                    <Plus className="h-6 w-6" />
+                  </span>
+                  <span className="max-w-full truncate text-xs text-primary">{t.liffBook.addPetShort}</span>
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t.liff.noPetsFound}</p>
@@ -739,15 +771,6 @@ function BookingBody() {
                 />
               )
             ))}
-          {kind === "BATH" && selectedPetId !== "new" && (
-            <AddPetButton
-              onClick={() => {
-                setNewPets([emptyPetDraft()]);
-                setSelectedPetId("new");
-              }}
-              t={t}
-            />
-          )}
         </div>
       )}
 
