@@ -542,10 +542,10 @@ export function ExistingPetFields({
           <img
             src={pet.photoUrl}
             alt=""
-            className="h-14 w-14 shrink-0 rounded-full border border-primary/15 object-cover"
+            className="h-14 w-14 shrink-0 rounded-2xl border border-primary/15 object-cover"
           />
         ) : (
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted text-center text-[0.5625rem] leading-tight text-muted-foreground">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted text-center text-[0.5625rem] leading-tight text-muted-foreground">
             {t.liffBook.noPhoto}
           </span>
         )}
@@ -585,13 +585,13 @@ export function ExistingPetFields({
 
           <div className={cn("space-y-1 rounded-2xl p-3", fleaPassed ? "bg-emerald-50" : "bg-amber-50")}>
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold">
+              <span className="inline-flex items-center gap-1 text-xs font-bold">
+                {t.fleaTick.title}
                 <VerifySeal
                   passed={fleaPassed}
                   label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                  className="h-[15px] w-[15px]"
+                  className="h-3 w-3"
                 />
-                {t.fleaTick.title}
               </span>
               <span
                 className={cn(
@@ -602,11 +602,18 @@ export function ExistingPetFields({
                 {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
               </span>
             </div>
-            <p className="text-xs font-semibold">{medicine}</p>
-            <p className="text-[0.6875rem] text-muted-foreground">
-              {t.fleaTick.lastGivenLabel}{" "}
-              {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
-            </p>
+            <dl className="space-y-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</dt>
+                <dd className="shrink-0 text-xs font-semibold">{medicine}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-xs text-muted-foreground">{t.liffBook.fleaReceivedLabel}</dt>
+                <dd className="shrink-0 text-xs font-semibold">
+                  {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
       )}

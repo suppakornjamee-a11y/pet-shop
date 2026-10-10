@@ -686,10 +686,7 @@ function BookingBody() {
 
       {kind && ctx.linked && (
         <div className={cn("space-y-4 p-4", CARD)}>
-          <div>
-            <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
-            <p className="text-xs text-muted-foreground">{t.liffBook.petSectionHint}</p>
-          </div>
+          <h2 className="text-base font-bold">{t.liffBook.petSectionTitle}</h2>
 
           {pets.length > 0 || kind === "BATH" ? (
             <div className="flex flex-wrap gap-2">
