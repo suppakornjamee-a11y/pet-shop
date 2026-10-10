@@ -63,10 +63,16 @@ import {
   type FleaDraft,
   type ItemDraft,
 } from "./cart";
-import { CARD, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
+import { CARD, MaskIcon, Stepper, type CtxPet, type Kind, type Room, type Service, type T } from "./shared";
 
 const KIND_ORDER: Kind[] = ["BATH", "BOARDING", "OTHER"];
 const KIND_ICONS: Record<Kind, typeof Home> = { BOARDING: Home, BATH: Scissors, OTHER: Sparkles };
+/** ไอคอนการ์ดเลือกบริการหน้าแรก — คนละชุดกับ KIND_ICONS (ใช้ที่หัวหน้ารายละเอียดรายการ) */
+const KIND_TILE_ICON_SRC: Record<Kind, string> = {
+  BATH: "/images/icons/cat-grooming.png",
+  BOARDING: "/images/icons/dog-house.png",
+  OTHER: "/images/icons/pet-training.png",
+};
 
 type Ctx =
   | { linked: false }
@@ -609,45 +615,43 @@ function BookingBody() {
         <Stepper step={1} t={t} />
       </div>
 
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold leading-tight">{t.liff.chooseServiceTitle}</h1>
+      <div className="space-y-4 rounded-3xl border border-primary/10 bg-primary/5 p-4">
+        <div className="flex items-end justify-between gap-3">
+          <h1 className="text-lg font-bold leading-tight">{t.liff.chooseServiceTitle}</h1>
+          <span className="shrink-0 pb-0.5 text-xs text-muted-foreground">{t.liffBook.stepNumber(1)}</span>
         </div>
-        <span className="shrink-0 pb-0.5 text-xs text-muted-foreground">{t.liffBook.stepNumber(1)}</span>
-      </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
-        {KIND_ORDER.map((k) => {
-          const Icon = KIND_ICONS[k];
-          const active = kind === k;
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => chooseKind(k)}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-3xl border-2 p-3 text-center transition-colors sm:flex-row sm:items-center sm:gap-3 sm:text-left",
-                active ? "border-primary bg-primary/5" : "border-border bg-card"
-              )}
-            >
-              <span
+        <div className="grid grid-cols-3 gap-2.5">
+          {KIND_ORDER.map((k) => {
+            const active = kind === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => chooseKind(k)}
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : k === "OTHER"
-                      ? "bg-amber-100 text-amber-600"
-                      : "bg-primary/10 text-primary"
+                  "flex flex-col items-center gap-2 rounded-3xl p-3 text-center transition-colors sm:flex-row sm:gap-3 sm:text-left",
+                  active ? "bg-primary text-primary-foreground shadow-md" : "bg-card"
                 )}
               >
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className={cn("text-sm font-bold leading-tight", active && "text-primary")}>
-                {t.liffBook.kind[k]}
-              </span>
-            </button>
-          );
-        })}
+                <span
+                  className={cn(
+                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors",
+                    active ? "bg-white/15" : "bg-primary/10"
+                  )}
+                >
+                  <MaskIcon
+                    src={KIND_TILE_ICON_SRC[k]}
+                    className={cn("h-7 w-7", active ? "text-primary-foreground" : "text-primary")}
+                  />
+                </span>
+                <span className="text-sm font-bold leading-tight">
+                  {t.liffBook.kind[k]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {kind && !ctx.linked && kind === "BATH" && (

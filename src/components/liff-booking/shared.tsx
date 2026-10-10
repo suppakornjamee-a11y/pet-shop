@@ -304,8 +304,8 @@ const STEP_ICONS = [
   "/images/icons/step-progress.png",
 ];
 
-/** ไอคอนขั้นตอนเป็น PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask ทำให้เปลี่ยนสีตามสถานะได้ด้วยไฟล์เดียว */
-function StepIcon({ src, className }: { src: string; className?: string }) {
+/** ไอคอน PNG ลายเส้นสีดำล้วน — ระบายสีตาม currentColor ด้วย mask ทำให้เปลี่ยนสีตามสถานะได้ด้วยไฟล์เดียว (ใช้กับไอคอนขั้นตอน + ไอคอนการ์ดเลือกบริการ) */
+export function MaskIcon({ src, className }: { src: string; className?: string }) {
   return (
     <span
       aria-hidden
@@ -334,7 +334,7 @@ export function Stepper({ step, t }: { step: Step; t: T }) {
         return (
           <Fragment key={label}>
             <div className="flex w-16 shrink-0 flex-col items-center gap-1 py-1">
-              <StepIcon
+              <MaskIcon
                 src={STEP_ICONS[i]}
                 className={cn("h-8 w-8 transition-colors", active ? "text-primary" : "text-muted-foreground/35")}
               />
