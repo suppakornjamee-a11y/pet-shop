@@ -396,7 +396,7 @@ function BookingBody() {
             <span className="absolute left-1/2 top-0 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card text-primary shadow-md">
               <MaskIcon src={KIND_TILE_ICON_SRC[draft.kind]} className="h-9 w-9" />
             </span>
-            <div className={cn("space-y-1 rounded-b-3xl px-4 pb-4 pt-10 text-center", CARD)}>
+            <div className="space-y-1 rounded-b-3xl border bg-card px-4 pb-4 pt-10 text-center shadow-[0_2px_12px_rgba(190,60,110,0.06)]">
               <p className="text-lg font-bold">{t.liffBook.kind[draft.kind]}</p>
               <p className="truncate text-xs text-muted-foreground">{petMeta}</p>
             </div>
