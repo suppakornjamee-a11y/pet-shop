@@ -581,7 +581,7 @@ export function ItemDetail({
               <div key={row.label} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{row.label}</p>
-                  <p className="truncate text-xs text-muted-foreground">{row.sub}</p>
+                  <p className="text-xs text-muted-foreground">{row.sub}</p>
                 </div>
                 <p className="shrink-0 text-sm text-muted-foreground">{formatBaht(row.price)}</p>
               </div>

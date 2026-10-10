@@ -445,7 +445,7 @@ function BookingBody() {
           t={t}
         />
 
-        <div className="fixed inset-x-0 bottom-0 z-10 flex items-center gap-[14px] rounded-t-[28px] bg-white px-4 pt-4 pb-[calc(28px+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-12px_rgba(120,40,70,0.22)]">
+        <div className="fixed inset-x-0 bottom-0 z-10 flex items-center gap-[14px] rounded-t-[28px] bg-white px-8 pt-4 pb-[calc(28px+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-12px_rgba(120,40,70,0.22)]">
           <div className="flex w-[112px] flex-none flex-col gap-[3px]">
             <span className="text-xs text-[#8A6B76]">{t.liffBook.estimateShort}</span>
             <div className="flex items-baseline gap-0.5 leading-none text-[#2A1A20]">
