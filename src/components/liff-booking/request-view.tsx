@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Bath, CalendarDays, Check, Clock, Home, Hourglass, Loader2, LogIn, LogOut, Scissors, X } from "lucide-react";
 import { liffCancelOrder, liffGetBookingRequest, liffRescheduleBookingRequest } from "@/app/actions/liff";
-import { formatBaht, formatDateLong, formatTime } from "@/lib/format";
+import { formatBaht, formatDateLong, formatDateWeekday, formatTime } from "@/lib/format";
+import BookingTicket from "./BookingTicket";
 import { toThaiDateStr } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { useLiff, LiffGate, handleLiffAuthExpiry } from "@/components/liff-provider";
@@ -364,7 +365,12 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
   const canResubmit = !!draft && (draft.kind === "BOARDING" ? !!draft.date && !!draft.checkOutDate : !!draft.time);
 
   return (
-    <div className={cn("space-y-5 py-2", selected.status === "RESCHEDULE_REQUIRED" ? "pb-28" : "pb-20")}>
+    <div
+      className={cn(
+        "-mx-4 space-y-5 bg-[#FBEFF3] px-4 py-2",
+        selected.status === "RESCHEDULE_REQUIRED" ? "pb-28" : "pb-20"
+      )}
+    >
       <h1 className="text-lg font-bold">{t.liff.ordersPageTitle}</h1>
       <Stepper step={stepOf(selected)} t={t} />
 
@@ -461,16 +467,20 @@ function RequestBody({ requestId, initialOrderId }: { requestId: string; initial
         </>
       ) : (
         <>
-          <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Check className="h-4 w-4" strokeWidth={3} />
-            </span>
-            <div className="min-w-0">
-              <p className="font-bold leading-tight">{t.labels.bookingRequestStatus.CONFIRMED}</p>
-              <p className="mt-0.5 text-xs font-medium text-primary">{t.liff.inProgressTitle}</p>
-            </div>
-          </div>
-          <SummaryCard order={selected} t={t} showPaid />
+          <BookingTicket
+            statusLabel={t.liff.inProgressTitle}
+            serviceName={t.liffBook.summaryKind[orderKind(selected)]}
+            petName={selected.pet?.name ?? ""}
+            petType={selected.pet ? t.labels.species[selected.pet.species] : ""}
+            dateText={selected.appointmentAt ? formatDateWeekday(selected.appointmentAt) : ""}
+            timeText={selected.appointmentAt ? `${timeOf(selected.appointmentAt)} ${t.liff.timeUnitSuffix}` : ""}
+            mainItems={selected.items.filter((it) => it.bucket === "main").map((it) => it.name)}
+            extraItems={selected.items.filter((it) => it.bucket === "addon").map((it) => it.name)}
+            freeItems={selected.items.filter((it) => it.bucket === "free").map((it) => it.name)}
+            total={selected.total}
+            deposit={selected.paid}
+            serviceIconSrc="/images/icons/cat-grooming.png"
+          />
           {isBath && selected.paid < selected.total && (
             <p className="text-center text-xs text-muted-foreground">{t.liffBook.depositNote}</p>
           )}

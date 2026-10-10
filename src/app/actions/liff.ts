@@ -836,6 +836,24 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
   if (!req || req.customer.lineUserId !== identity.userId) {
     return { ok: false as const, error: "ไม่พบคำขอจองนี้" };
   }
+
+  // รายการที่บันทึกไว้เป็น snapshot ไม่มีข้อมูลว่าเป็นบริการหลัก/เสริม ต้องย้อนไปดูตารางบริการจริงผ่าน refId
+  const serviceIds = [
+    ...new Set(
+      req.orders.flatMap((o) => o.items.filter((it) => it.itemType === "SERVICE" && it.refId).map((it) => it.refId as string))
+    ),
+  ];
+  const addonServiceIds = new Set(
+    serviceIds.length > 0
+      ? (await prisma.service.findMany({ where: { id: { in: serviceIds }, group: { not: null } }, select: { id: true } })).map(
+          (s) => s.id
+        )
+      : []
+  );
+  // ฟรี (defaultOn) ราคาตั้งไว้ 0 เสมอตั้งแต่ seed — เช็คจาก subtotal ได้โดยไม่ต้องสืบเพิ่ม
+  const itemBucket = (it: { subtotal: number; refId: string | null }): "main" | "addon" | "free" =>
+    it.subtotal === 0 ? "free" : addonServiceIds.has(it.refId ?? "") ? "addon" : "main";
+
   const iso = (d: Date | null) => d?.toISOString() ?? null;
   return {
     ok: true as const,
@@ -845,6 +863,7 @@ export async function liffGetBookingRequest(idToken: string, requestId: string) 
     rescheduleReason: req.rescheduleReason,
     orders: req.orders.map(({ payments, activityLogs, ...o }) => ({
       ...o,
+      items: o.items.map((it) => ({ ...it, bucket: itemBucket(it) })),
       appointmentAt: iso(o.appointmentAt),
       checkInAt: iso(o.checkInAt),
       checkOutAt: iso(o.checkOutAt),

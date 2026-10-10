@@ -34,6 +34,18 @@ export function formatDateLong(date: Date | string): string {
   }).format(d);
 }
 
+/** วันย่อ + วันที่ + เดือนย่อ + ปี เช่น "ส. 17 ต.ค. 2569" — ใช้กับตั๋วจอง */
+export function formatDateWeekday(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("th-TH", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: TIME_ZONE,
+  }).format(d);
+}
+
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("th-TH", {
