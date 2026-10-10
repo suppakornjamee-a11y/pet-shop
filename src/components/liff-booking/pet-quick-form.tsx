@@ -563,22 +563,22 @@ export function ExistingPetFields({
             <div className="rounded-2xl bg-card p-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs font-bold text-muted-foreground">{t.liffBook.species}</p>
+                  <p className="text-xs font-bold text-foreground">{t.liffBook.species}</p>
                   <p className="mt-0.5 text-sm">{t.labels.species[pet.species]}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-muted-foreground">{t.liffBook.breed}</p>
+                  <p className="text-xs font-bold text-foreground">{t.liffBook.breed}</p>
                   <p className="mt-0.5 text-sm">{pet.breed || "-"}</p>
                 </div>
               </div>
               <div className="my-3 border-t" />
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs font-bold text-muted-foreground">{t.liffBook.ageLabel}</p>
+                  <p className="text-xs font-bold text-foreground">{t.liffBook.ageLabel}</p>
                   <p className="mt-0.5 text-sm">{ageText}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-muted-foreground">{t.orders.petWeightLabel}</p>
+                  <p className="text-xs font-bold text-foreground">{t.orders.petWeightLabel}</p>
                   <p className="mt-0.5 text-sm">
                     {Number(pet.weightKg) > 0 ? `${pet.weightKg} ${t.liffBook.weightUnit}` : "-"}
                   </p>
@@ -592,7 +592,7 @@ export function ExistingPetFields({
               <div className="divide-y">
                 {healthRows.map(([label, value]) => (
                   <div key={label} className="py-2.5 first:pt-0 last:pb-0">
-                    <p className="text-xs font-bold text-muted-foreground">{label}</p>
+                    <p className="text-xs font-bold text-foreground">{label}</p>
                     <p className="mt-0.5 break-words text-sm">{value}</p>
                   </div>
                 ))}
@@ -618,11 +618,11 @@ export function ExistingPetFields({
               <div className="rounded-2xl bg-card p-3">
                 <div className="divide-y">
                   <div className="pb-2.5">
-                    <p className="text-xs font-bold text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</p>
+                    <p className="text-xs font-bold text-foreground">{t.liffBook.fleaMedicineNameLabel}</p>
                     <p className="mt-0.5 break-words text-sm">{medicine}</p>
                   </div>
                   <div className="pt-2.5">
-                    <p className="text-xs font-bold text-muted-foreground">{t.liffBook.fleaReceivedLabel}</p>
+                    <p className="text-xs font-bold text-foreground">{t.liffBook.fleaReceivedLabel}</p>
                     <p className="mt-0.5 text-sm">
                       {pet.lastFleaTickDate ? formatDateLong(thaiDayRange(pet.lastFleaTickDate).start) : "-"}
                     </p>
