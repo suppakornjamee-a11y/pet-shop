@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Sparkles, Video, Wallet } from "lucide-react";
 import { getOpenSlots, checkRoomAvailability } from "@/app/actions/liff";
-import type { FleaTickProductInfo } from "@/lib/flea-tick";
 import { formatBaht, formatDateLong } from "@/lib/format";
 import { addDaysThai, thaiDayRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { bathGroups, cartTimesTaken, estimateDraft, type CartEntry, type ItemDraft } from "./cart";
-import { FleaTickSection } from "./flea-section";
 import { ImagePicker } from "./image-picker";
 import {
   CCTV_ROOM_RATE,
@@ -32,7 +30,6 @@ import {
   Section,
   TimeSlotGroups,
   todayStr,
-  type CtxPet,
   type Room,
   type Service,
   type SlotOption,
@@ -343,9 +340,6 @@ function RoomPicker({
 export function ItemDetail({
   draft,
   onChange,
-  pet,
-  catalog,
-  invalidId,
   services,
   rooms,
   cart,
@@ -354,10 +348,6 @@ export function ItemDetail({
 }: {
   draft: ItemDraft;
   onChange: (d: ItemDraft) => void;
-  pet: CtxPet;
-  catalog: FleaTickProductInfo[];
-  /** ช่องแรกที่ยังกรอกไม่ครบตอนกดตรวจสอบรายการ — ขึ้นขอบแดง */
-  invalidId?: string | null;
   /** บริการของประเภทนี้ที่กรองชนิดสัตว์แล้ว */
   services: Service[];
   rooms: Room[];
@@ -408,8 +398,6 @@ export function ItemDetail({
 
       {draft.kind === "BATH" && (
         <>
-          <FleaTickSection draft={draft} set={set} pet={pet} catalog={catalog} invalidId={invalidId} t={t} />
-
           <Section title={t.liffBook.bathType}>
             <div className="grid gap-2">
               {groups.main.map((s) => (

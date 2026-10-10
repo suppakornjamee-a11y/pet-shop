@@ -584,24 +584,14 @@ export function ExistingPetFields({
           </div>
 
           <div className={cn("space-y-1 rounded-2xl p-3", fleaPassed ? "bg-emerald-50" : "bg-amber-50")}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1 text-xs font-bold">
-                {t.fleaTick.title}
-                <VerifySeal
-                  passed={fleaPassed}
-                  label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-                  className="h-3 w-3"
-                />
-              </span>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold text-white",
-                  fleaPassed ? "bg-emerald-500" : "bg-amber-500"
-                )}
-              >
-                {fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
-              </span>
-            </div>
+            <span className="inline-flex items-center gap-1 text-xs font-bold">
+              {t.fleaTick.title}
+              <VerifySeal
+                passed={fleaPassed}
+                label={fleaPassed ? t.liffBook.fleaPassed : t.fleaTick.pending}
+                className="h-3 w-3"
+              />
+            </span>
             <dl className="space-y-1">
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-xs text-muted-foreground">{t.liffBook.fleaMedicineNameLabel}</dt>
@@ -619,7 +609,6 @@ export function ExistingPetFields({
       )}
 
       <div className="space-y-1.5">
-        <Label htmlFor={id("info")}>{t.liffBook.infoConfirmLabel}</Label>
         <select
           id={id("info")}
           className={cn(SELECT, "sm:pr-8", bad("info") && INVALID)}

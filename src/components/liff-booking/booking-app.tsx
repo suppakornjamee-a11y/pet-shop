@@ -407,9 +407,6 @@ function BookingBody() {
         <ItemDetail
           draft={draft}
           onChange={setDraft}
-          pet={draftPet}
-          catalog={catalog}
-          invalidId={invalidId}
           services={draftServices}
           rooms={rooms}
           cart={cart}
