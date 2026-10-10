@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CalendarDays, Check, ChevronLeft, Clock, Loader2, PawPrint, Plus, ShoppingBag } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, Loader2, PawPrint, Plus, ShoppingBag, Tag } from "lucide-react";
 import {
   getBookableRooms,
   getBookableServices,
@@ -44,6 +44,7 @@ import { ItemDetail, draftReady, whenLabel } from "./item-detail";
 import { validateFleaForDraft } from "./flea-section";
 import { fleaDataOf } from "./flea-validation";
 import {
+  bathGroups,
   entryToPayload,
   estimateDraft,
   forSpecies,
@@ -98,32 +99,26 @@ function petToDraft(p: CtxPet): PetDraft {
 /** แถบปุ่มที่แปะขอบล่างจอ — summary = ข้อความสรุปด้านซ้าย (เช่น ยอดโดยประมาณ) · aboveTabs = ยกขึ้นเหนือแถบเมนูล่าง */
 function BottomBar({
   summary,
-  caption,
   aboveTabs = false,
   children,
 }: {
   summary?: React.ReactNode;
-  /** บรรทัดเล็กเหนือแถบ บอกสถานะว่าทำไมกดปุ่มไม่ได้/พร้อมแล้ว */
-  caption?: React.ReactNode;
   aboveTabs?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "fixed inset-x-3 z-10 mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
+        "fixed inset-x-3 z-10 mx-auto flex max-w-md items-center gap-3 sm:max-w-xl md:max-w-2xl lg:max-w-3xl",
         aboveTabs ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]" : "bottom-3"
       )}
     >
-      {caption && <p className="mb-1.5 px-1 text-xs font-medium text-muted-foreground">{caption}</p>}
-      <div className="flex items-center gap-3">
-        {summary && (
-          <div className="min-w-0 shrink-0 rounded-2xl border bg-card/95 px-3 py-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
-            {summary}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+      {summary && (
+        <div className="min-w-0 shrink-0 rounded-2xl border bg-card/95 px-3 py-2 shadow-[0_8px_24px_rgba(190,60,110,0.16)] backdrop-blur">
+          {summary}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -381,6 +376,8 @@ function BookingBody() {
   if (stage === "detail" && draft && draftPet && idToken) {
     const detailEstimate = estimateDraft(draft, draftServices, rooms).estimate;
     const detailReady = draftReady(draft, draftServices, rooms, cart, editingKey);
+    const detailMainChosen =
+      draft.kind === "BATH" && bathGroups(draftServices).main.some((s) => draft.serviceIds.includes(s.id));
     return (
       <div className="space-y-4 pb-28">
         <div>
@@ -448,29 +445,34 @@ function BookingBody() {
           t={t}
         />
 
-        <BottomBar
-          caption={detailReady ? t.liff.detailReadyCaption : t.liff.detailNotReadyCaption}
-          summary={
-            <div className="leading-tight">
-              <div className="text-[0.6875rem] text-muted-foreground">{t.liffBook.estimateShort}</div>
-              <div className="text-lg font-bold tabular-nums text-primary">{formatBaht(detailEstimate)}</div>
-              {draft.kind === "BATH" && detailReady && detailEstimate > 0 && (
-                <div className="flex items-center gap-1 text-[0.6875rem] font-medium text-amber-600">
-                  <Clock className="h-3 w-3" />
-                  {t.liffBook.depositHint(formatBaht(Math.min(BATH_DEPOSIT_AMOUNT, detailEstimate)))}
-                </div>
-              )}
+        <div className="fixed inset-x-0 bottom-0 z-10 flex items-center gap-[14px] rounded-t-[28px] bg-white px-4 pt-4 pb-[calc(28px+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-12px_rgba(120,40,70,0.22)]">
+          <div className="flex w-[112px] flex-none flex-col gap-[3px]">
+            <span className="text-xs text-[#8A6B76]">{t.liffBook.estimateShort}</span>
+            <div className="flex items-baseline gap-0.5 leading-none text-[#2A1A20]">
+              <span className="text-base font-semibold">฿</span>
+              <span className="text-[28px] font-bold tracking-[-0.5px]">{detailEstimate.toLocaleString("th-TH")}</span>
             </div>
-          }
-        >
-          <Button
-            className="h-11 w-full rounded-2xl text-sm font-semibold shadow-md"
+            {detailMainChosen && (
+              <span className="mt-1 inline-flex w-fit items-center gap-1 self-start rounded-[6px] bg-[#E8F5EC] py-[3px] pl-1.5 pr-2 text-[11.5px] font-semibold text-[#1E7A44]">
+                <Tag className="h-3 w-3" strokeWidth={2.4} />
+                {t.liffBook.depositHint(formatBaht(Math.min(BATH_DEPOSIT_AMOUNT, detailEstimate)))}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
             disabled={!detailReady}
             onClick={addChecked}
+            className={cn(
+              "min-h-14 flex-1 rounded-[18px] text-base font-semibold",
+              detailReady
+                ? "bg-[#B8456F] text-white shadow-[0_10px_22px_-10px_#B8456F]"
+                : "cursor-not-allowed bg-[#E7E2E4] text-[#A39A9E]"
+            )}
           >
-            {draft.kind !== "BOARDING" && !draft.time ? t.liff.chooseTimeFirstButton : t.liff.confirmBookingButton}
-          </Button>
-        </BottomBar>
+            {t.liff.confirmBookingButton}
+          </button>
+        </div>
       </div>
     );
   }
