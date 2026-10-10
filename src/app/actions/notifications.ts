@@ -2,7 +2,6 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStaffUser } from "@/lib/auth-helpers";
-import { formatDate, formatTime } from "@/lib/format";
 
 /** งานที่รอพนักงานลงมือ — คิวใหม่ที่ต้องยืนยัน กับสลิปที่ลูกค้าส่งมาแล้วต้องตรวจ */
 export type StaffAlertKind = "QUEUE" | "SLIP";
@@ -17,20 +16,9 @@ export type StaffAlert = {
   customerName: string;
   petName: string | null;
   amount: number | null;
+  /** เวลาที่ลูกค้าทำรายการจริง — คิวคือตอนส่งคำขอจอง (createdAt), สลิปคือตอนอัปโหลดสลิป (submittedAt) */
   at: string;
-  /** เฉพาะรายการคิว (QUEUE) — วันเวลาที่ลูกค้าขอจอง ใช้ตัดสินใจว่าจัดคิวให้ได้ไหม (null สำหรับรายการสลิป) */
-  when: string | null;
 };
-
-/** วันเวลาที่ลูกค้าขอจอง — คิวส่วนกลาง (อาบน้ำ/บริการอื่น) ใช้ appointmentAt, ห้องพักใช้ช่วงเช็คอิน–เช็คเอาท์ */
-function requestedWhen(o: { appointmentAt: Date | null; checkInAt: Date | null; checkOutAt: Date | null }): string | null {
-  if (o.checkInAt) {
-    const inDate = formatDate(o.checkInAt);
-    return o.checkOutAt ? `${inDate} – ${formatDate(o.checkOutAt)}` : inDate;
-  }
-  if (o.appointmentAt) return `${formatDate(o.appointmentAt)} ${formatTime(o.appointmentAt)} น.`;
-  return null;
-}
 
 export type StaffAlerts = { count: number; items: StaffAlert[] };
 
@@ -56,9 +44,6 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
         id: true,
         code: true,
         createdAt: true,
-        appointmentAt: true,
-        checkInAt: true,
-        checkOutAt: true,
         customer: { select: { name: true } },
         pet: { select: { name: true } },
       },
@@ -95,7 +80,6 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
       petName: o.pet?.name ?? null,
       amount: null,
       at: o.createdAt.toISOString(),
-      when: requestedWhen(o),
     })),
     ...slips.map((p) => ({
       kind: "SLIP" as const,
@@ -106,7 +90,6 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
       petName: p.order.pet?.name ?? null,
       amount: p.amount,
       at: (p.submittedAt ?? p.createdAt).toISOString(),
-      when: null,
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 

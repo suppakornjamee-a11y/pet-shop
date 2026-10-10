@@ -126,7 +126,7 @@ export function NotificationBell() {
                     {it.petName && <span className="text-muted-foreground"> · {it.petName}</span>}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {it.code} · {it.when ?? formatDateTime(new Date(it.at))}
+                    {it.code} · {formatDateTime(new Date(it.at))}
                   </span>
                 </span>
               </DropdownMenuItem>
