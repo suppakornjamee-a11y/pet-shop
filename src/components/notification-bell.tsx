@@ -18,21 +18,44 @@ import {
 
 /** ถามทุก 30 วินาที — ถี่พอให้พนักงานรู้เกือบทันที แต่ไม่ถี่จนยิงฐานข้อมูลทิ้งเปล่า */
 const POLL_MS = 30_000;
+/** จำเวลาที่พนักงานคนนี้ (แยกตาม userId) เปิดกระดิ่งดูล่าสุดไว้ในเครื่อง — ใช้ลดเลขแจ้งเตือนตอนเปิดดู
+ * เหมือน Facebook (รายการที่ยังไม่เสร็จยังอยู่ในลิสต์เหมือนเดิม แค่เลขแดงไม่นับของที่เคยเห็นแล้ว) */
+const SEEN_KEY_PREFIX = "staffAlertsSeenAt:";
+
+function readLastSeen(userId: string): string | null {
+  try {
+    return localStorage.getItem(SEEN_KEY_PREFIX + userId);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastSeen(userId: string, iso: string) {
+  try {
+    localStorage.setItem(SEEN_KEY_PREFIX + userId, iso);
+  } catch {
+    // โหมดส่วนตัว/บล็อก storage — เก็บไม่ได้ก็ปล่อยผ่าน แค่กระดิ่งไม่จำสถานะข้ามรอบโหลด
+  }
+}
 
 export function NotificationBell() {
   const { t } = useI18n();
-  const [count, setCount] = useState(0);
   const [items, setItems] = useState<StaffAlert[]>([]);
   const [canNotify, setCanNotify] = useState(false);
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
 
+  const userIdRef = useRef<string | null>(null);
   // จำยอดครั้งก่อนไว้ เพื่อเด้งแจ้งเตือนเฉพาะตอน "มีของใหม่เพิ่มเข้ามา" ไม่ใช่ทุกรอบที่ถาม
   const lastCount = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await getStaffAlerts();
-      setCount(res.count);
       setItems(res.items);
+      if (userIdRef.current !== res.userId) {
+        userIdRef.current = res.userId;
+        setLastSeenAt(readLastSeen(res.userId));
+      }
       if (typeof Notification !== "undefined") setCanNotify(Notification.permission === "granted");
 
       const previous = lastCount.current;
@@ -78,18 +101,29 @@ export function NotificationBell() {
     setCanNotify(result === "granted");
   }
 
-  const Icon = count > 0 ? BellRing : Bell;
+  // เลขแดง = รายการที่ "ยังไม่เคยเปิดกระดิ่งดู" เท่านั้น ไม่ใช่งานค้างทั้งหมด — งานที่ยังไม่เสร็จแต่เคยเห็นแล้ว
+  // ยังอยู่ในลิสต์ด้านในตามเดิม แค่ไม่ถูกนับที่ตัวเลขอีก (เหมือนกระดิ่งของ Facebook)
+  const unseenCount = lastSeenAt === null ? items.length : items.filter((it) => it.at > lastSeenAt).length;
+
+  function markSeenNow() {
+    if (!userIdRef.current) return;
+    const now = new Date().toISOString();
+    writeLastSeen(userIdRef.current, now);
+    setLastSeenAt(now);
+  }
+
+  const Icon = unseenCount > 0 ? BellRing : Bell;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => open && markSeenNow()}>
       <DropdownMenuTrigger
         render={<Button variant="ghost" size="icon" className="relative" />}
         aria-label={t.notifications.title}
       >
-        <Icon className={cn("h-5 w-5", count > 0 && "text-primary")} />
-        {count > 0 && (
+        <Icon className={cn("h-5 w-5", unseenCount > 0 && "text-primary")} />
+        {unseenCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white tabular-nums">
-            {count > 9 ? "9+" : count}
+            {unseenCount > 9 ? "9+" : unseenCount}
           </span>
         )}
       </DropdownMenuTrigger>

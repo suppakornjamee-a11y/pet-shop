@@ -20,7 +20,7 @@ export type StaffAlert = {
   at: string;
 };
 
-export type StaffAlerts = { count: number; items: StaffAlert[] };
+export type StaffAlerts = { count: number; items: StaffAlert[]; userId: string };
 
 /**
  * รายการที่รอพนักงานลงมือ — ใช้กับกระดิ่งแจ้งเตือนมุมขวาบน
@@ -32,7 +32,7 @@ export type StaffAlerts = { count: number; items: StaffAlert[] };
 export async function getStaffAlerts(): Promise<StaffAlerts> {
   const user = await requireStaffUser();
   // ช่างอาบน้ำยืนยันคิว/ตรวจสลิปไม่ได้อยู่แล้ว ไม่ต้องรบกวนด้วยตัวเลขที่กดอะไรไม่ได้
-  if (user.role === "GROOMER") return { count: 0, items: [] };
+  if (user.role === "GROOMER") return { count: 0, items: [], userId: user.id };
 
   const [queues, slips] = await Promise.all([
     // ออเดอร์ที่รอเช็คคิว — รวมรายการในคำขอจองจาก LINE ด้วย (แอดมินอนุมัติทีละรายการ)
@@ -93,5 +93,5 @@ export async function getStaffAlerts(): Promise<StaffAlerts> {
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
-  return { count: items.length, items: items.slice(0, 10) };
+  return { count: items.length, items: items.slice(0, 10), userId: user.id };
 }
